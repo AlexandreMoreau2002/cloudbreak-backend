@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 
+
 from fastapi import FastAPI
 
 from app.api.v1.endpoints.health import router as health_router

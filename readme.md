@@ -11,38 +11,61 @@ API backend de l'application Cloudbreak — prédit la probabilité de mer de nu
 - **Pydantic v2** — validation et settings
 - **Gunicorn + Uvicorn** — serveur de production
 
-## Installation
+## Setup (première fois)
 
 ```bash
+# 1. Créer le virtualenv (pour les outils qualité en local — pas pour lancer le serveur)
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt -r requirements-dev.txt
+
+# 2. Copier le fichier d'environnement
+cp .env.example .env
+# puis remplir les valeurs dans .env
 ```
 
 ## Lancer en dev
 
+Le backend tourne **toujours sous Docker** — même setup que la prod.
+
 ```bash
-# Démarrer PostgreSQL + Redis en local
-docker compose -f ../infra/docker-compose.dev.yml up -d
-
-# Lancer les migrations
-alembic upgrade head
-
-# Démarrer le serveur
-uvicorn app.main:app --reload
+# Depuis le dossier infra/
+docker compose -f docker-compose.dev.yml up -d      # démarrer
+docker compose -f docker-compose.dev.yml down       # arrêter
+docker compose -f docker-compose.dev.yml logs -f    # voir les logs en temps réel
 ```
 
-L'API est disponible sur http://localhost:8000
+Containers lancés :
+- `cloudbreak-backend` → API FastAPI sur http://localhost:8000
+- `cloudbreak-db` → PostgreSQL sur port 5432
+- `cloudbreak-redis` → Redis sur port 6379
+
 La doc Swagger est sur http://localhost:8000/docs
 
-## Qualité
+## Migrations
 
 ```bash
-ruff check .          # lint
-ruff format .         # format
-mypy app/             # typage
-pytest                # tous les tests
-pytest --cov=app      # avec couverture
+# Appliquer les migrations (depuis backend/ avec .venv activé)
+source .venv/bin/activate
+alembic upgrade head
+
+# Créer une nouvelle migration après avoir modifié un model
+alembic revision --autogenerate -m "description"
+```
+
+## Qualité & Tests
+
+Ces commandes se lancent **en local** (pas dans Docker) avec le virtualenv activé :
+
+```bash
+source .venv/bin/activate
+
+ruff check .          # lint — vérifie le style et les erreurs (imports inutilisés, etc.)
+ruff format .         # formate automatiquement le code
+mypy app/             # typage statique — vérifie que les types sont cohérents
+pytest                # tous les tests (découverte automatique des test_*.py)
+pytest -v             # tous les tests avec détail par test
+pytest --cov=app      # avec rapport de couverture de code
 ```
 
 ## Structure

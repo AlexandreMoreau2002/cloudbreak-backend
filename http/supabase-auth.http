@@ -1,0 +1,23 @@
+# Supabase Auth — obtenir un JWT sans passer par l'app mobile
+
+###
+# 1. Créer un compte
+POST {{supabaseUrl}}/auth/v1/signup
+Content-Type: application/json
+apikey: {{supabaseKey}}
+
+{
+  "email": "test@cloudbreak.app",
+  "password": "motdepasse123"
+}
+
+###
+# 2. Se connecter → récupère access_token dans la réponse
+POST {{supabaseUrl}}/auth/v1/token?grant_type=password
+Content-Type: application/json
+apikey: {{supabaseKey}}
+
+{
+  "email": "test@cloudbreak.app",
+  "password": "motdepasse123"
+}

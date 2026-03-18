@@ -4,6 +4,7 @@ __pycache__/
 *.pyo
 .env
 .DS_Store
+.vscode/settings.json
 *.log
 .mypy_cache/
 .ruff_cache/

@@ -1,0 +1,17 @@
+# Auth — tester avec un JWT Supabase valide
+# 1. Lance l'app mobile, connecte-toi, copie le token depuis les logs
+# 2. Colle-le dans rest-client.environmentVariables > local > jwt dans .vscode/settings.json
+
+###
+# GET /api/v1/user/me — utilisateur courant (nécessite JWT valide)
+GET {{baseUrl}}/api/v1/user/me
+Authorization: Bearer {{jwt}}
+
+###
+# GET /api/v1/user/me — sans token → 403
+GET {{baseUrl}}/api/v1/user/me
+
+###
+# GET /api/v1/user/me — token invalide → 401
+GET {{baseUrl}}/api/v1/user/me
+Authorization: Bearer token.invalide.ici

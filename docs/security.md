@@ -38,13 +38,20 @@ Document de référence sécurité. À mettre à jour à chaque story qui touche
 
 ## Authentification
 
-**État actuel** : pas encore implémentée (epic 2).
+**État actuel** : implémentée (story 2-1).
 
-**Cible** :
-- JWT Supabase validé **localement** côté backend via clé publique
-- Zéro appel réseau Supabase par requête (pas de roundtrip auth à chaque call)
+- JWT Supabase validé **localement** via clé publique ECC P-256 (JWKS)
+- Zéro appel réseau Supabase par requête
 - Dependency FastAPI `get_current_user` injectée sur chaque route protégée
 - `/health` est la seule route publique sans auth
+
+### Configuration Supabase — dev vs prod
+
+| Paramètre | Dev | Prod |
+|-----------|-----|------|
+| Confirm email | **désactivé** | **activé** |
+
+> La confirmation email est désactivée en dev pour fluidifier les tests. À réactiver dans le dashboard Supabase avant la release 1.0.0 : Authentication → Providers → Email → "Confirm email" → ON.
 
 ---
 
@@ -96,7 +103,6 @@ pip-audit  # à installer : pip install pip-audit
 
 ### Ce qui n'existe pas encore
 - Pas de rate limiting (à implémenter epic 3 ou avant prod)
-- Pas de validation JWT (epic 2)
 - Pas de quota enforcement (epic 4)
 
 ---
@@ -107,7 +113,8 @@ pip-audit  # à installer : pip install pip-audit
 - [ ] PostgreSQL et Redis non exposés (ports non mappés dans `docker-compose.yml` prod)
 - [ ] Caddy HTTPS opérationnel (Let's Encrypt)
 - [ ] Rate limiting activé sur les endpoints publics
-- [ ] JWT validation opérationnelle sur toutes les routes protégées
+- [x] JWT validation opérationnelle sur toutes les routes protégées
+- [ ] Confirm email réactivé dans Supabase (avant release 1.0.0)
 - [ ] `DEBUG=False` / `ENVIRONMENT=production`
 - [ ] Logs ne contiennent aucun secret ou donnée personnelle
 - [ ] `pip-audit` passé sans vulnérabilité critique

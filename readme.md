@@ -29,10 +29,9 @@ cp .env.example .env
 Le backend tourne **toujours sous Docker** — même setup que la prod.
 
 ```bash
-# Depuis le dossier infra/
-docker compose -f docker-compose.dev.yml up -d      # démarrer
-docker compose -f docker-compose.dev.yml down       # arrêter
-docker compose -f docker-compose.dev.yml logs -f    # voir les logs en temps réel
+make dev      # démarrer db + redis
+make down     # arrêter
+make logs     # suivre les logs en temps réel
 ```
 
 Containers lancés :
@@ -45,12 +44,10 @@ La doc Swagger est sur http://localhost:8000/docs
 ## Migrations
 
 ```bash
-# Appliquer les migrations (depuis backend/ avec .venv activé)
 source .venv/bin/activate
-alembic upgrade head
 
-# Créer une nouvelle migration après avoir modifié un model
-alembic revision --autogenerate -m "description"
+make migrate      # appliquer les migrations
+make migration    # créer une nouvelle migration (demande une description)
 ```
 
 ## Qualité & Tests
@@ -60,12 +57,21 @@ Ces commandes se lancent **en local** (pas dans Docker) avec le virtualenv activ
 ```bash
 source .venv/bin/activate
 
-ruff check .          # lint — vérifie le style et les erreurs (imports inutilisés, etc.)
-ruff format .         # formate automatiquement le code
-mypy app/             # typage statique — vérifie que les types sont cohérents
-pytest                # tous les tests (découverte automatique des test_*.py)
-pytest -v             # tous les tests avec détail par test
-pytest --cov=app      # avec rapport de couverture de code
+make validate     # ✅ tout valider d'un coup — à lancer avant chaque commit
+```
+
+Cette commande enchaîne dans l'ordre :
+1. `ruff check .` — 0 erreur lint
+2. `ruff format --check .` — code bien formaté
+3. `mypy app/` — 0 erreur typage
+4. `pytest --cov=app --cov-report=term-missing` — tous les tests passent, coverage 100%
+
+Commandes individuelles :
+```bash
+make lint         # ruff check uniquement
+make format       # ruff format (applique le formatage)
+make typecheck    # mypy uniquement
+make test         # pytest --cov uniquement
 ```
 
 ## Structure

@@ -2,16 +2,16 @@
 
 ## Workflow de développement
 
-Après chaque modification, lancer dans l'ordre :
+**Toujours lancer `make validate` avant de commiter.** Cette commande valide tout d'un coup :
 
 ```bash
-ruff check .                              # 0 erreur lint
-ruff format .                             # formatage auto
-mypy app/                                 # 0 erreur typage
-pytest --cov=app --cov-report=term-missing  # tous les tests passent, coverage 100%
+make validate
+# enchaîne : ruff check → ruff format --check → mypy → pytest --cov
 ```
+
+Ne jamais commiter si `make validate` échoue.
 
 **Règles :**
 - Le coverage doit rester à **100%** — tout nouveau fichier source a son fichier de test dans `tests/`
-- 0 erreur ruff et 0 erreur mypy avant de commiter
+- 0 erreur ruff, 0 erreur mypy avant de commiter
 - L'infra locale doit tourner pour les tests d'intégration : `docker compose -f ../infra/docker-compose.dev.yml up -d`

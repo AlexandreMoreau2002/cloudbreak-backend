@@ -5,9 +5,6 @@
     },
     {
       "splitTerminals": [{ "name": "Terminal", "commands": [] }]
-    },
-    {
-      "splitTerminals": [{ "name": "Serveur", "commands": ["uvicorn app.main:app --reload"] }]
     }
   ]
 }

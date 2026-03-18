@@ -1,0 +1,13 @@
+{
+  "restoreTerminals.terminals": [
+    {
+      "splitTerminals": [{ "name": "Claude", "commands": ["claude --resume"] }]
+    },
+    {
+      "splitTerminals": [{ "name": "Terminal", "commands": [] }]
+    },
+    {
+      "splitTerminals": [{ "name": "Serveur", "commands": ["uvicorn app.main:app --reload"] }]
+    }
+  ]
+}

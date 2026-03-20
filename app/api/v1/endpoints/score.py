@@ -54,7 +54,7 @@ async def get_peak_by_id(peak_id: str, db: AsyncSession) -> Peak | None:
 @router.get("/score", response_model=ScoreResponse)
 async def get_score(
     peak_id: Annotated[str, Query(description="Identifiant du sommet")],
-    date: Annotated[str, Query(description="Date ISO 8601, ex: 2026-10-15")],
+    date: Annotated[str, Query(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Date ISO 8601, ex: 2026-10-15")],
     hour: Annotated[int, Query(ge=0, le=23, description="Heure souhaitée (défaut: 6h)")] = 6,
     current_user: dict[str, Any] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

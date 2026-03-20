@@ -81,9 +81,10 @@ app/
 ├── api/v1/endpoints/   # Routes HTTP (health, score, peaks, auth...)
 ├── core/               # config.py, errors.py
 ├── db/                 # session.py SQLAlchemy
+├── domain/             # Logique métier pure (zero I/O) — score, weather_types
 ├── models/             # ORM SQLAlchemy
 ├── schemas/            # Pydantic Request/Response
-├── services/           # Logique métier (score, weather...)
+├── services/           # Intégrations I/O (cache Redis, providers HTTP)
 └── main.py             # Point d'entrée FastAPI
 alembic/                # Migrations DB
 tests/                  # Tests unitaires
@@ -114,3 +115,4 @@ cp .env.example .env
 Chaque feature implementée a sa documentation dans `docs/` :
 
 - [Setup squelette FastAPI](docs/story-1-2-setup-backend.md)
+- [Refactoring domain/ layer](docs/story-refactor-domain-layer.md)

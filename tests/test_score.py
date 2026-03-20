@@ -10,8 +10,7 @@ Score conditionnel (seulement si conditions non bloquantes) :
   Verdicts : high ≥ 70, medium 40-69, low < 40.
 """
 
-from app.services.score import (
-    WeatherData,
+from app.domain.score import (
     _cloud_base_component,
     _humidity_component,
     _inversion_component,
@@ -19,6 +18,7 @@ from app.services.score import (
     _wind_component,
     calculate_score,
 )
+from app.domain.weather_types import WeatherData
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────

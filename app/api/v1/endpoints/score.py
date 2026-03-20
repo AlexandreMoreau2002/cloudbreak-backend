@@ -19,19 +19,21 @@ Erreurs :
 """
 
 import logging
-from sqlalchemy import select
-import redis.asyncio as aioredis
-from app.models.peak import Peak
-from app.db.session import get_db
 from typing import Annotated, Any
+
+import redis.asyncio as aioredis
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.session import get_db
+from app.models.peak import Peak
 from app.core.config import settings
 from app.core.errors import ErrorCode
-from app.services.score import calculate_score
+from app.domain.score import calculate_score
 from app.services.weather import WeatherService
-from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_current_user
 from app.schemas.score import ScoreConditionsSchema, ScoreResponse
-from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.services.weather_providers.open_meteo import OpenMeteoProvider
 
 logger = logging.getLogger(__name__)
@@ -54,7 +56,7 @@ async def get_peak_by_id(peak_id: str, db: AsyncSession) -> Peak | None:
 @router.get("/score", response_model=ScoreResponse)
 async def get_score(
     peak_id: Annotated[str, Query(description="Identifiant du sommet")],
-    date: Annotated[str, Query(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Date ISO 8601, ex: 2026-10-15")],
+    date: Annotated[str, Query(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Date ISO 8601")],
     hour: Annotated[int, Query(ge=0, le=23, description="Heure souhaitée (défaut: 6h)")] = 6,
     current_user: dict[str, Any] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

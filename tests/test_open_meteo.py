@@ -9,7 +9,7 @@ Couvre :
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from app.services.weather_providers.base import PressureLevelData
+from app.domain.weather_types import PressureLevelData
 
 from app.services.weather_providers.open_meteo import (
     OpenMeteoProvider,

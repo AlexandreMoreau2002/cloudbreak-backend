@@ -13,7 +13,7 @@ import pytest
 from dataclasses import asdict
 from unittest.mock import AsyncMock, MagicMock
 from app.services.weather import WeatherService
-from app.services.weather_providers.base import WeatherData
+from app.domain.weather_types import WeatherData
 
 
 SAMPLE_WEATHER = WeatherData(

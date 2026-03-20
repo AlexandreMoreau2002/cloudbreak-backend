@@ -14,7 +14,7 @@ import logging
 from typing import Any
 from dataclasses import asdict
 from redis.asyncio import Redis
-from app.services.weather_providers.base import PressureLevelData, WeatherData, WeatherProvider
+from app.domain.weather_types import PressureLevelData, WeatherData, WeatherProvider
 
 logger = logging.getLogger(__name__)
 

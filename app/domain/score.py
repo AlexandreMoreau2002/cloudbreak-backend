@@ -26,7 +26,7 @@ Verdicts :
 
 from typing import TypedDict
 
-from app.services.weather_providers.base import WeatherData
+from app.domain.weather_types import WeatherData
 
 
 # ── Types ─────────────────────────────────────────────────────────────────────

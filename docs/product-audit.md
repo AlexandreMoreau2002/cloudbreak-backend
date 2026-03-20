@@ -1,6 +1,6 @@
 # Cloudbreak — Audit produit
 
-_Dernière mise à jour : 2026-03-20_
+_Dernière mise à jour : 2026-03-21_
 
 ---
 
@@ -29,6 +29,7 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 | Migrations DB | ✅ Alembic |
 | Tests — 76 tests, 100% coverage | ✅ |
 | CI pipeline | ✅ GitHub Actions |
+| Domain layer (`app/domain/`) — logique métier pure (zero I/O) | ✅ Refactorisé |
 
 ### Ce qui n'existe pas encore
 

@@ -15,7 +15,7 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 from unittest.mock import AsyncMock, patch, MagicMock
 from app.main import app
-from app.services.weather_providers.base import WeatherData
+from app.domain.weather_types import WeatherData
 
 
 MOCK_USER = {"id": "user-123", "email": "alex@test.com"}

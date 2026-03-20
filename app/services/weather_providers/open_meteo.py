@@ -24,7 +24,7 @@ from datetime import date as date_type
 
 import httpx
 
-from app.services.weather_providers.base import PressureLevelData, WeatherData, WeatherProvider
+from app.domain.weather_types import PressureLevelData, WeatherData, WeatherProvider
 
 logger = logging.getLogger(__name__)
 

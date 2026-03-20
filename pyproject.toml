@@ -13,6 +13,10 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+testpaths = ["tests"]
 filterwarnings = [
     "ignore::DeprecationWarning:jose",
 ]
+
+[tool.coverage.run]
+omit = ["app/db/seed.py"]

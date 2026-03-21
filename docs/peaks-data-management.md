@@ -2,19 +2,32 @@
 
 ## Ce qu'on a aujourd'hui
 
-**13 898 sommets** couvrant toute la France métropolitaine montagneuse, issus d'OpenStreetMap.
+**21 574 entrées** couvrant toute la France : sommets, cols, viewpoints urbains iconiques, issus d'OpenStreetMap + entrées manuelles.
 
-| Massif | Sommets | Bounding box utilisée | Altitude min |
-|--------|---------|----------------------|-------------|
-| Pyrénées | ~6 566 | 42.4°N–43.5°N / 2°W–3.3°E | 800m |
-| Alpes Sud | ~4 185 | 44.0°N–45.5°N / 5.5°E–7.5°E | 800m |
-| Alpes Nord | ~2 479 | 45.5°N–46.5°N / 5.5°E–7.5°E | 800m |
-| Massif Central | ~765 | 44.5°N–46.2°N / 2.3°E–4.5°E | 600m |
-| Vosges | ~409 | 47.7°N–48.8°N / 6.6°E–7.4°E | 600m |
-| Jura | ~181 | 46.0°N–47.5°N / 5.4°E–6.5°E | 700m |
-| Cols manuels | 1 | — | — |
+| Source | Entrées | Altitude min |
+|--------|---------|-------------|
+| `natural=peak` — Pyrénées | ~6 566 | 500m |
+| `natural=peak` — Alpes Sud | ~4 185 | 500m |
+| `natural=peak` — Alpes Nord | ~2 479 | 500m |
+| `natural=peak` — Massif Central | ~765 | 500m |
+| `natural=peak` — Vosges | ~409 | 500m |
+| `natural=peak` — Jura | ~181 | 500m |
+| `natural=saddle` — France | ~quelques centaines | 500m |
+| `tourism=viewpoint` — France | ~quelques centaines | 100m |
+| Manuels (cols + viewpoints urbains) | 6 | — |
 
-**Absent par design :** les cols (`mountain_pass` dans OSM), les sommets < 500-800m, et tout ce qui est hors France.
+**Viewpoints urbains manuels** (tagués différemment ou sous seuil dans OSM) :
+
+| Spot | Altitude | Ville | Raison d'ajout manuel |
+|------|---------|-------|----------------------|
+| La Bastille | 476m | Grenoble | tagué `attraction` dans OSM, pas `viewpoint` |
+| Colline de Fourvière | 295m | Lyon | `natural=peak` mais sous seuil 500m |
+| Mont Saint-Clair | 176m | Sète | `natural=peak` mais sous seuil 500m |
+| Sacré-Cœur | 130m | Paris | aucun tag `ele` dans OSM |
+| Colline du Château | 92m | Nice | aucun tag `ele` dans OSM |
+| Col de la Croix-Fry | 1477m | Haute-Savoie | `mountain_pass` pas `natural=peak` |
+
+**Stratégie viewpoints automatique** : `generate_peaks.py` requête tous les `tourism=viewpoint["name"]` sans filtre `[ele]`, puis enrichit leur altitude via l'**API Open-Meteo Elevation** (gratuite, batch 100 coords). Filtre final : altitude ≥ 80m. Les spots manuels ci-dessus sont la garantie filet de sécurité si Overpass/Open-Meteo ne les capturent pas.
 
 ---
 

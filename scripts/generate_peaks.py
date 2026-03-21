@@ -10,12 +10,13 @@ Prérequis :
 Résultat : affiche le bloc PEAKS prêt à coller dans app/db/seed.py
 """
 
+import re
 import sys
 import time
 import uuid
-from typing import Any
-
 import httpx
+import unicodedata
+from typing import Any
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 
@@ -58,9 +59,6 @@ REQUIRED_SLUGS = {"col-de-la-croix-fry", "mont-blanc", "champ-du-feu"}
 
 
 def slugify(name: str) -> str:
-    import unicodedata
-    import re
-
     nfkd = unicodedata.normalize("NFKD", name)
     ascii_str = nfkd.encode("ascii", "ignore").decode("ascii")
     slug = re.sub(r"[^\w\s-]", "", ascii_str.lower())

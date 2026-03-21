@@ -17,8 +17,8 @@ import logging
 
 from sqlalchemy import text
 
-from app.db.session import async_session_maker, engine
 from app.models.peak import Peak
+from app.db.session import async_session_maker, engine
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ PEAKS = [
         "altitude": 4248,
     },
     {
-        "id": "ffe045d4-ec07-5a89-a6b2-4d9180b0a378",
+        "id": "dbb9d1b9-f19b-59b1-ace7-d3c9f1eb79ef",
         "name": "Grandes Jorasses",
         "slug": "grandes-jorasses",
         "lat": 45.868156,
@@ -137,7 +137,7 @@ PEAKS = [
         "altitude": 3901,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890abc",
+        "id": "b0a4d948-7d04-521c-9e4e-82395ce2881a",
         "name": "Grande Casse",
         "slug": "grande-casse",
         "lat": 45.3894,
@@ -145,7 +145,7 @@ PEAKS = [
         "altitude": 3855,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890abe",
+        "id": "091ec490-f938-530b-aa7a-c1ba51eebf88",
         "name": "Mont Pourri",
         "slug": "mont-pourri",
         "lat": 45.5172,
@@ -153,7 +153,7 @@ PEAKS = [
         "altitude": 3779,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890abd",
+        "id": "d43d4568-51b6-5e1d-94cc-c9eb0959fb47",
         "name": "Aiguille de la Grande Sassière",
         "slug": "aiguille-de-la-grande-sassiere",
         "lat": 45.5194,
@@ -161,7 +161,7 @@ PEAKS = [
         "altitude": 3747,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ac1",
+        "id": "3c080efb-3d3f-5777-ab57-1307e0a3f3f7",
         "name": "Pointe de la Galise",
         "slug": "pointe-de-la-galise",
         "lat": 45.5303,
@@ -169,7 +169,7 @@ PEAKS = [
         "altitude": 3344,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ac2",
+        "id": "6be7cb45-14b8-553c-9e7a-04b4661724c5",
         "name": "Aiguille du Tour",
         "slug": "aiguille-du-tour",
         "lat": 45.9928,
@@ -177,7 +177,7 @@ PEAKS = [
         "altitude": 3542,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ac0",
+        "id": "93680fc5-1a73-5d18-91c8-6b0d078f2c34",
         "name": "Grand Arc",
         "slug": "grand-arc",
         "lat": 45.5267,
@@ -185,7 +185,7 @@ PEAKS = [
         "altitude": 2477,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890abf",
+        "id": "6a4fde30-2cb8-54dc-8733-d3f05426b9e7",
         "name": "Pointe de l'Observatoire",
         "slug": "pointe-de-lobservatoire",
         "lat": 45.4533,
@@ -202,7 +202,7 @@ PEAKS = [
     },
     # Alpes — moyens massifs (mer de nuage idéale : 1400-3000m)
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890aca",
+        "id": "dbcc9796-8324-581a-9572-ab26a5d53c0c",
         "name": "Grand Pic de Belledonne",
         "slug": "grand-pic-de-belledonne",
         "lat": 45.2358,
@@ -210,7 +210,7 @@ PEAKS = [
         "altitude": 2927,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ac3",
+        "id": "6c747bf7-8130-5ee0-a1e0-625bd93e3a07",
         "name": "Pointe Percée",
         "slug": "pointe-percee",
         "lat": 46.0208,
@@ -218,7 +218,7 @@ PEAKS = [
         "altitude": 2750,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ac5",
+        "id": "d5470a40-ef74-59b0-b40e-9bea3942e680",
         "name": "Grand Veymont",
         "slug": "grand-veymont",
         "lat": 44.9244,
@@ -226,7 +226,7 @@ PEAKS = [
         "altitude": 2341,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890acc",
+        "id": "46413391-4df5-5860-8c53-cb8487a9b16a",
         "name": "La Tournette",
         "slug": "la-tournette",
         "lat": 45.8303,
@@ -234,7 +234,7 @@ PEAKS = [
         "altitude": 2351,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890acd",
+        "id": "47aba4e2-2672-56e1-af5d-1c50442dab68",
         "name": "Mont Charvin",
         "slug": "mont-charvin",
         "lat": 45.8039,
@@ -242,7 +242,7 @@ PEAKS = [
         "altitude": 2409,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890acb",
+        "id": "0b10e35c-bc6d-5e10-8bba-1edc16ae5751",
         "name": "Croix de Chamrousse",
         "slug": "croix-de-chamrousse",
         "lat": 45.1194,
@@ -250,7 +250,7 @@ PEAKS = [
         "altitude": 2250,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ac4",
+        "id": "67e08876-6950-5b01-9d63-748a625a83ae",
         "name": "Dent d'Oche",
         "slug": "dent-doche",
         "lat": 46.3233,
@@ -258,7 +258,7 @@ PEAKS = [
         "altitude": 2222,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ac9",
+        "id": "54a53487-5c06-5dcc-b7b5-f50954d34bc3",
         "name": "Mont Aiguille",
         "slug": "mont-aiguille",
         "lat": 44.7244,
@@ -266,7 +266,7 @@ PEAKS = [
         "altitude": 2087,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ac6",
+        "id": "2b806fb7-2c01-5a72-8cf8-43e3ddd9a9d2",
         "name": "Chamechaude",
         "slug": "chamechaude",
         "lat": 45.2594,
@@ -274,7 +274,7 @@ PEAKS = [
         "altitude": 2082,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ac7",
+        "id": "3d58b9c0-fd10-510e-99ea-21544e65cd2f",
         "name": "Dent de Crolles",
         "slug": "dent-de-crolles",
         "lat": 45.3528,
@@ -282,7 +282,7 @@ PEAKS = [
         "altitude": 2062,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ac8",
+        "id": "c3af335e-47a4-57ff-8790-869bffc775b6",
         "name": "Moucherotte",
         "slug": "moucherotte",
         "lat": 45.1208,
@@ -290,7 +290,7 @@ PEAKS = [
         "altitude": 1901,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ad1",
+        "id": "3f5c6f7a-e2a0-5f11-965b-22905db145bb",
         "name": "Le Môle",
         "slug": "le-mole",
         "lat": 46.1167,
@@ -298,7 +298,7 @@ PEAKS = [
         "altitude": 1863,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ace",
+        "id": "56ff1306-d227-5d97-8c8f-3a117b108bd0",
         "name": "Parmelan",
         "slug": "parmelan",
         "lat": 45.9817,
@@ -314,7 +314,7 @@ PEAKS = [
         "altitude": 1720,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890acf",
+        "id": "55c77803-ade4-5e43-8fa8-40b2a4faa5bc",
         "name": "Semnoz",
         "slug": "semnoz",
         "lat": 45.8386,
@@ -322,7 +322,7 @@ PEAKS = [
         "altitude": 1699,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ad3",
+        "id": "641a7423-508b-5058-a341-9ee45d1ef6c7",
         "name": "Revard",
         "slug": "revard",
         "lat": 45.65,
@@ -338,7 +338,7 @@ PEAKS = [
         "altitude": 1531,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ad2",
+        "id": "72749755-ee0d-5089-b813-0c88f8bcd4c5",
         "name": "Col des Aravis",
         "slug": "col-des-aravis",
         "lat": 45.8581,
@@ -354,7 +354,7 @@ PEAKS = [
         "altitude": 1477,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ad0",
+        "id": "63543485-377f-518f-a05e-68eb1114ee7e",
         "name": "Mont Salève",
         "slug": "mont-saleve",
         "lat": 46.1339,
@@ -379,7 +379,7 @@ PEAKS = [
         "altitude": 1363,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ad5",
+        "id": "7ad723f6-6ea2-5d15-b75c-edd1913139d9",
         "name": "Gazon du Faing",
         "slug": "gazon-du-faing",
         "lat": 48.0497,
@@ -387,7 +387,7 @@ PEAKS = [
         "altitude": 1303,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ad4",
+        "id": "8fcb3613-8bab-5ad0-a62f-a91c7b92a3ca",
         "name": "Petit Ballon",
         "slug": "petit-ballon",
         "lat": 47.9711,
@@ -395,7 +395,7 @@ PEAKS = [
         "altitude": 1272,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ad8",
+        "id": "29cf9711-0254-5198-80d7-ad7403dd58f3",
         "name": "Brézouard",
         "slug": "brezouard",
         "lat": 48.2175,
@@ -411,7 +411,7 @@ PEAKS = [
         "altitude": 1247,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ad6",
+        "id": "d65b8240-cf9c-519a-8e8c-168106640ffd",
         "name": "Ballon de Servance",
         "slug": "ballon-de-servance",
         "lat": 47.8253,
@@ -427,7 +427,7 @@ PEAKS = [
         "altitude": 1099,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ad7",
+        "id": "730355ad-b5db-579c-b711-3377fd594a04",
         "name": "Donon",
         "slug": "donon",
         "lat": 48.5111,
@@ -484,7 +484,7 @@ PEAKS = [
         "altitude": 1567,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ad9",
+        "id": "db5432b0-c21f-53b2-ad4c-bd3155257497",
         "name": "Mont Gerbier-de-Jonc",
         "slug": "mont-gerbier-de-jonc",
         "lat": 44.8419,
@@ -492,7 +492,7 @@ PEAKS = [
         "altitude": 1551,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890adb",
+        "id": "9d9c1f83-f434-581d-99f0-28893f5feba6",
         "name": "Signal du Luguet",
         "slug": "signal-du-luguet",
         "lat": 45.3458,
@@ -508,7 +508,7 @@ PEAKS = [
         "altitude": 1465,
     },
     {
-        "id": "e4c1a2b3-d4e5-5f67-8901-234567890ada",
+        "id": "010df43f-719c-524a-9a0a-bf140314b483",
         "name": "Crêt de l'Œillon",
         "slug": "cret-de-loeillon",
         "lat": 45.3844,
@@ -548,9 +548,10 @@ async def seed() -> None:
         result = await session.execute(text("SELECT COUNT(*) FROM peaks"))
         count = result.scalar()
         if count and count > 0:
-            logger.warning("seed_skipped", extra={"reason": "table peaks non vide", "count": count})
-            print(f"⚠️  Table peaks contient déjà {count} entrée(s) — seed ignoré.")
-            print("   Pour forcer : DELETE FROM peaks; puis relancer.")
+            logger.warning(
+                "seed_skipped",
+                extra={"reason": "non vide", "count": count, "hint": "DELETE FROM peaks"},
+            )
             return
 
         for data in PEAKS:
@@ -558,7 +559,6 @@ async def seed() -> None:
             session.add(peak)
 
         await session.commit()
-        print(f"✅ {len(PEAKS)} sommets insérés.")
         logger.info("seed_completed", extra={"count": len(PEAKS)})
 
 

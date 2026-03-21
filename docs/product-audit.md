@@ -107,20 +107,18 @@ Recalibrer les poids en fonction des cas vrais vs faux.
 
 ---
 
-## Les 10 sommets disponibles
+## Les 64 sommets disponibles
 
-| Sommet | Altitude | Région | Intérêt mer de nuage |
-|--------|----------|--------|----------------------|
-| Puy de Dôme | 1465m | Auvergne | ⭐⭐⭐ Iconique |
-| Mont Ventoux | 1912m | Provence | ⭐⭐⭐ Classique |
-| Crêt de la Neige | 1720m | Jura | ⭐⭐⭐ Très favorable |
-| Grand Ballon | 1424m | Vosges | ⭐⭐⭐ Favorable |
-| Ballon d'Alsace | 1247m | Vosges | ⭐⭐ Correct |
-| Mont Aigoual | 1567m | Cévennes | ⭐⭐ Correct |
-| Mont Salève | 1379m | Haute-Savoie | ⭐⭐ Correct |
-| Pic Saint-Loup | 658m | Languedoc | ⭐ Rare (altitude basse) |
-| Roc'h Trevezel | 384m | Bretagne | ⭐ Rare (altitude basse) |
-| Pic du Midi de Bigorre | 2877m | Pyrénées | ⭐ Rare (trop haut) |
+Données issues d'OpenStreetMap (Overpass API) + compléments manuels pour les Vosges et Massif Central.
+
+| Massif | Nb sommets | Exemples |
+|--------|-----------|---------|
+| Alpes françaises | ~40 | Mont Blanc (4807m), Aiguille du Midi (3842m), La Tournette (2351m), Col de la Croix-Fry (1477m) |
+| Vosges | ~9 | Grand Ballon (1424m), Hohneck (1363m), Champ du Feu (1099m) |
+| Massif Central | ~8 | Puy de Sancy (1885m), Puy de Dôme (1465m), Mont Aigoual (1567m) |
+| Autres | ~7 | Mont Ventoux (1912m), Pic du Midi de Bigorre (2877m), Roc'h Trévezel (384m) |
+
+Pour régénérer depuis OpenStreetMap : `python scripts/generate_peaks.py`
 
 ---
 
@@ -129,6 +127,6 @@ Recalibrer les poids en fonction des cas vrais vs faux.
 1. **Connecter l'app mobile** à ce backend
 2. **Endpoint recherche** — permettre de chercher un sommet par nom
 3. **Freemium** — quota 1 consultation/jour pour les non-abonnés
-4. **Élargir la base de sommets** — aujourd'hui 10, objectif 500+ pour le lancement
+4. **Élargir la base de sommets** — aujourd'hui 64, objectif 500+ pour le lancement
 5. **Validations terrain** — les utilisateurs confirment ou infirment le score avec une photo
 6. **Recalibration de l'algo** — après 50+ validations terrain

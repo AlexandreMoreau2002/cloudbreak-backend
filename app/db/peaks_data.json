@@ -1640,6 +1640,14 @@
     "id": "e08e3e6b-4c36-5824-a43b-57059f51df81"
   },
   {
+    "name": "Glacier du Géant",
+    "slug": "glacier-du-geant",
+    "lat": 45.878911,
+    "lng": 6.887913,
+    "altitude": 3685,
+    "id": "24db3ce9-7a7e-53b1-8ecb-bb0304deed51"
+  },
+  {
     "name": "Aiguille du Pelvoux",
     "slug": "aiguille-du-pelvoux",
     "lat": 44.896137,
@@ -1736,6 +1744,14 @@
     "id": "43985b5c-de72-5004-a4f9-cb316b0e94ac"
   },
   {
+    "name": "Terrasse 3842",
+    "slug": "terrasse-3842",
+    "lat": 45.878637,
+    "lng": 6.887425,
+    "altitude": 3676,
+    "id": "78456c8a-8e16-56ad-bfe0-41187a92bd36"
+  },
+  {
     "id": "742490af-164f-5e33-995d-f7d430343b54",
     "name": "Aiguille du Plan",
     "slug": "aiguille-du-plan",
@@ -1790,6 +1806,22 @@
     "lat": 45.810426,
     "lng": 6.78979,
     "altitude": 3670
+  },
+  {
+    "name": "Terrasse Rébuffat",
+    "slug": "terrasse-rebuffat",
+    "lat": 45.878282,
+    "lng": 6.887467,
+    "altitude": 3670,
+    "id": "7d19aaf0-dbab-5041-aed3-f5fb520722f5"
+  },
+  {
+    "name": "Terrasse Mont Blanc",
+    "slug": "terrasse-mont-blanc",
+    "lat": 45.878212,
+    "lng": 6.887294,
+    "altitude": 3670,
+    "id": "5792563a-704d-5093-a00e-a4198ccc1ef1"
   },
   {
     "name": "Pic de la Grave",
@@ -2094,6 +2126,30 @@
     "lat": 45.909682,
     "lng": 7.014483,
     "altitude": 3635
+  },
+  {
+    "name": "Terrasse Aravis",
+    "slug": "terrasse-aravis",
+    "lat": 45.879166,
+    "lng": 6.886829,
+    "altitude": 3635,
+    "id": "479873da-4f74-5a09-81f7-70d97ecd6004"
+  },
+  {
+    "name": "Terrasse Chamonix",
+    "slug": "terrasse-chamonix",
+    "lat": 45.879299,
+    "lng": 6.887225,
+    "altitude": 3635,
+    "id": "1387c488-1f3d-5f68-8e4e-25028fa128e1"
+  },
+  {
+    "name": "Terrasse Vallée Blanche",
+    "slug": "terrasse-vallee-blanche",
+    "lat": 45.879193,
+    "lng": 6.887238,
+    "altitude": 3635,
+    "id": "d30186bb-b472-5fc0-bfff-88537d7c63da"
   },
   {
     "id": "45830af2-837c-57da-8e77-662c38721962",
@@ -5414,6 +5470,14 @@
     "lng": 6.326697,
     "altitude": 3411,
     "id": "9d050cd5-1712-5ff8-b14a-06d607c3db7a"
+  },
+  {
+    "name": "Terrasse à 360°",
+    "slug": "terrasse-a-360",
+    "lat": 45.845877,
+    "lng": 6.931619,
+    "altitude": 3411,
+    "id": "51b3d50c-bf83-5ad1-824d-51768a28b3ac"
   },
   {
     "name": "Pic de Dormillouse",
@@ -11158,6 +11222,14 @@
     "lat": 45.546093,
     "lng": 7.41702,
     "altitude": 3183
+  },
+  {
+    "name": "JusThijs",
+    "slug": "justhijs",
+    "lat": 45.587999,
+    "lng": 7.285215,
+    "altitude": 3183,
+    "id": "41b2ddab-5afc-53aa-9fad-e1a5aa40b643"
   },
   {
     "name": "Pointe du Fond de Roure",
@@ -17766,6 +17838,14 @@
     "lat": 45.510599,
     "lng": 7.416397,
     "altitude": 3002
+  },
+  {
+    "name": "Colle Sommeiller Viewpoint",
+    "slug": "colle-sommeiller-viewpoint",
+    "lat": 45.134267,
+    "lng": 6.845022,
+    "altitude": 3002,
+    "id": "0df5c49d-7c23-508e-a163-3a49c446e4ce"
   },
   {
     "name": "Colle della Porta",
@@ -34880,6 +34960,14 @@
     "altitude": 2734
   },
   {
+    "name": "Ometto",
+    "slug": "ometto",
+    "lat": 45.734147,
+    "lng": 6.838143,
+    "altitude": 2734,
+    "id": "efa3d3c7-b3e9-5844-90c7-b02af76bfeef"
+  },
+  {
     "name": "Cime du Sambuis",
     "slug": "cime-du-sambuis",
     "lat": 45.26363,
@@ -50584,6 +50672,14 @@
     "altitude": 2555
   },
   {
+    "name": "Croix du Sergent Pinelli 2635 m",
+    "slug": "croix-du-sergent-pinelli-2635-m",
+    "lat": 45.035943,
+    "lng": 5.90482,
+    "altitude": 2555,
+    "id": "9cadfa5d-79e2-5c33-908b-c14ea615d943"
+  },
+  {
     "name": "Agulla de Perramó",
     "slug": "agulla-de-perramo",
     "lat": 42.642991,
@@ -51046,6 +51142,14 @@
     "lat": 46.125946,
     "lng": 6.873266,
     "altitude": 2549
+  },
+  {
+    "name": "Table d'orientation du Chaz Dura",
+    "slug": "table-dorientation-du-chaz-dura",
+    "lat": 45.692158,
+    "lng": 6.916041,
+    "altitude": 2549,
+    "id": "2966aa37-16b4-5d8b-81b1-7319e393b9fa"
   },
   {
     "name": "Pas du Mont Colomb",
@@ -57280,6 +57384,14 @@
     "altitude": 2473
   },
   {
+    "name": "Col de Terre Rouge",
+    "slug": "col-de-terre-rouge",
+    "lat": 44.494706,
+    "lng": 6.589169,
+    "altitude": 2473,
+    "id": "764d2800-b66e-5568-a0fd-7bef52be321d"
+  },
+  {
     "name": "Colle dell'Assietta",
     "slug": "colle-dellassietta",
     "lat": 45.070379,
@@ -60808,6 +60920,14 @@
     "altitude": 2427
   },
   {
+    "name": "Roccia Tagliata",
+    "slug": "roccia-tagliata",
+    "lat": 44.979506,
+    "lng": 6.752812,
+    "altitude": 2427,
+    "id": "028b9f94-62ef-59f0-b086-f492557acec7"
+  },
+  {
     "name": "Méale",
     "slug": "meale",
     "lat": 44.530455,
@@ -64080,6 +64200,14 @@
     "altitude": 2375
   },
   {
+    "name": "Panoramic Experience",
+    "slug": "panoramic-experience",
+    "lat": 45.657487,
+    "lng": 6.875463,
+    "altitude": 2375,
+    "id": "c596e7d0-20ca-5ea6-9afb-379c91b79ee6"
+  },
+  {
     "name": "Rocca Corna",
     "slug": "rocca-corna",
     "lat": 44.461135,
@@ -65776,6 +65904,14 @@
     "altitude": 2349
   },
   {
+    "name": "Glacier Inférieur des Balmes",
+    "slug": "glacier-inferieur-des-balmes",
+    "lat": 45.553004,
+    "lng": 6.967791,
+    "altitude": 2349,
+    "id": "84de4ca4-4aed-5f86-b280-62b990c3e827"
+  },
+  {
     "name": "Col d'Arsine",
     "slug": "col-darsine",
     "lat": 44.977845,
@@ -66904,6 +67040,14 @@
     "altitude": 2330
   },
   {
+    "name": "Punto panoramico",
+    "slug": "punto-panoramico",
+    "lat": 44.568533,
+    "lng": 7.01303,
+    "altitude": 2330,
+    "id": "9f56df07-2194-5a0e-88fb-0f5e88c9196d"
+  },
+  {
     "name": "Petit Col des Encombres",
     "slug": "petit-col-des-encombres",
     "lat": 45.294171,
@@ -67894,6 +68038,14 @@
     "lat": 46.007139,
     "lng": 6.83311,
     "altitude": 2314
+  },
+  {
+    "name": "Clot della Soma",
+    "slug": "clot-della-soma",
+    "lat": 44.992116,
+    "lng": 6.94863,
+    "altitude": 2314,
+    "id": "8b58c417-d75c-5eba-84bd-7a06b0957406"
   },
   {
     "name": "Monte Ciastella",
@@ -75968,6 +76120,14 @@
     "id": "09c86471-e23b-5d81-9e83-9d63bb30b552"
   },
   {
+    "name": "Prise d'eau Émosson",
+    "slug": "prise-deau-emosson",
+    "lat": 45.968041,
+    "lng": 6.963193,
+    "altitude": 2162,
+    "id": "29dfcdc8-45d9-5c46-92b8-22344412843a"
+  },
+  {
     "name": "Pic de Gleize",
     "slug": "pic-de-gleize",
     "lat": 44.633827,
@@ -77702,6 +77862,14 @@
     "lng": 1.169926,
     "altitude": 2123,
     "id": "2f6123c9-7bfd-56f5-aa08-a87559186615"
+  },
+  {
+    "name": "Vasevay",
+    "slug": "vasevay",
+    "lat": 46.019795,
+    "lng": 7.341916,
+    "altitude": 2123,
+    "id": "8550147c-109c-5eef-a6b7-6dc74f4391aa"
   },
   {
     "name": "Tossalet des Mentides",
@@ -80416,6 +80584,14 @@
     "altitude": 2075
   },
   {
+    "name": "Arête du Pas de l'Ours",
+    "slug": "arete-du-pas-de-lours",
+    "lat": 45.806096,
+    "lng": 6.425013,
+    "altitude": 2075,
+    "id": "7d39dd2b-ec9c-5e5f-a9f6-ee567aa4a758"
+  },
+  {
     "name": "Soum de Mauloc",
     "slug": "soum-de-mauloc",
     "lat": 42.876676,
@@ -82840,6 +83016,14 @@
     "id": "4f8947e0-4770-515e-a42c-d93255d2b844"
   },
   {
+    "name": "La Grande Berge",
+    "slug": "la-grande-berge",
+    "lat": 45.677699,
+    "lng": 6.642408,
+    "altitude": 2027,
+    "id": "4b07f647-20f1-5132-a78e-1cd727d23c38"
+  },
+  {
     "name": "Le Grand Som",
     "slug": "le-grand-som",
     "lat": 45.37041,
@@ -83102,6 +83286,22 @@
     "lat": 46.065027,
     "lng": 6.918965,
     "altitude": 2022
+  },
+  {
+    "name": "Croix",
+    "slug": "croix",
+    "lat": 46.283556,
+    "lng": 7.349933,
+    "altitude": 2022,
+    "id": "0a0134b4-bc0c-5eef-b485-2ca6b77ebd4a"
+  },
+  {
+    "name": "Glacier du Miage",
+    "slug": "glacier-du-miage",
+    "lat": 45.779025,
+    "lng": 6.870166,
+    "altitude": 2022,
+    "id": "5ba540a2-5943-51e0-8b21-69b0b4695f93"
   },
   {
     "name": "Punta Colletto",
@@ -83422,6 +83622,14 @@
     "lat": 46.3573,
     "lng": 7.004265,
     "altitude": 2017
+  },
+  {
+    "name": "Le Chantier d'Elmer",
+    "slug": "le-chantier-delmer",
+    "lat": 46.00049,
+    "lng": 7.336231,
+    "altitude": 2017,
+    "id": "d6ebb794-e047-501d-a0ba-13c0757a8e69"
   },
   {
     "name": "Pic de Céüse",
@@ -84184,6 +84392,14 @@
     "altitude": 2003
   },
   {
+    "name": "Le Kuklos",
+    "slug": "le-kuklos",
+    "lat": 46.35982,
+    "lng": 7.00153,
+    "altitude": 2003,
+    "id": "e6616ee2-d33a-5501-9b3b-79ee15dcdc63"
+  },
+  {
     "name": "Le Cuchon",
     "slug": "le-cuchon",
     "lat": 44.635845,
@@ -84886,6 +85102,14 @@
     "lat": 45.658304,
     "lng": 6.563706,
     "altitude": 1991
+  },
+  {
+    "name": "Point de vue vers le Mont Blanc",
+    "slug": "point-de-vue-vers-le-mont-blanc",
+    "lat": 45.412551,
+    "lng": 6.187482,
+    "altitude": 1991,
+    "id": "3ea3bfc2-6890-521c-80b9-5b00fc56a2a8"
   },
   {
     "name": "Pas de la Coche",
@@ -86904,6 +87128,14 @@
     "id": "9bb7d7c7-3941-5885-a8f2-0c04809928e5"
   },
   {
+    "name": "Belvédère d'Aujon",
+    "slug": "belvedere-daujon",
+    "lat": 45.991039,
+    "lng": 6.670353,
+    "altitude": 1947,
+    "id": "2f4c3bef-2d81-50ef-9914-fed251358150"
+  },
+  {
     "name": "Pundas dera Tosquera",
     "slug": "pundas-dera-tosquera",
     "lat": 42.751901,
@@ -87992,6 +88224,14 @@
     "altitude": 1925
   },
   {
+    "name": "Вид на Женевское озеро, город Монтрё и долину реки Ронаи",
+    "slug": "",
+    "lat": 46.285259,
+    "lng": 6.865663,
+    "altitude": 1925,
+    "id": "ba198465-593a-5d01-b5d9-779be959e2f9"
+  },
+  {
     "name": "Col du Glandon",
     "slug": "col-du-glandon",
     "lat": 45.239606,
@@ -88198,6 +88438,14 @@
     "lat": 46.150251,
     "lng": 6.792859,
     "altitude": 1920
+  },
+  {
+    "name": "Virage des Arcades",
+    "slug": "virage-des-arcades",
+    "lat": 45.640953,
+    "lng": 6.844613,
+    "altitude": 1920,
+    "id": "79a5c590-3e2c-5a87-9f4a-d2228247ba8f"
   },
   {
     "name": "Pic des Pontils",
@@ -90264,6 +90512,14 @@
     "altitude": 1880
   },
   {
+    "name": "Pointe de Chésery ou de Bécret",
+    "slug": "pointe-de-chesery-ou-de-becret",
+    "lat": 46.203844,
+    "lng": 6.809656,
+    "altitude": 1880,
+    "id": "cc42333b-fadf-55ca-8c14-a6e9b371ebb6"
+  },
+  {
     "name": "Pas du Fouillet",
     "slug": "pas-du-fouillet",
     "lat": 44.853435,
@@ -90502,6 +90758,14 @@
     "lat": 46.238672,
     "lng": 6.732098,
     "altitude": 1875
+  },
+  {
+    "name": "Chalet des Pyramides",
+    "slug": "chalet-des-pyramides",
+    "lat": 45.888281,
+    "lng": 6.852222,
+    "altitude": 1875,
+    "id": "a2d16773-6182-51a3-a039-8620cff450eb"
   },
   {
     "name": "Cap de Bouirech (Bouirex)",
@@ -93880,6 +94144,14 @@
     "id": "eabf0ace-fe1e-522a-ae83-293f39dd3987"
   },
   {
+    "name": "Sautodoz",
+    "slug": "sautodoz",
+    "lat": 46.428481,
+    "lng": 6.971973,
+    "altitude": 1803,
+    "id": "da5b08b4-8d3f-5fed-908f-6beae4675c7e"
+  },
+  {
     "name": "Col de l'Arech",
     "slug": "col-de-larech",
     "lat": 42.82748,
@@ -94504,6 +94776,14 @@
     "altitude": 1788
   },
   {
+    "name": "Pierre à la Dame",
+    "slug": "pierre-a-la-dame",
+    "lat": 45.928421,
+    "lng": 6.348725,
+    "altitude": 1788,
+    "id": "4c8de05f-f388-52f6-b665-7bf34dbc3c00"
+  },
+  {
     "name": "Monte Sociu",
     "slug": "monte-sociu",
     "lat": 44.464225,
@@ -94598,6 +94878,14 @@
     "lat": 46.324861,
     "lng": 6.825592,
     "altitude": 1786
+  },
+  {
+    "name": "Vue sur le Mont-Blanc",
+    "slug": "vue-sur-le-mont-blanc",
+    "lat": 45.760769,
+    "lng": 6.551823,
+    "altitude": 1786,
+    "id": "f543b787-79b4-553e-80af-1b4f45b737e4"
   },
   {
     "name": "Col de la Cabane",
@@ -94910,6 +95198,14 @@
     "lat": 46.318796,
     "lng": 6.79718,
     "altitude": 1781
+  },
+  {
+    "name": "Lac de Montriond",
+    "slug": "lac-de-montriond",
+    "lat": 46.221396,
+    "lng": 6.772706,
+    "altitude": 1781,
+    "id": "c85790ed-4411-5ce6-8f14-4bdfa50ff629"
   },
   {
     "name": "Le Petit Cordœil",
@@ -95656,6 +95952,14 @@
     "altitude": 1768
   },
   {
+    "name": "Cornillon",
+    "slug": "cornillon",
+    "lat": 46.257142,
+    "lng": 6.805224,
+    "altitude": 1768,
+    "id": "e92421d4-206f-5759-bcbe-4e8a29f43ce0"
+  },
+  {
     "name": "Punta Cucuraza",
     "slug": "punta-cucuraza",
     "lat": 42.733423,
@@ -96192,6 +96496,14 @@
     "altitude": 1757
   },
   {
+    "name": "Pra Da Dzeu",
+    "slug": "pra-da-dzeu",
+    "lat": 46.164968,
+    "lng": 7.260253,
+    "altitude": 1757,
+    "id": "61cf5bcf-ff49-5c00-8d5e-319a478b4e5a"
+  },
+  {
     "name": "La Bau",
     "slug": "la-bau",
     "lat": 44.287126,
@@ -96438,6 +96750,14 @@
     "lat": 46.10266,
     "lng": 7.146867,
     "altitude": 1752
+  },
+  {
+    "name": "Vue panoramique sur le barrage de Roselend",
+    "slug": "vue-panoramique-sur-le-barrage-de-roselend",
+    "lat": 45.690064,
+    "lng": 6.655761,
+    "altitude": 1752,
+    "id": "cdfd7096-3028-5848-b1cc-feee6eb8ed7d"
   },
   {
     "name": "Roc del Fener de l'Ala",
@@ -96942,6 +97262,14 @@
     "lat": 45.883054,
     "lng": 6.382013,
     "altitude": 1741
+  },
+  {
+    "name": "#GRANDBO",
+    "slug": "grandbo",
+    "lat": 45.966937,
+    "lng": 6.497093,
+    "altitude": 1741,
+    "id": "11ed1536-7a6f-5090-88f2-8823322b1899"
   },
   {
     "name": "Col du Frêt",
@@ -98336,6 +98664,14 @@
     "altitude": 1712
   },
   {
+    "name": "belvédère chalet de la thuile",
+    "slug": "belvedere-chalet-de-la-thuile",
+    "lat": 45.589196,
+    "lng": 6.364091,
+    "altitude": 1712,
+    "id": "e2edf9ca-457c-5ae5-a63a-10d0f42f9190"
+  },
+  {
     "name": "La Peyrouse",
     "slug": "la-peyrouse",
     "lat": 44.991865,
@@ -98510,6 +98846,14 @@
     "lng": -0.857218,
     "altitude": 1709,
     "id": "33e032dd-4e6d-5265-aacb-eddedfb8deee"
+  },
+  {
+    "name": "Punto Panoramico Creux de Bouque",
+    "slug": "punto-panoramico-creux-de-bouque",
+    "lat": 45.677452,
+    "lng": 7.16479,
+    "altitude": 1709,
+    "id": "b5937d54-0ab0-5211-9640-bee42d03552e"
   },
   {
     "name": "Col de Léchaud",
@@ -98752,6 +99096,14 @@
     "altitude": 1705
   },
   {
+    "name": "La Para",
+    "slug": "la-para",
+    "lat": 44.576091,
+    "lng": 6.455466,
+    "altitude": 1705,
+    "id": "4f06bd62-e8b1-529a-9841-22776707b95d"
+  },
+  {
     "name": "Tuc de la Core de Léat",
     "slug": "tuc-de-la-core-de-leat",
     "lat": 42.85811,
@@ -98976,6 +99328,14 @@
     "altitude": 1700
   },
   {
+    "name": "Mine de la Lappiaz",
+    "slug": "mine-de-la-lappiaz",
+    "lat": 46.192953,
+    "lng": 6.765669,
+    "altitude": 1700,
+    "id": "40619c1d-dd0b-5db3-a20b-6900bbb931a1"
+  },
+  {
     "name": "Col des Faïsses",
     "slug": "col-des-faisses",
     "lat": 44.776481,
@@ -99014,6 +99374,14 @@
     "lng": 1.518605,
     "altitude": 1699,
     "id": "f318c402-fe24-500f-bec0-e07cf3be0e47"
+  },
+  {
+    "name": "Pierre Besse",
+    "slug": "pierre-besse",
+    "lat": 45.601014,
+    "lng": 6.169035,
+    "altitude": 1699,
+    "id": "74c798da-01c3-5049-8cc9-c447aac3fcec"
   },
   {
     "name": "Pic de la Loze",
@@ -99670,6 +100038,14 @@
     "lng": 5.94818,
     "altitude": 1684,
     "id": "5642643f-a9da-5a57-a0be-a4a6284e58af"
+  },
+  {
+    "name": "Plan-Belle-Crête",
+    "slug": "plan-belle-crete",
+    "lat": 45.769906,
+    "lng": 7.062775,
+    "altitude": 1684,
+    "id": "eaccafaf-fe1b-586a-94b7-e899772f15c9"
   },
   {
     "name": "Truc Lausa",
@@ -100376,6 +100752,14 @@
     "id": "6eda6bed-5049-554d-ac2f-5c07e7aab162"
   },
   {
+    "name": "Point de vue sur Lac de Roselend",
+    "slug": "point-de-vue-sur-lac-de-roselend",
+    "lat": 45.698026,
+    "lng": 6.636698,
+    "altitude": 1672,
+    "id": "67bad7b0-34e2-5441-8592-92598071b362"
+  },
+  {
     "name": "Bec d'la Rama",
     "slug": "bec-dla-rama",
     "lat": 45.238882,
@@ -100542,6 +100926,14 @@
     "lat": 45.810394,
     "lng": 6.400414,
     "altitude": 1669
+  },
+  {
+    "name": "Belvédère de la Croix des Salles",
+    "slug": "belvedere-de-la-croix-des-salles",
+    "lat": 45.876828,
+    "lng": 6.595081,
+    "altitude": 1669,
+    "id": "907ad635-ca20-56bf-b45e-95053e58a37b"
   },
   {
     "name": "Croix du Puy",
@@ -101040,6 +101432,14 @@
     "altitude": 1657
   },
   {
+    "name": "Croix des 7 frères",
+    "slug": "croix-des-7-freres",
+    "lat": 46.042527,
+    "lng": 6.664125,
+    "altitude": 1657,
+    "id": "54b6e4ee-2b99-5635-8751-86f7260a5e1b"
+  },
+  {
     "name": "Punta del Raso",
     "slug": "punta-del-raso",
     "lat": 42.776478,
@@ -101102,6 +101502,14 @@
     "lat": 46.139293,
     "lng": 6.695715,
     "altitude": 1656
+  },
+  {
+    "name": "Belvédère de la cascade de la Raie",
+    "slug": "belvedere-de-la-cascade-de-la-raie",
+    "lat": 45.56102,
+    "lng": 6.902039,
+    "altitude": 1656,
+    "id": "9417aeb1-86a9-5cce-9cd7-5b900399115c"
   },
   {
     "name": "Pas de Massare",
@@ -101398,6 +101806,14 @@
     "lat": 45.87686,
     "lng": 6.761397,
     "altitude": 1650
+  },
+  {
+    "name": "Moraine de Taconnaz",
+    "slug": "moraine-de-taconnaz",
+    "lat": 45.882939,
+    "lng": 6.846596,
+    "altitude": 1650,
+    "id": "5de04f48-52fe-5566-ac3b-2c7219fec7f2"
   },
   {
     "name": "Pas de l'Ours",
@@ -101800,6 +102216,14 @@
     "id": "6968baca-bf31-57e8-b2c1-1f668d89b191"
   },
   {
+    "name": "Sevan",
+    "slug": "sevan",
+    "lat": 46.305833,
+    "lng": 6.818599,
+    "altitude": 1641,
+    "id": "33d1bcd4-d9d2-5b4b-b0bd-0aa2c5d0478e"
+  },
+  {
     "name": "Puy de Manse",
     "slug": "puy-de-manse",
     "lat": 44.614528,
@@ -101910,6 +102334,14 @@
     "lat": 46.443711,
     "lng": 7.041817,
     "altitude": 1638
+  },
+  {
+    "name": "La Brèche de Charance",
+    "slug": "la-breche-de-charance",
+    "lat": 44.584643,
+    "lng": 6.039636,
+    "altitude": 1638,
+    "id": "0acfc059-5170-5967-a108-c37878c41fe1"
   },
   {
     "name": "Col du salut",
@@ -102142,6 +102574,14 @@
     "lng": 2.175919,
     "altitude": 1633,
     "id": "3e8057a8-5550-5d53-94fd-a14c957a074c"
+  },
+  {
+    "name": "La Vue de Reverettaz",
+    "slug": "la-vue-de-reverettaz",
+    "lat": 45.96122,
+    "lng": 6.89644,
+    "altitude": 1633,
+    "id": "327e12d1-dfc3-5b58-87ce-9b57a9dc221e"
   },
   {
     "name": "Croix des Ramées",
@@ -102496,6 +102936,14 @@
     "altitude": 1627
   },
   {
+    "name": "Belvédère du Mont Lachat",
+    "slug": "belvedere-du-mont-lachat",
+    "lat": 45.920124,
+    "lng": 6.343741,
+    "altitude": 1627,
+    "id": "a63f6864-11e3-53d3-ad0c-6e7183824428"
+  },
+  {
     "name": "Tossal de Sant Quiri",
     "slug": "tossal-de-sant-quiri",
     "lat": 42.406341,
@@ -102592,6 +103040,14 @@
     "altitude": 1625
   },
   {
+    "name": "Alpe Foirosa",
+    "slug": "alpe-foirosa",
+    "lat": 44.714174,
+    "lng": 7.231712,
+    "altitude": 1625,
+    "id": "d93a474e-4982-57dc-ae1e-8e958464ca0c"
+  },
+  {
     "name": "Punta Pratta",
     "slug": "punta-pratta",
     "lat": 44.51577,
@@ -102646,6 +103102,14 @@
     "lng": 0.405727,
     "altitude": 1624,
     "id": "fc214b2b-1c15-51b9-baa8-b3d5a74dbd20"
+  },
+  {
+    "name": "Bellevue ServozHouches",
+    "slug": "bellevue-servozhouches",
+    "lat": 45.956359,
+    "lng": 6.75692,
+    "altitude": 1624,
+    "id": "d95536ae-db68-5ed1-9f20-9b99f09b8c23"
   },
   {
     "name": "La Buffe",
@@ -103304,6 +103768,14 @@
     "altitude": 1613
   },
   {
+    "name": "Point de vue sur la Mer de Glace",
+    "slug": "point-de-vue-sur-la-mer-de-glace",
+    "lat": 45.937337,
+    "lng": 6.919565,
+    "altitude": 1613,
+    "id": "43f234fa-0ca6-5ba2-9fb1-bdfae9033776"
+  },
+  {
     "name": "Dente della Vecchia",
     "slug": "dente-della-vecchia",
     "lat": 45.427351,
@@ -103934,6 +104406,14 @@
     "lng": 2.298225,
     "altitude": 1601,
     "id": "29cb4fbb-cbcf-5279-93dc-7ce25a7bd28e"
+  },
+  {
+    "name": "Point de vue depuis la Chapelle",
+    "slug": "point-de-vue-depuis-la-chapelle",
+    "lat": 45.699511,
+    "lng": 6.645772,
+    "altitude": 1601,
+    "id": "25540c49-ec4c-5e96-af05-726bd8b9f99d"
   },
   {
     "name": "Col du Frenay",
@@ -105432,6 +105912,14 @@
     "altitude": 1564
   },
   {
+    "name": "Croix d'Orizan",
+    "slug": "croix-dorizan",
+    "lat": 45.654637,
+    "lng": 6.269889,
+    "altitude": 1564,
+    "id": "85747669-af39-5dfd-9d61-64388adb559e"
+  },
+  {
     "name": "Col de Chausseyras",
     "slug": "col-de-chausseyras",
     "lat": 44.693839,
@@ -106656,6 +107144,14 @@
     "altitude": 1541
   },
   {
+    "name": "Gorge du Manival",
+    "slug": "gorge-du-manival",
+    "lat": 45.297146,
+    "lng": 5.832926,
+    "altitude": 1541,
+    "id": "3757bfbe-ee34-5b02-8d7f-9efde2bf7901"
+  },
+  {
     "name": "Montruvel",
     "slug": "montruvel",
     "lat": 44.045604,
@@ -107432,6 +107928,14 @@
     "id": "ad5625f1-7d55-519f-95ef-333a2797dfad"
   },
   {
+    "name": "Croix de Chevrotière",
+    "slug": "croix-de-chevrotiere",
+    "lat": 45.289024,
+    "lng": 6.333186,
+    "altitude": 1524,
+    "id": "7ed1aced-3dec-52e8-bd8b-d316abaa78ac"
+  },
+  {
     "name": "Colle dell'Encuccetta",
     "slug": "colle-dellencuccetta",
     "lat": 44.485285,
@@ -107936,6 +108440,14 @@
     "id": "963047f9-7d9e-5382-9e89-7e57bc3f9ae2"
   },
   {
+    "name": "Belvédère des 7 deux mille",
+    "slug": "belvedere-des-7-deux-mille",
+    "lat": 45.711667,
+    "lng": 6.163805,
+    "altitude": 1511,
+    "id": "e13628c6-daf5-5ee8-b570-fcdd2d148836"
+  },
+  {
     "name": "Col de Souchière",
     "slug": "col-de-souchiere",
     "lat": 44.607528,
@@ -108118,6 +108630,14 @@
     "lng": 7.368152,
     "altitude": 1506,
     "id": "917b1481-46ba-5e55-b2c3-b8926c1d61bf"
+  },
+  {
+    "name": "Belvédère du Revard",
+    "slug": "belvedere-du-revard",
+    "lat": 45.681982,
+    "lng": 5.974526,
+    "altitude": 1506,
+    "id": "15fcd9e9-26b2-5464-975a-dd3a6dab5dae"
   },
   {
     "name": "Col de la Cine",
@@ -108872,6 +109392,14 @@
     "altitude": 1492
   },
   {
+    "name": "Col du Chérel",
+    "slug": "col-du-cherel",
+    "lat": 45.685965,
+    "lng": 6.209576,
+    "altitude": 1492,
+    "id": "39e0d922-366f-5cda-9899-2c2fd0d679d1"
+  },
+  {
     "name": "Saint-Apôtre",
     "slug": "saint-apotre",
     "lat": 44.540845,
@@ -109168,6 +109696,14 @@
     "id": "94ef2baf-ce30-5db1-a86c-fb0397077b12"
   },
   {
+    "name": "Belvédère du Sentier du Planay",
+    "slug": "belvedere-du-sentier-du-planay",
+    "lat": 45.807817,
+    "lng": 6.11657,
+    "altitude": 1486,
+    "id": "7cadc7b8-94f4-59db-82b4-8e5cbb6a805f"
+  },
+  {
     "name": "Col de Crozet",
     "slug": "col-de-crozet",
     "lat": 46.294149,
@@ -109190,6 +109726,14 @@
     "lat": 45.686744,
     "lng": 5.9828,
     "altitude": 1485
+  },
+  {
+    "name": "Cascade de Bérard",
+    "slug": "cascade-de-berard",
+    "lat": 46.020145,
+    "lng": 6.911942,
+    "altitude": 1485,
+    "id": "e565c7a1-7a9c-551e-9f99-8c40bf80864f"
   },
   {
     "name": "Montagne de Palle",
@@ -109238,6 +109782,14 @@
     "lng": 2.427624,
     "altitude": 1484,
     "id": "bd91ac1e-8316-5e73-8534-c4c80bfafd25"
+  },
+  {
+    "name": "Belvédère de la Barre",
+    "slug": "belvedere-de-la-barre",
+    "lat": 45.93383,
+    "lng": 6.287592,
+    "altitude": 1484,
+    "id": "654b4429-d3a0-5296-9ea7-0d037f571d04"
   },
   {
     "name": "Sommet de la Platte",
@@ -109296,6 +109848,14 @@
     "id": "6ae0bee5-2826-504d-93cf-ce36e0ad03d8"
   },
   {
+    "name": "Point de vue des Cropts",
+    "slug": "point-de-vue-des-cropts",
+    "lat": 46.248807,
+    "lng": 7.10459,
+    "altitude": 1483,
+    "id": "78c76d23-4de6-5ec1-bd9f-bd963cdb0bbe"
+  },
+  {
     "name": "Serre de Notre-Dame",
     "slug": "serre-de-notre-dame",
     "lat": 44.382295,
@@ -109342,6 +109902,14 @@
     "lng": 0.415905,
     "altitude": 1482,
     "id": "b0db1988-8b2d-53ad-836a-751e73c4b37b"
+  },
+  {
+    "name": "Panorama Mont Blanc",
+    "slug": "panorama-mont-blanc",
+    "lat": 45.681489,
+    "lng": 7.160547,
+    "altitude": 1482,
+    "id": "c2c880e3-cf49-50cd-8458-7fe34e3216bc"
   },
   {
     "name": "Serre de la Pialade",
@@ -109414,6 +109982,14 @@
     "lat": 45.556943,
     "lng": 6.064419,
     "altitude": 1480
+  },
+  {
+    "name": "Tête du Chevet",
+    "slug": "tete-du-chevet",
+    "lat": 46.007475,
+    "lng": 6.652349,
+    "altitude": 1480,
+    "id": "6b0c6d27-2715-5368-a66b-ab395b371b35"
   },
   {
     "name": "Suc d'Ourseyre",
@@ -110224,6 +110800,14 @@
     "altitude": 1461
   },
   {
+    "name": "Croix du Signal",
+    "slug": "croix-du-signal",
+    "lat": 45.618858,
+    "lng": 5.817801,
+    "altitude": 1461,
+    "id": "bef7bfd8-29b9-5ba9-a46d-eaa895428a88"
+  },
+  {
     "name": "Montagne de Roussillon",
     "slug": "montagne-de-roussillon",
     "lat": 44.907165,
@@ -110590,6 +111174,14 @@
     "lat": 45.671579,
     "lng": 5.829317,
     "altitude": 1452
+  },
+  {
+    "name": "Croix des suifs",
+    "slug": "croix-des-suifs",
+    "lat": 45.106059,
+    "lng": 5.598749,
+    "altitude": 1452,
+    "id": "d1629418-e6ba-596b-9e1e-c0cf9126e4aa"
   },
   {
     "name": "Col Saint-Antoine",
@@ -111312,6 +111904,14 @@
     "id": "8581db1d-44f5-5c35-b5eb-00a03ac43c1c"
   },
   {
+    "name": "Betulla solitaria",
+    "slug": "betulla-solitaria",
+    "lat": 44.587534,
+    "lng": 7.280663,
+    "altitude": 1439,
+    "id": "0cedc27b-758b-505a-a3ab-c4aac602db9b"
+  },
+  {
     "name": "Col de la Sinne",
     "slug": "col-de-la-sinne",
     "lat": 44.025519,
@@ -111592,6 +112192,14 @@
     "altitude": 1434
   },
   {
+    "name": "Rocher du Roux (Panorama)",
+    "slug": "rocher-du-roux-panorama",
+    "lat": 45.820276,
+    "lng": 6.253363,
+    "altitude": 1434,
+    "id": "2752d9e1-be14-5b19-8b42-9c104f31d5d6"
+  },
+  {
     "name": "Col de la Gorgeat",
     "slug": "col-de-la-gorgeat",
     "lat": 45.49525,
@@ -111808,6 +112416,14 @@
     "id": "420d523d-2952-5a9d-9425-20378d91eba0"
   },
   {
+    "name": "Le Grand Bisse d'Ayent",
+    "slug": "le-grand-bisse-dayent",
+    "lat": 46.309772,
+    "lng": 7.422146,
+    "altitude": 1429,
+    "id": "2fb3c7fd-6467-5932-92cb-112c77fd4ff0"
+  },
+  {
     "name": "Signal de Saint-Michel",
     "slug": "signal-de-saint-michel",
     "lat": 44.878825,
@@ -111982,6 +112598,22 @@
     "lat": 45.943054,
     "lng": 5.753041,
     "altitude": 1426
+  },
+  {
+    "name": "Cascade du Boréon",
+    "slug": "cascade-du-boreon",
+    "lat": 44.113065,
+    "lng": 7.28217,
+    "altitude": 1426,
+    "id": "a32738e9-0c52-5420-880b-d21c27b42d29"
+  },
+  {
+    "name": "Bric d'la Porta",
+    "slug": "bric-dla-porta",
+    "lat": 44.960985,
+    "lng": 7.061844,
+    "altitude": 1426,
+    "id": "ad71156b-9187-5067-8dfb-6c04271bef49"
   },
   {
     "name": "Col des Priourets",
@@ -112472,6 +113104,14 @@
     "id": "e9010c4d-e897-50e4-a934-ba7f669b533f"
   },
   {
+    "name": "L'Arbaley",
+    "slug": "larbaley",
+    "lat": 46.342983,
+    "lng": 6.860803,
+    "altitude": 1418,
+    "id": "ee089439-90ba-546d-960a-0fb45393f395"
+  },
+  {
     "name": "Punta Culet",
     "slug": "punta-culet",
     "lat": 44.247581,
@@ -112608,6 +113248,14 @@
     "id": "f458c591-bb7e-5131-b222-60c9bc6fc7b7"
   },
   {
+    "name": "Fenêtre des Pendants",
+    "slug": "fenetre-des-pendants",
+    "lat": 45.720477,
+    "lng": 6.031588,
+    "altitude": 1416,
+    "id": "8a2bfdef-86ce-539b-9098-fd4553a0ae36"
+  },
+  {
     "name": "Lakuaga",
     "slug": "lakuaga",
     "lat": 42.87581,
@@ -112662,6 +113310,14 @@
     "lng": -1.037544,
     "altitude": 1414,
     "id": "b95fabc1-2074-5ce3-a758-f60bba8b89e4"
+  },
+  {
+    "name": "Bouquetin",
+    "slug": "bouquetin",
+    "lat": 45.382551,
+    "lng": 6.719583,
+    "altitude": 1414,
+    "id": "6aa1c40f-61c0-5311-96e7-fb519f5792d3"
   },
   {
     "name": "Cerro de la Liana",
@@ -113088,6 +113744,14 @@
     "id": "d3b92ecc-af0c-5fe5-99bf-01b1d2426402"
   },
   {
+    "name": "Saut de la Pucelle",
+    "slug": "saut-de-la-pucelle",
+    "lat": 46.224385,
+    "lng": 6.353081,
+    "altitude": 1404,
+    "id": "fb76371e-3397-5b3c-8279-d5a6300400e5"
+  },
+  {
     "name": "Alto de San Quílez",
     "slug": "alto-de-san-quilez",
     "lat": 42.554834,
@@ -113126,6 +113790,14 @@
     "lng": 5.474234,
     "altitude": 1402,
     "id": "1137a6a6-1db4-5b86-9028-5164dd3fb1b9"
+  },
+  {
+    "name": "Gorges de Gruvaz",
+    "slug": "gorges-de-gruvaz",
+    "lat": 45.845406,
+    "lng": 6.7486,
+    "altitude": 1402,
+    "id": "037d5589-9997-5c19-a598-3b35f45f037b"
   },
   {
     "name": "La Blache",
@@ -113390,6 +114062,14 @@
     "lng": 0.922041,
     "altitude": 1397,
     "id": "2de4cc76-94e1-523d-bfd2-1ff6e12dc003"
+  },
+  {
+    "name": "Plan Pepè",
+    "slug": "plan-pepe",
+    "lat": 45.676808,
+    "lng": 7.189298,
+    "altitude": 1397,
+    "id": "94826175-adfd-5faa-ac98-72bdc4cae487"
   },
   {
     "name": "Col de Prat-de-Bouc",
@@ -113678,6 +114358,14 @@
     "lng": -0.293539,
     "altitude": 1389,
     "id": "73132548-a193-584f-b079-d37d1ea1f013"
+  },
+  {
+    "name": "Belvédère des Dappes",
+    "slug": "belvedere-des-dappes",
+    "lat": 46.445669,
+    "lng": 6.070195,
+    "altitude": 1389,
+    "id": "0fac7b7d-615a-5da8-91e4-fc1fbf4ffa38"
   },
   {
     "name": "Pic du Lizieux",
@@ -114240,6 +114928,14 @@
     "id": "5aac3578-afcf-5e22-ad68-48ba32aff811"
   },
   {
+    "name": "Le Turet",
+    "slug": "le-turet",
+    "lat": 46.36293,
+    "lng": 6.042251,
+    "altitude": 1377,
+    "id": "834afee1-c35c-5ea6-96a3-36042c03711e"
+  },
+  {
     "name": "Puy Masso",
     "slug": "puy-masso",
     "lat": 45.011329,
@@ -114350,6 +115046,14 @@
     "lat": 46.24392,
     "lng": 6.850155,
     "altitude": 1374
+  },
+  {
+    "name": "Belvédère Avant Pays Savoyard",
+    "slug": "belvedere-avant-pays-savoyard",
+    "lat": 45.661819,
+    "lng": 5.817947,
+    "altitude": 1374,
+    "id": "fbc30867-5895-5b91-91ad-05878c6a9890"
   },
   {
     "name": "I Tre Roc",
@@ -114544,6 +115248,14 @@
     "altitude": 1370
   },
   {
+    "name": "La Grande Crevasse",
+    "slug": "la-grande-crevasse",
+    "lat": 46.336489,
+    "lng": 6.98239,
+    "altitude": 1370,
+    "id": "fd475488-a6b7-5926-b1c2-d429698ab167"
+  },
+  {
     "name": "Colle Lunella",
     "slug": "colle-lunella",
     "lat": 45.191095,
@@ -114598,6 +115310,14 @@
     "lng": -0.834528,
     "altitude": 1369,
     "id": "a0778c65-338f-51a5-b88a-2a9fd58741ee"
+  },
+  {
+    "name": "Belvédère de Château Richard",
+    "slug": "belvedere-de-chateau-richard",
+    "lat": 45.608167,
+    "lng": 5.81545,
+    "altitude": 1369,
+    "id": "a38d2ec4-7749-5dca-ba48-ff5f8a819b30"
   },
   {
     "name": "Col de la Morte",
@@ -115360,6 +116080,14 @@
     "altitude": 1356
   },
   {
+    "name": "2ème Panoramique du Glacier des Bossons",
+    "slug": "2eme-panoramique-du-glacier-des-bossons",
+    "lat": 45.894649,
+    "lng": 6.85407,
+    "altitude": 1356,
+    "id": "76088e11-84c3-52b1-9624-b498679327f7"
+  },
+  {
     "name": "Il Turu",
     "slug": "il-turu",
     "lat": 45.234583,
@@ -116104,6 +116832,14 @@
     "id": "3681a2c4-d564-56dc-bdbc-256494f46807"
   },
   {
+    "name": "1er Panoramique du Glacier des Bossons",
+    "slug": "1er-panoramique-du-glacier-des-bossons",
+    "lat": 45.895125,
+    "lng": 6.853575,
+    "altitude": 1342,
+    "id": "98c264cc-551e-5844-b6e5-6d0b75d82363"
+  },
+  {
     "name": "Lakurde",
     "slug": "lakurde",
     "lat": 43.025302,
@@ -116206,6 +116942,14 @@
     "lat": 45.513567,
     "lng": 6.225827,
     "altitude": 1340
+  },
+  {
+    "name": "Belvédère de Bénévent",
+    "slug": "belvedere-de-benevent",
+    "lat": 45.813328,
+    "lng": 6.121522,
+    "altitude": 1340,
+    "id": "912225fd-2a3e-50c8-b4d0-c84b8150afb2"
   },
   {
     "name": "Monte di Santa Cristina",
@@ -116680,6 +117424,14 @@
     "id": "a96b4e86-d2e1-5833-baa0-e7797bd0ffc9"
   },
   {
+    "name": "Fruitières de Nyon",
+    "slug": "fruitieres-de-nyon",
+    "lat": 46.460077,
+    "lng": 6.151066,
+    "altitude": 1331,
+    "id": "0bdf1ddb-6f68-5fb6-af68-0e059e1ebb76"
+  },
+  {
     "name": "Col des Pellas",
     "slug": "col-des-pellas",
     "lat": 44.856546,
@@ -116742,6 +117494,14 @@
     "lat": 45.682179,
     "lng": 6.435594,
     "altitude": 1330
+  },
+  {
+    "name": "Belvédère Barnaud",
+    "slug": "belvedere-barnaud",
+    "lat": 45.681181,
+    "lng": 6.013972,
+    "altitude": 1330,
+    "id": "3e179735-5826-5cf1-8acb-462339f90aa7"
   },
   {
     "name": "Col de la Molède",
@@ -117240,6 +118000,22 @@
     "id": "9e29743e-db06-5a7e-a0e8-a92ab1dc37af"
   },
   {
+    "name": "Cascade de Barberine",
+    "slug": "cascade-de-barberine",
+    "lat": 46.05492,
+    "lng": 6.936474,
+    "altitude": 1320,
+    "id": "66be169a-db7e-5be3-b094-fbe4d3938cc2"
+  },
+  {
+    "name": "Vue du bout du monde",
+    "slug": "vue-du-bout-du-monde",
+    "lat": 46.110622,
+    "lng": 6.863027,
+    "altitude": 1320,
+    "id": "ca1853db-7278-5f2c-afd1-98c857d8bfba"
+  },
+  {
     "name": "La Falconiera",
     "slug": "la-falconiera",
     "lat": 45.052488,
@@ -117326,6 +118102,14 @@
     "lng": -1.165557,
     "altitude": 1318,
     "id": "b744b9f7-fc4e-5e4a-af07-7f2eb2439aa7"
+  },
+  {
+    "name": "Point de vue sur le Lac du Bourget",
+    "slug": "point-de-vue-sur-le-lac-du-bourget",
+    "lat": 45.716068,
+    "lng": 6.030186,
+    "altitude": 1318,
+    "id": "fbd5a723-9890-569e-b852-a86f484d911e"
   },
   {
     "name": "Col de Vestizoux",
@@ -117616,6 +118400,14 @@
     "id": "3d620849-6d87-54f9-9cf8-24139fc26255"
   },
   {
+    "name": "Point de vue sur le Lac",
+    "slug": "point-de-vue-sur-le-lac",
+    "lat": 46.406338,
+    "lng": 5.999893,
+    "altitude": 1312,
+    "id": "4631c5a6-b765-50dd-b29f-54edf294ea72"
+  },
+  {
     "name": "Colle del Lis",
     "slug": "colle-del-lis",
     "lat": 45.177915,
@@ -117758,6 +118550,14 @@
     "lng": -0.977519,
     "altitude": 1309,
     "id": "e4a482e8-ed38-5f4d-b8af-019f4df1ef7b"
+  },
+  {
+    "name": "Belvédère du Pas du Roc",
+    "slug": "belvedere-du-pas-du-roc",
+    "lat": 45.972696,
+    "lng": 6.301112,
+    "altitude": 1309,
+    "id": "83d6c6c0-c3aa-5612-b7fd-a56d0a043eac"
   },
   {
     "name": "Monte Lausetto",
@@ -118360,6 +119160,14 @@
     "altitude": 1300
   },
   {
+    "name": "Panorama sur les Alpes",
+    "slug": "panorama-sur-les-alpes",
+    "lat": 46.134503,
+    "lng": 6.182076,
+    "altitude": 1300,
+    "id": "c940b27b-65a9-576c-bb57-77ad7eb16450"
+  },
+  {
     "name": "Col la Caille",
     "slug": "col-la-caille",
     "lat": 44.520894,
@@ -118430,6 +119238,14 @@
     "lng": -0.074715,
     "altitude": 1299,
     "id": "c67d67fc-8d20-52a5-b48f-ba069c26759d"
+  },
+  {
+    "name": "Chapelle de Notre-dame d'Hermone",
+    "slug": "chapelle-de-notre-dame-dhermone",
+    "lat": 46.306152,
+    "lng": 6.517582,
+    "altitude": 1299,
+    "id": "e4754025-9a85-53a5-8ef3-3602bd75211b"
   },
   {
     "name": "Le Néron",
@@ -118872,6 +119688,14 @@
     "id": "c273de8e-6fbf-5406-bbfd-f75b6b7419a9"
   },
   {
+    "name": "Belvédère de la Pausa",
+    "slug": "belvedere-de-la-pausa",
+    "lat": 44.076052,
+    "lng": 7.241794,
+    "altitude": 1290,
+    "id": "f7581e93-d436-589b-b10f-c442d9e307a2"
+  },
+  {
     "name": "Monte Casternaud",
     "slug": "monte-casternaud",
     "lat": 44.259805,
@@ -118974,6 +119798,14 @@
     "lng": 1.542622,
     "altitude": 1288,
     "id": "da70905c-6c92-5991-8716-22cf0a838e38"
+  },
+  {
+    "name": "Belvédère de Pierre Taillée",
+    "slug": "belvedere-de-pierre-taillee",
+    "lat": 45.994355,
+    "lng": 6.278208,
+    "altitude": 1288,
+    "id": "ff3972fe-8464-5ed0-bcae-769c0d0e8104"
   },
   {
     "name": "Puy de Montoncel",
@@ -119584,6 +120416,14 @@
     "altitude": 1278
   },
   {
+    "name": "Départ du 9",
+    "slug": "depart-du-9",
+    "lat": 44.603432,
+    "lng": 6.087807,
+    "altitude": 1278,
+    "id": "6b4feb45-a567-54c4-8990-52b33e4692d3"
+  },
+  {
     "name": "Col Lorial",
     "slug": "col-lorial",
     "lat": 44.613169,
@@ -120000,6 +120840,14 @@
     "id": "7a649658-ffb1-5344-b016-3a9799fa56bf"
   },
   {
+    "name": "Belvédère de Tréchauffé",
+    "slug": "belvedere-de-trechauffe",
+    "lat": 46.320662,
+    "lng": 6.624506,
+    "altitude": 1271,
+    "id": "c9376b9c-8ff4-51b4-b02a-6e64fa7d87f4"
+  },
+  {
     "name": "Le Pieu",
     "slug": "le-pieu",
     "lat": 45.052508,
@@ -120054,6 +120902,14 @@
     "lng": 1.288721,
     "altitude": 1270,
     "id": "0cd6f9ab-7360-59be-b550-a7fb54e443ad"
+  },
+  {
+    "name": "Pas à l'âne",
+    "slug": "pas-a-lane",
+    "lat": 46.013898,
+    "lng": 6.642934,
+    "altitude": 1270,
+    "id": "89382940-6750-5cdb-8c25-eff7169272ec"
   },
   {
     "name": "Notre-Dame de la Sentinelle",
@@ -120182,6 +121038,14 @@
     "lng": 5.365791,
     "altitude": 1268,
     "id": "049899db-24ac-587d-b6d2-abdbd6752a36"
+  },
+  {
+    "name": "Belvédère du rocher de Charvetan",
+    "slug": "belvedere-du-rocher-de-charvetan",
+    "lat": 45.610035,
+    "lng": 5.978281,
+    "altitude": 1268,
+    "id": "8ea6d641-953d-5219-86dd-12e80d85c647"
   },
   {
     "name": "Suc de Gramont",
@@ -120664,6 +121528,14 @@
     "altitude": 1259
   },
   {
+    "name": "Belvedere Champ Cossay",
+    "slug": "belvedere-champ-cossay",
+    "lat": 45.676179,
+    "lng": 7.172007,
+    "altitude": 1259,
+    "id": "6e6c226a-45d5-55ae-ba77-29b3a5059c5a"
+  },
+  {
     "name": "Schnepfenriedkopf",
     "slug": "schnepfenriedkopf",
     "lat": 47.981373,
@@ -121048,6 +121920,14 @@
     "id": "c73c89bf-a8a4-50eb-8d36-ebe065e825e0"
   },
   {
+    "name": "Roccia Appia",
+    "slug": "roccia-appia",
+    "lat": 44.584483,
+    "lng": 7.278933,
+    "altitude": 1252,
+    "id": "941a300e-e256-5de6-982c-6a87e06fb97c"
+  },
+  {
     "name": "Col de la Charousse",
     "slug": "col-de-la-charousse",
     "lat": 45.216085,
@@ -121326,6 +122206,14 @@
     "lng": -0.290463,
     "altitude": 1247,
     "id": "ce0233dc-baad-5922-bf93-174d1fcd52d2"
+  },
+  {
+    "name": "Balcon du Ciel",
+    "slug": "balcon-du-ciel",
+    "lat": 46.227577,
+    "lng": 7.423261,
+    "altitude": 1247,
+    "id": "5b711158-523b-520b-85bd-183ba237a5eb"
   },
   {
     "name": "Col Bayard",
@@ -122064,6 +122952,14 @@
     "id": "6196a5bd-852f-5f8c-9d9c-390bad246890"
   },
   {
+    "name": "Beauchateau",
+    "slug": "beauchateau",
+    "lat": 46.186328,
+    "lng": 5.859002,
+    "altitude": 1236,
+    "id": "a9a4ecc9-f35a-574d-bfdd-48fae705f7ec"
+  },
+  {
     "name": "Mont Daunis",
     "slug": "mont-daunis",
     "lat": 44.507713,
@@ -122294,6 +123190,14 @@
     "lng": -0.312897,
     "altitude": 1233,
     "id": "cc1f2d84-c49c-5cda-808d-2a64b48f7c34"
+  },
+  {
+    "name": "Belvedere di Saint Nicolas",
+    "slug": "belvedere-di-saint-nicolas",
+    "lat": 45.710927,
+    "lng": 7.16262,
+    "altitude": 1233,
+    "id": "217a65a0-2d65-5fdb-81f9-b5ac9c72df3a"
   },
   {
     "name": "Servalier",
@@ -123240,6 +124144,14 @@
     "id": "b3af7274-872b-572b-9fba-8aada668d5af"
   },
   {
+    "name": "Gorges du Dailley",
+    "slug": "gorges-du-dailley",
+    "lat": 46.139433,
+    "lng": 7.017596,
+    "altitude": 1219,
+    "id": "8e701fa8-5378-5625-9670-aaa26bf7d89e"
+  },
+  {
     "name": "Col de la Croix Perrin",
     "slug": "col-de-la-croix-perrin",
     "lat": 45.130378,
@@ -123608,6 +124520,22 @@
     "id": "4a0f9324-be24-578d-8da5-4fbf278f816d"
   },
   {
+    "name": "Point de vue de la Croix des Couloirs",
+    "slug": "point-de-vue-de-la-croix-des-couloirs",
+    "lat": 46.294709,
+    "lng": 5.827928,
+    "altitude": 1213,
+    "id": "7afe7fac-1b27-58d3-9dcd-24f6fd2df5cf"
+  },
+  {
+    "name": "Belvédere de la Corne",
+    "slug": "belvedere-de-la-corne",
+    "lat": 46.346259,
+    "lng": 5.984952,
+    "altitude": 1213,
+    "id": "0f7f0f13-c61b-5cd5-ab5c-40bc697f5183"
+  },
+  {
     "name": "Col de Saint-André",
     "slug": "col-de-saint-andre",
     "lat": 44.559136,
@@ -123670,6 +124598,14 @@
     "lat": 46.242899,
     "lng": 6.520345,
     "altitude": 1212
+  },
+  {
+    "name": "Le Truchet",
+    "slug": "le-truchet",
+    "lat": 46.300273,
+    "lng": 5.920805,
+    "altitude": 1212,
+    "id": "75479ab1-905a-566d-80ed-33e710ed2e0c"
   },
   {
     "name": "Col de Corobin",
@@ -124248,6 +125184,14 @@
     "id": "aee0eeec-206f-5b5e-a0c9-c6ee9e63c6ff"
   },
   {
+    "name": "N.D. de bois vert",
+    "slug": "nd-de-bois-vert",
+    "lat": 44.666497,
+    "lng": 6.056633,
+    "altitude": 1203,
+    "id": "054e33b6-2c5f-5570-81e3-11ad5e1d6576"
+  },
+  {
     "name": "Colle della Cresta",
     "slug": "colle-della-cresta",
     "lat": 45.007813,
@@ -124512,6 +125456,14 @@
     "id": "62a6816e-7ca5-5cf2-8de6-061718428728"
   },
   {
+    "name": "Les Feux",
+    "slug": "les-feux",
+    "lat": 46.014356,
+    "lng": 6.636896,
+    "altitude": 1199,
+    "id": "c5c6a4a7-fdc6-5936-905c-c40fd5b3b8b7"
+  },
+  {
     "name": "La Pierre Pamole",
     "slug": "la-pierre-pamole",
     "lat": 45.803015,
@@ -124614,6 +125566,14 @@
     "lng": 1.510515,
     "altitude": 1197,
     "id": "6a4aad35-1501-5445-b464-bc5e6648fa89"
+  },
+  {
+    "name": "Cascade d'Ardent",
+    "slug": "cascade-dardent",
+    "lat": 46.214455,
+    "lng": 6.755146,
+    "altitude": 1197,
+    "id": "9a385e22-ee8c-5220-813f-b699015482a8"
   },
   {
     "name": "Rocher de Faux Fay",
@@ -125248,6 +126208,14 @@
     "id": "0ec75985-a62b-53d2-92ac-b3693e0f0383"
   },
   {
+    "name": "Panorama du Lac de Vallon",
+    "slug": "panorama-du-lac-de-vallon",
+    "lat": 46.218224,
+    "lng": 6.553896,
+    "altitude": 1186,
+    "id": "89f15d24-528f-5eed-b8d5-eac04bd42979"
+  },
+  {
     "name": "Colle di Rosa",
     "slug": "colle-di-rosa",
     "lat": 44.367625,
@@ -125664,6 +126632,22 @@
     "id": "77434019-e23b-5cec-af2d-e1df432c8ada"
   },
   {
+    "name": "Cascade mystérieuse",
+    "slug": "cascade-mysterieuse",
+    "lat": 45.964089,
+    "lng": 6.440585,
+    "altitude": 1180,
+    "id": "b8852409-28ac-5c03-a30b-2fb11f44a05d"
+  },
+  {
+    "name": "Cascade de la Sauflaz",
+    "slug": "cascade-de-la-sauflaz",
+    "lat": 46.153517,
+    "lng": 6.871909,
+    "altitude": 1180,
+    "id": "283b307a-087f-54d1-b705-18d2c7a1495e"
+  },
+  {
     "name": "Large Tête",
     "slug": "large-tete",
     "lat": 47.870501,
@@ -125782,6 +126766,14 @@
     "lng": 6.470667,
     "altitude": 1178,
     "id": "db4cc71d-c554-57f0-bcf7-e4c9bc76a4fc"
+  },
+  {
+    "name": "Point de vue des Roches d'Orvaz",
+    "slug": "point-de-vue-des-roches-dorvaz",
+    "lat": 46.258101,
+    "lng": 5.812146,
+    "altitude": 1178,
+    "id": "088913e9-0e4e-580a-a6f9-36a801969c5f"
   },
   {
     "name": "Le Steinberg",
@@ -126048,6 +127040,14 @@
     "altitude": 1173
   },
   {
+    "name": "Table d'orientation de La Cry",
+    "slug": "table-dorientation-de-la-cry",
+    "lat": 45.89375,
+    "lng": 6.626771,
+    "altitude": 1173,
+    "id": "96918326-4e61-5f68-b96c-4abedac52cb9"
+  },
+  {
     "name": "Ekaitza",
     "slug": "ekaitza",
     "lat": 43.063666,
@@ -126246,6 +127246,14 @@
     "lng": 7.052498,
     "altitude": 1170,
     "id": "67d0df9c-2ee1-5836-a9a1-4b2fc6573b51"
+  },
+  {
+    "name": "Crêt Brulé",
+    "slug": "cret-brule",
+    "lat": 45.928266,
+    "lng": 6.391537,
+    "altitude": 1170,
+    "id": "b6e406f7-11fd-5034-9436-7e5c8fc3a1de"
   },
   {
     "name": "Sattefels",
@@ -126552,6 +127560,14 @@
     "id": "40e2112f-8335-55f4-a601-783981976cec"
   },
   {
+    "name": "Belvédère du Rochet Chenalet",
+    "slug": "belvedere-du-rochet-chenalet",
+    "lat": 45.790825,
+    "lng": 6.250304,
+    "altitude": 1165,
+    "id": "6248848e-2bbe-59bf-bdd1-b3943e3b0628"
+  },
+  {
     "name": "Pierres du Jour",
     "slug": "pierres-du-jour",
     "lat": 46.000483,
@@ -126760,6 +127776,14 @@
     "id": "4a76d162-705e-50bb-a574-1a4f384919dc"
   },
   {
+    "name": "Roccia dell'Eco",
+    "slug": "roccia-delleco",
+    "lat": 44.582196,
+    "lng": 7.277766,
+    "altitude": 1161,
+    "id": "d24d7200-5457-5eb6-9a34-3235066a25fd"
+  },
+  {
     "name": "Col d'Espréaux",
     "slug": "col-despreaux",
     "lat": 44.473466,
@@ -126814,6 +127838,14 @@
     "lng": 2.427271,
     "altitude": 1160,
     "id": "6724dd0b-11d7-5ff0-9399-221a08b50df6"
+  },
+  {
+    "name": "La Roche",
+    "slug": "la-roche",
+    "lat": 45.071629,
+    "lng": 5.814209,
+    "altitude": 1160,
+    "id": "71135316-8ab1-5e72-991a-0fcf87cb0018"
   },
   {
     "name": "Chabrunat",
@@ -127968,6 +129000,14 @@
     "id": "e4fe3dbe-f156-54f2-a352-c021e91f29db"
   },
   {
+    "name": "Belvédère de la tendue",
+    "slug": "belvedere-de-la-tendue",
+    "lat": 46.387643,
+    "lng": 5.914947,
+    "altitude": 1142,
+    "id": "c972a086-fb08-5e0d-9a98-fad1e0654330"
+  },
+  {
     "name": "Rehberg",
     "slug": "rehberg",
     "lat": 48.202923,
@@ -128118,6 +129158,14 @@
     "lat": 45.731461,
     "lng": 5.824137,
     "altitude": 1140
+  },
+  {
+    "name": "Décollage de Provinces",
+    "slug": "decollage-de-provinces",
+    "lat": 45.601895,
+    "lng": 5.807377,
+    "altitude": 1140,
+    "id": "714e79c3-429e-5f24-bad7-02f0829db02f"
   },
   {
     "name": "Sainte-Madeleine",
@@ -129024,6 +130072,22 @@
     "altitude": 1128
   },
   {
+    "name": "Belvédère de la Luette",
+    "slug": "belvedere-de-la-luette",
+    "lat": 46.374482,
+    "lng": 5.938654,
+    "altitude": 1128,
+    "id": "84ed8cae-e5e5-53fc-a9c9-cefa336054ad"
+  },
+  {
+    "name": "Colletto del Forno",
+    "slug": "colletto-del-forno",
+    "lat": 45.036388,
+    "lng": 7.261311,
+    "altitude": 1128,
+    "id": "bbc49615-b82d-5b3e-897f-963fb17ac2ea"
+  },
+  {
     "name": "Col des Baraques",
     "slug": "col-des-baraques",
     "lat": 44.966508,
@@ -129752,6 +130816,14 @@
     "id": "f54d72a3-8b3a-5df2-9230-324b6c146534"
   },
   {
+    "name": "Panorama du Vélodrome d'Esclangon",
+    "slug": "panorama-du-velodrome-desclangon",
+    "lat": 44.208161,
+    "lng": 6.278879,
+    "altitude": 1117,
+    "id": "aa38b67c-3c24-5555-baa9-028586249fd5"
+  },
+  {
     "name": "Le Suquet",
     "slug": "le-suquet",
     "lat": 44.010378,
@@ -130032,6 +131104,14 @@
     "altitude": 1112
   },
   {
+    "name": "Roc de Veyges",
+    "slug": "roc-de-veyges",
+    "lat": 46.329397,
+    "lng": 6.979518,
+    "altitude": 1112,
+    "id": "f1fd049f-48d9-5c24-b7d6-32d61fd40217"
+  },
+  {
     "name": "Bric Rora",
     "slug": "bric-rora",
     "lat": 44.343672,
@@ -130208,6 +131288,14 @@
     "altitude": 1110
   },
   {
+    "name": "Ancienne Gare de Téléphérique",
+    "slug": "ancienne-gare-de-telepherique",
+    "lat": 45.891978,
+    "lng": 6.189144,
+    "altitude": 1110,
+    "id": "3e3d1a44-14c6-5831-ba14-8aa13de3c93a"
+  },
+  {
     "name": "Tossal de Fontpalleró",
     "slug": "tossal-de-fontpallero",
     "lat": 42.431353,
@@ -130288,6 +131376,14 @@
     "id": "4a63526e-f029-55d8-b93f-158aa4126174"
   },
   {
+    "name": "Bélvédère du Repenty",
+    "slug": "belvedere-du-repenty",
+    "lat": 46.486997,
+    "lng": 6.015604,
+    "altitude": 1108,
+    "id": "e1b5b08a-6d55-507f-8fdb-6d95a4f11f02"
+  },
+  {
     "name": "Col de la Fageole",
     "slug": "col-de-la-fageole",
     "lat": 45.100699,
@@ -130342,6 +131438,14 @@
     "lng": 7.421563,
     "altitude": 1107,
     "id": "099df6e4-cf5f-57b8-9f1b-8bbec2ab2dc3"
+  },
+  {
+    "name": "Belvédère des Pontets",
+    "slug": "belvedere-des-pontets",
+    "lat": 45.485597,
+    "lng": 6.509478,
+    "altitude": 1107,
+    "id": "0c55c6f2-163e-53a2-a598-1afbc20cf802"
   },
   {
     "name": "Col des Festreaux",
@@ -130640,6 +131744,14 @@
     "altitude": 1102
   },
   {
+    "name": "Foto-Spot Gstaad Saanenland",
+    "slug": "foto-spot-gstaad-saanenland",
+    "lat": 46.492454,
+    "lng": 7.267614,
+    "altitude": 1102,
+    "id": "fcfeafb5-7c81-50dc-a92d-51f5bc2d9127"
+  },
+  {
     "name": "Truc dell'Eremita",
     "slug": "truc-delleremita",
     "lat": 45.117149,
@@ -130928,6 +132040,14 @@
     "altitude": 1098
   },
   {
+    "name": "Mont Favy",
+    "slug": "mont-favy",
+    "lat": 46.031787,
+    "lng": 6.62778,
+    "altitude": 1098,
+    "id": "b463c0f6-2d8a-5825-b9e7-31693d00f261"
+  },
+  {
     "name": "Suc du Pertuis",
     "slug": "suc-du-pertuis",
     "lat": 45.092875,
@@ -131214,6 +132334,14 @@
     "lng": 1.523478,
     "altitude": 1093,
     "id": "675191fb-decd-57ac-b5c3-2efaa47c30f0"
+  },
+  {
+    "name": "Sallauscex",
+    "slug": "sallauscex",
+    "lat": 46.450128,
+    "lng": 6.922183,
+    "altitude": 1093,
+    "id": "b3e663f4-4d70-5428-ba30-9dc0b0418643"
   },
   {
     "name": "Col de Pourri Faing",
@@ -131600,6 +132728,14 @@
     "id": "005fd43c-378d-56bf-ac8c-1dfee2ece18f"
   },
   {
+    "name": "Belvédère de la pointe de la Roche",
+    "slug": "belvedere-de-la-pointe-de-la-roche",
+    "lat": 46.38057,
+    "lng": 5.898423,
+    "altitude": 1086,
+    "id": "3baf9d9b-2cdb-5017-adf2-35644f451745"
+  },
+  {
     "name": "Laiana",
     "slug": "laiana",
     "lat": 42.892979,
@@ -131902,6 +133038,14 @@
     "lng": -1.868936,
     "altitude": 1081,
     "id": "b1f8df79-6fb3-5fde-b8ca-964ce6927ef3"
+  },
+  {
+    "name": "Copiet",
+    "slug": "copiet",
+    "lat": 45.723391,
+    "lng": 7.483194,
+    "altitude": 1081,
+    "id": "327e12b6-a172-5534-a967-259e9079c1c8"
   },
   {
     "name": "Serre de la Fayole",
@@ -132424,6 +133568,14 @@
     "id": "d4cdfbc0-9358-50a1-9a12-8161e3c14365"
   },
   {
+    "name": "Panorama sur le bassin genevois",
+    "slug": "panorama-sur-le-bassin-genevois",
+    "lat": 46.154545,
+    "lng": 6.194206,
+    "altitude": 1074,
+    "id": "f1a7f40a-468b-5ec9-9c26-e49595c8ac59"
+  },
+  {
     "name": "Grand Langenberg",
     "slug": "grand-langenberg",
     "lat": 47.806932,
@@ -132526,6 +133678,14 @@
     "lng": 6.506968,
     "altitude": 1072,
     "id": "1585dd93-1e95-5e41-9a90-4c3a33609abb"
+  },
+  {
+    "name": "Point de vue de la Roche Fauconnière",
+    "slug": "point-de-vue-de-la-roche-fauconniere",
+    "lat": 46.235887,
+    "lng": 5.791198,
+    "altitude": 1072,
+    "id": "72ce8fbd-47bb-57ca-a85f-cc4f31a51cee"
   },
   {
     "name": "Col des Perches",
@@ -133086,6 +134246,14 @@
     "lng": 5.403063,
     "altitude": 1064,
     "id": "cf5dcfe6-13b5-5955-8193-fa3964dcbceb"
+  },
+  {
+    "name": "Table d'orientation du Bec Margain",
+    "slug": "table-dorientation-du-bec-margain",
+    "lat": 45.299219,
+    "lng": 5.882282,
+    "altitude": 1064,
+    "id": "a953b5e0-a737-5320-99e8-124e3f3eb0cf"
   },
   {
     "name": "La Gesse",
@@ -134200,6 +135368,14 @@
     "altitude": 1050
   },
   {
+    "name": "Cascade de la Muzelle",
+    "slug": "cascade-de-la-muzelle",
+    "lat": 44.979719,
+    "lng": 6.120942,
+    "altitude": 1050,
+    "id": "900e6e8e-ac82-5ab9-9e2a-d8475dc16e09"
+  },
+  {
     "name": "Les Winterges",
     "slug": "les-winterges",
     "lat": 47.938774,
@@ -134286,6 +135462,14 @@
     "lng": 5.224518,
     "altitude": 1049,
     "id": "c3a057fc-3b50-5893-bffc-0f5a8037194c"
+  },
+  {
+    "name": "Cascade de Nyon",
+    "slug": "cascade-de-nyon",
+    "lat": 46.165916,
+    "lng": 6.71192,
+    "altitude": 1049,
+    "id": "82cc6a3a-35e6-51b5-8e31-9a4cbde0db2e"
   },
   {
     "name": "Col du Tourrond",
@@ -134656,6 +135840,14 @@
     "id": "cb84a2b8-b0b2-5788-b708-04ca04ddb81f"
   },
   {
+    "name": "Cascade du Bief de la Chaille",
+    "slug": "cascade-du-bief-de-la-chaille",
+    "lat": 46.464493,
+    "lng": 6.053613,
+    "altitude": 1044,
+    "id": "44013bf3-caa8-5459-aa7e-7c3b13bb539f"
+  },
+  {
     "name": "Belackerkopf",
     "slug": "belackerkopf",
     "lat": 47.834968,
@@ -134838,6 +136030,14 @@
     "lng": 2.565692,
     "altitude": 1041,
     "id": "b6bf0cac-1022-5c03-93fe-e47d89f75cfb"
+  },
+  {
+    "name": "Echauguette",
+    "slug": "echauguette",
+    "lat": 44.667813,
+    "lng": 6.626996,
+    "altitude": 1041,
+    "id": "15803753-f5e2-5318-954a-fac0aa21dcaf"
   },
   {
     "name": "Col de Barioz",
@@ -135784,6 +136984,14 @@
     "id": "3d733ead-fff2-595d-8440-0f47e6592c8f"
   },
   {
+    "name": "Golet du Pont",
+    "slug": "golet-du-pont",
+    "lat": 45.742435,
+    "lng": 6.034829,
+    "altitude": 1028,
+    "id": "9e120f83-c367-5f68-9283-372919875ed3"
+  },
+  {
     "name": "Sardanne",
     "slug": "sardanne",
     "lat": 44.457925,
@@ -136288,6 +137496,14 @@
     "id": "c789ee2c-4479-5f6e-9b6f-6564d407fd60"
   },
   {
+    "name": "Belvédère Roche Chabée",
+    "slug": "belvedere-roche-chabee",
+    "lat": 46.348251,
+    "lng": 5.819324,
+    "altitude": 1021,
+    "id": "f61c33d0-9ec3-50d8-be1b-0fbf8114475e"
+  },
+  {
     "name": "Belvédère du Cuchet",
     "slug": "belvedere-du-cuchet",
     "lat": 46.309209,
@@ -136568,6 +137784,14 @@
     "id": "ab0af592-26d9-5e30-9323-19ea5b13297b"
   },
   {
+    "name": "Sur le replan",
+    "slug": "sur-le-replan",
+    "lat": 46.370923,
+    "lng": 5.898472,
+    "altitude": 1016,
+    "id": "889437af-90f0-581e-98e2-9540a988222d"
+  },
+  {
     "name": "Bordagaina",
     "slug": "bordagaina",
     "lat": 42.946648,
@@ -136638,6 +137862,14 @@
     "lng": 7.177208,
     "altitude": 1015,
     "id": "98d379c5-f969-5b33-abc8-3bfbe0a413d6"
+  },
+  {
+    "name": "Belvédère de la Cernaise",
+    "slug": "belvedere-de-la-cernaise",
+    "lat": 46.350137,
+    "lng": 5.900302,
+    "altitude": 1015,
+    "id": "14b3912d-a416-5e67-bf96-a85ac24619d1"
   },
   {
     "name": "Col de Serre Larobe",
@@ -137176,6 +138408,14 @@
     "id": "b769777d-c981-526a-a52a-da410c1f1119"
   },
   {
+    "name": "Belvédère du Surmontant",
+    "slug": "belvedere-du-surmontant",
+    "lat": 46.358229,
+    "lng": 5.828104,
+    "altitude": 1008,
+    "id": "09748baf-0785-55b6-9902-a2ffc1428e05"
+  },
+  {
     "name": "Monte Combanera",
     "slug": "monte-combanera",
     "lat": 45.229738,
@@ -137206,6 +138446,14 @@
     "lng": 0.713417,
     "altitude": 1007,
     "id": "ac4c1578-4df1-5ffe-8972-7d9daae76208"
+  },
+  {
+    "name": "Belvédère de Pernette",
+    "slug": "belvedere-de-pernette",
+    "lat": 45.804831,
+    "lng": 6.24127,
+    "altitude": 1007,
+    "id": "365d26c4-6498-52c0-b76c-7994d07aadd4"
   },
   {
     "name": "Colle Braida",
@@ -137640,6 +138888,14 @@
     "id": "3591c52a-b6b3-5161-a20c-cb7f1bf64483"
   },
   {
+    "name": "L'Observatoire",
+    "slug": "lobservatoire",
+    "lat": 45.645976,
+    "lng": 6.39347,
+    "altitude": 1002,
+    "id": "f7e48cde-2622-5ea0-a198-cc90eb720b98"
+  },
+  {
     "name": "Belvedere",
     "slug": "belvedere",
     "lat": 44.908082,
@@ -138038,6 +139294,14 @@
     "lng": 6.4525,
     "altitude": 995,
     "id": "7dafe176-44cb-5a25-a323-58b7a209a7bb"
+  },
+  {
+    "name": "Belvédère du Grand Jet",
+    "slug": "belvedere-du-grand-jet",
+    "lat": 45.520617,
+    "lng": 6.473352,
+    "altitude": 995,
+    "id": "3986835a-31d1-5cfd-a4a9-bd5696845f88"
   },
   {
     "name": "Collet du Brec",
@@ -138632,6 +139896,22 @@
     "altitude": 987
   },
   {
+    "name": "Point de vue sur la vallée du Rhône",
+    "slug": "point-de-vue-sur-la-vallee-du-rhone",
+    "lat": 45.737383,
+    "lng": 5.576817,
+    "altitude": 987,
+    "id": "bce1418c-5821-51e9-9a23-2b8c11cd061e"
+  },
+  {
+    "name": "Vue sur les Tours St Jacques",
+    "slug": "vue-sur-les-tours-st-jacques",
+    "lat": 45.749299,
+    "lng": 6.058353,
+    "altitude": 987,
+    "id": "e64132b8-1512-5d89-973b-a28fdd1e3884"
+  },
+  {
     "name": "Grossmann",
     "slug": "grossmann",
     "lat": 48.559167,
@@ -138872,6 +140152,14 @@
     "id": "3709fd01-297c-52cc-8d2b-686d6385982b"
   },
   {
+    "name": "Vue panoramique sur la Albertville et le Mont-Blanc",
+    "slug": "vue-panoramique-sur-la-albertville-et-le-mont-blanc",
+    "lat": 45.673119,
+    "lng": 6.316738,
+    "altitude": 984,
+    "id": "067f1710-5e90-546d-856a-ecf006ce060b"
+  },
+  {
     "name": "Col de Saint-Sébastien",
     "slug": "col-de-saint-sebastien",
     "lat": 44.841612,
@@ -139038,6 +140326,14 @@
     "lng": 6.199606,
     "altitude": 982,
     "id": "f1de9f31-dfe1-59c4-ac6e-94f96d7c2586"
+  },
+  {
+    "name": "Belvédère Grand-Arc",
+    "slug": "belvedere-grand-arc",
+    "lat": 45.669742,
+    "lng": 6.311755,
+    "altitude": 982,
+    "id": "fb282a55-5d4d-5afe-8eb6-83665907f01c"
   },
   {
     "name": "Col de la Sentinelle",
@@ -140112,6 +141408,14 @@
     "id": "2438b588-eb7d-5f6a-a2a5-8f78f191fba6"
   },
   {
+    "name": "Belvédère Tournette",
+    "slug": "belvedere-tournette",
+    "lat": 45.67369,
+    "lng": 6.312799,
+    "altitude": 966,
+    "id": "a1ae7159-3ea6-54e2-b407-656a4c754fe0"
+  },
+  {
     "name": "Punta Masuan",
     "slug": "punta-masuan",
     "lat": 45.193174,
@@ -140590,6 +141894,14 @@
     "lng": -1.564385,
     "altitude": 959,
     "id": "d9945e8a-c7e9-5396-af5d-9457c9c7301b"
+  },
+  {
+    "name": "Cirque du Fer à Cheval",
+    "slug": "cirque-du-fer-a-cheval",
+    "lat": 46.077252,
+    "lng": 6.840501,
+    "altitude": 959,
+    "id": "a29d0a0c-88cc-5cfe-bb58-1536ae258ed9"
   },
   {
     "name": "Col des Égaux",
@@ -141272,6 +142584,14 @@
     "id": "2b90de09-31ab-5b83-952f-96eee098a020"
   },
   {
+    "name": "Belvédère du Mont Clergeon",
+    "slug": "belvedere-du-mont-clergeon",
+    "lat": 45.864212,
+    "lng": 5.884796,
+    "altitude": 949,
+    "id": "2a1f3f0f-60c2-537f-99ca-ca8dae9d1475"
+  },
+  {
     "name": "Rocher de Bellevue",
     "slug": "rocher-de-bellevue",
     "lat": 45.29103,
@@ -141462,6 +142782,14 @@
     "lng": 5.769702,
     "altitude": 947,
     "id": "396ab503-4c83-5a20-b7b5-32695401c50c"
+  },
+  {
+    "name": "Belvédère du Beulet",
+    "slug": "belvedere-du-beulet",
+    "lat": 46.107026,
+    "lng": 6.143285,
+    "altitude": 947,
+    "id": "3d3f7d55-affd-5cd0-926d-87e7fcb6717e"
   },
   {
     "name": "Urstein",
@@ -141752,6 +143080,22 @@
     "id": "5ce25cee-2684-5fb6-961e-a0a181139d5a"
   },
   {
+    "name": "Belvedere du Haut Cret",
+    "slug": "belvedere-du-haut-cret",
+    "lat": 46.230812,
+    "lng": 5.661304,
+    "altitude": 943,
+    "id": "88f1dba9-3d6d-54a6-95d1-59d59dda41d5"
+  },
+  {
+    "name": "4 massifs from la Roche",
+    "slug": "4-massifs-from-la-roche",
+    "lat": 45.279489,
+    "lng": 5.595929,
+    "altitude": 943,
+    "id": "170f596e-7b8b-53a7-bf77-7b0d7d83abe2"
+  },
+  {
     "name": "Truc Basinatto",
     "slug": "truc-basinatto",
     "lat": 45.091693,
@@ -142024,6 +143368,14 @@
     "id": "6bdc929c-65a6-5750-9671-9db43687880f"
   },
   {
+    "name": "Belvédère de Chalais",
+    "slug": "belvedere-de-chalais",
+    "lat": 45.29098,
+    "lng": 5.657586,
+    "altitude": 939,
+    "id": "eaed4996-8e5d-5d8b-b744-02f1063dcaa6"
+  },
+  {
     "name": "La Ronde Bruche",
     "slug": "la-ronde-bruche",
     "lat": 47.933266,
@@ -142262,6 +143614,14 @@
     "lng": 5.297325,
     "altitude": 936,
     "id": "f3188d4c-f673-5e7b-a69a-a662efb43815"
+  },
+  {
+    "name": "La Gyquière",
+    "slug": "la-gyquiere",
+    "lat": 44.517293,
+    "lng": 6.154939,
+    "altitude": 936,
+    "id": "53e58357-1a80-5a4b-bb0c-62c476bf7202"
   },
   {
     "name": "Colle Cumola",
@@ -142590,6 +143950,14 @@
     "lng": 6.791779,
     "altitude": 932,
     "id": "7bd62568-1a69-5e8b-81a4-e552ee6232ae"
+  },
+  {
+    "name": "Belvédère du Sérémond",
+    "slug": "belvedere-du-seremond",
+    "lat": 45.859969,
+    "lng": 5.627019,
+    "altitude": 932,
+    "id": "99b2ab57-abd6-5366-b583-a17396286955"
   },
   {
     "name": "Gurutxagako lepo",
@@ -143104,6 +144472,14 @@
     "id": "68ff3d7e-2e26-5527-b95d-423f7ed0ca78"
   },
   {
+    "name": "Belvédère de la Montagne de Cessens",
+    "slug": "belvedere-de-la-montagne-de-cessens",
+    "lat": 45.801876,
+    "lng": 5.872738,
+    "altitude": 925,
+    "id": "b513df2b-b6e3-57be-ba53-b7492d84d4c6"
+  },
+  {
     "name": "Mintxegi",
     "slug": "mintxegi",
     "lat": 42.918915,
@@ -143462,6 +144838,14 @@
     "lng": 5.870205,
     "altitude": 919,
     "id": "772a0c95-f087-5774-8c0f-b36b14ce5ce9"
+  },
+  {
+    "name": "Guile Canoe entry point 1",
+    "slug": "guile-canoe-entry-point-1",
+    "lat": 44.671636,
+    "lng": 6.644985,
+    "altitude": 919,
+    "id": "2f58d690-0f83-52c9-bb28-86d8f95b3d07"
   },
   {
     "name": "Passe du Sècheneux",
@@ -144280,6 +145664,22 @@
     "altitude": 908
   },
   {
+    "name": "Belvédère du Col du Pré Vernet",
+    "slug": "belvedere-du-col-du-pre-vernet",
+    "lat": 45.908319,
+    "lng": 6.170162,
+    "altitude": 908,
+    "id": "fa13d214-5588-50f9-9de8-637594cbf6d9"
+  },
+  {
+    "name": "Rocher de Najon",
+    "slug": "rocher-de-najon",
+    "lat": 44.100887,
+    "lng": 6.216605,
+    "altitude": 908,
+    "id": "f3dc143a-5860-55a6-b9b2-2e0c37badbed"
+  },
+  {
     "name": "Kohlberg",
     "slug": "kohlberg",
     "lat": 48.512037,
@@ -144350,6 +145750,22 @@
     "lng": 0.505278,
     "altitude": 907,
     "id": "05666767-4517-5cd8-9c1f-429f8ed75831"
+  },
+  {
+    "name": "Point of view over The Alps",
+    "slug": "point-of-view-over-the-alps",
+    "lat": 46.088694,
+    "lng": 6.166388,
+    "altitude": 907,
+    "id": "30cfa8d5-81d5-5cca-abec-d612f03a3525"
+  },
+  {
+    "name": "Font de Sème",
+    "slug": "font-de-seme",
+    "lat": 46.157356,
+    "lng": 5.641083,
+    "altitude": 907,
+    "id": "8aa2ae45-40f1-5189-94fd-4ffc5f06e049"
   },
   {
     "name": "Puy Modifié",
@@ -144536,6 +145952,14 @@
     "id": "830245f2-4baf-57d5-a1e5-f142b6e8aee1"
   },
   {
+    "name": "Arches de l'Écorche-Bœuf",
+    "slug": "arches-de-lecorche-buf",
+    "lat": 45.98859,
+    "lng": 5.766736,
+    "altitude": 904,
+    "id": "f841ca49-a589-5a29-85b4-042064f81c84"
+  },
+  {
     "name": "Le Fournet",
     "slug": "le-fournet",
     "lat": 45.155554,
@@ -144694,6 +146118,14 @@
     "lat": 45.707924,
     "lng": 5.846928,
     "altitude": 901
+  },
+  {
+    "name": "Statue de la Vierge",
+    "slug": "statue-de-la-vierge",
+    "lat": 46.308191,
+    "lng": 5.768233,
+    "altitude": 901,
+    "id": "b55143b4-c4e1-5ae2-bd98-a0c6724ca59e"
   },
   {
     "name": "Col du Banchet",
@@ -145248,6 +146680,14 @@
     "id": "c570d284-69f4-508d-a24a-c81a6e57b425"
   },
   {
+    "name": "Belvédère de la Sourde",
+    "slug": "belvedere-de-la-sourde",
+    "lat": 46.443049,
+    "lng": 5.813712,
+    "altitude": 894,
+    "id": "be36823d-1562-5bf1-944c-d1961025d1c6"
+  },
+  {
     "name": "Bric Castelletto",
     "slug": "bric-castelletto",
     "lat": 44.87282,
@@ -145318,6 +146758,14 @@
     "lng": 7.476997,
     "altitude": 893,
     "id": "f366f874-0006-5582-8517-a54d58119b10"
+  },
+  {
+    "name": "Panorama de Champeillant",
+    "slug": "panorama-de-champeillant",
+    "lat": 46.348383,
+    "lng": 6.590487,
+    "altitude": 893,
+    "id": "eec1eeb8-0646-52eb-9d3e-a0e6abf0cbfc"
   },
   {
     "name": "Montagnazza",
@@ -145488,6 +146936,14 @@
     "id": "3ec9b8f6-d082-57ed-ac02-2c6d104b7aea"
   },
   {
+    "name": "Belvédère des Maquisards",
+    "slug": "belvedere-des-maquisards",
+    "lat": 46.481669,
+    "lng": 6.029594,
+    "altitude": 891,
+    "id": "511ff6e8-e3c9-52be-97ca-288c86f31fe3"
+  },
+  {
     "name": "Rocca Due Denti",
     "slug": "rocca-due-denti",
     "lat": 44.957067,
@@ -145558,6 +147014,22 @@
     "lat": 45.999243,
     "lng": 6.107145,
     "altitude": 890
+  },
+  {
+    "name": "Le Fulet",
+    "slug": "le-fulet",
+    "lat": 46.15707,
+    "lng": 5.617293,
+    "altitude": 890,
+    "id": "052c7d7d-711a-50bb-8a4c-97400fcf2f50"
+  },
+  {
+    "name": "Belvédère de Crémillon",
+    "slug": "belvedere-de-cremillon",
+    "lat": 46.114798,
+    "lng": 6.15064,
+    "altitude": 890,
+    "id": "49c58b58-5705-5d49-bf91-f29d3c3535f1"
   },
   {
     "name": "Arangaitz",
@@ -145912,6 +147384,14 @@
     "id": "ca0e0e3b-fc3f-514a-9085-f7c9eeb63547"
   },
   {
+    "name": "Belvedère de la Cauche",
+    "slug": "belvedere-de-la-cauche",
+    "lat": 45.749237,
+    "lng": 5.817466,
+    "altitude": 885,
+    "id": "e5c26f40-ab6c-55d7-b66e-9b2367632047"
+  },
+  {
     "name": "Col des Mille Martyrs",
     "slug": "col-des-mille-martyrs",
     "lat": 45.43309,
@@ -146240,6 +147720,14 @@
     "id": "505127b1-b46d-5c04-8527-4a66ac13bd4f"
   },
   {
+    "name": "La Saussette",
+    "slug": "la-saussette",
+    "lat": 45.543903,
+    "lng": 6.093153,
+    "altitude": 881,
+    "id": "255dffca-f4ac-5614-97f4-96de7c840bdf"
+  },
+  {
     "name": "Col du Pilori",
     "slug": "col-du-pilori",
     "lat": 45.425571,
@@ -146342,6 +147830,14 @@
     "lng": 6.751396,
     "altitude": 880,
     "id": "47250372-2779-5492-901a-d6477ecbaf29"
+  },
+  {
+    "name": "Roche Bidet",
+    "slug": "roche-bidet",
+    "lat": 45.75041,
+    "lng": 5.556336,
+    "altitude": 880,
+    "id": "9cf96781-b43d-5f55-9de5-7568feecc682"
   },
   {
     "name": "Croix de Fresse",
@@ -146478,6 +147974,14 @@
     "lng": 7.247687,
     "altitude": 878,
     "id": "655aefa1-ba4a-5a55-b902-122e432bf585"
+  },
+  {
+    "name": "Belvédère du Capet",
+    "slug": "belvedere-du-capet",
+    "lat": 46.45241,
+    "lng": 5.841978,
+    "altitude": 878,
+    "id": "c6c0a8b1-201d-5f72-a2b8-c739dee0fd45"
   },
   {
     "name": "Tourdeaux",
@@ -146694,6 +148198,22 @@
     "lng": 6.932536,
     "altitude": 875,
     "id": "ee684427-3ddb-5fcd-b0b5-6db301cef8fe"
+  },
+  {
+    "name": "Belvédère du Bois des Hêtres",
+    "slug": "belvedere-du-bois-des-hetres",
+    "lat": 45.821891,
+    "lng": 6.234247,
+    "altitude": 875,
+    "id": "fe70e34f-01b3-5e6f-a2f6-8bb3b6ae3e4f"
+  },
+  {
+    "name": "Belvédère de la Colonne",
+    "slug": "belvedere-de-la-colonne",
+    "lat": 46.453657,
+    "lng": 5.825462,
+    "altitude": 875,
+    "id": "d6b403dc-f50d-5f67-adea-9564f2b96ee7"
   },
   {
     "name": "Tête du 10ème B.C.P.",
@@ -147006,6 +148526,14 @@
     "lng": -1.581374,
     "altitude": 871,
     "id": "892882d1-531e-5af5-bf18-e5ccaf063db3"
+  },
+  {
+    "name": "L'Eterlou",
+    "slug": "leterlou",
+    "lat": 45.704166,
+    "lng": 5.847179,
+    "altitude": 871,
+    "id": "ff79ee63-a829-5728-a68d-7e0617ae2141"
   },
   {
     "name": "Col de la Flachière",
@@ -147720,6 +149248,14 @@
     "id": "3d730fbc-3b8d-5353-940f-170ceb8bf395"
   },
   {
+    "name": "Belvédère de la Scia",
+    "slug": "belvedere-de-la-scia",
+    "lat": 46.398011,
+    "lng": 5.767779,
+    "altitude": 863,
+    "id": "a3437e06-ac52-5590-b509-74dd8bc6bfd4"
+  },
+  {
     "name": "Plain des Bornes",
     "slug": "plain-des-bornes",
     "lat": 47.821163,
@@ -147870,6 +149406,14 @@
     "lat": 45.715548,
     "lng": 6.380887,
     "altitude": 861
+  },
+  {
+    "name": "Vesancy - Bassin Lémanique",
+    "slug": "vesancy-bassin-lemanique",
+    "lat": 46.357124,
+    "lng": 6.092529,
+    "altitude": 861,
+    "id": "1b45151b-df3b-5a41-b2ed-2247f183dea8"
   },
   {
     "name": "Saint-Jean",
@@ -148320,6 +149864,22 @@
     "id": "845af547-fd3c-5a1e-8538-bdb208064765"
   },
   {
+    "name": "Belvédère de Ponthoux",
+    "slug": "belvedere-de-ponthoux",
+    "lat": 46.395386,
+    "lng": 5.820687,
+    "altitude": 855,
+    "id": "8d8f7184-0c9d-5f18-91d7-88de4d2c6c76"
+  },
+  {
+    "name": "Balcon des Bossons",
+    "slug": "balcon-des-bossons",
+    "lat": 45.86181,
+    "lng": 6.222282,
+    "altitude": 855,
+    "id": "e7f58627-8fb4-5a41-92d9-5e2862a84fef"
+  },
+  {
     "name": "Colle di San Maurizio",
     "slug": "colle-di-san-maurizio",
     "lat": 44.36262,
@@ -148528,6 +150088,14 @@
     "id": "ebe4e22b-9cf0-5ab0-b6a6-a6231c003b8c"
   },
   {
+    "name": "Belvédère du Cuvet",
+    "slug": "belvedere-du-cuvet",
+    "lat": 46.455906,
+    "lng": 5.901967,
+    "altitude": 853,
+    "id": "0e8b7cfb-4a1a-58d4-98c1-cb7b4a001939"
+  },
+  {
     "name": "Les Trois Bornes",
     "slug": "les-trois-bornes",
     "lat": 48.310262,
@@ -148624,6 +150192,14 @@
     "id": "697f648d-291d-5734-8a1a-eae4eff65424"
   },
   {
+    "name": "Belvédère de la croix",
+    "slug": "belvedere-de-la-croix",
+    "lat": 46.338838,
+    "lng": 5.789759,
+    "altitude": 852,
+    "id": "176d6c9f-4044-5e71-a557-4c0d2def0545"
+  },
+  {
     "name": "Puy d'Orval",
     "slug": "puy-dorval",
     "lat": 45.699655,
@@ -148718,6 +150294,14 @@
     "lng": 6.761676,
     "altitude": 851,
     "id": "36d18f22-14ac-5d41-acae-77a190cf2879"
+  },
+  {
+    "name": "Chapelle de la Lésine",
+    "slug": "chapelle-de-la-lesine",
+    "lat": 45.649523,
+    "lng": 6.178264,
+    "altitude": 851,
+    "id": "0306372d-2cd9-5a60-9268-fb42088f812d"
   },
   {
     "name": "Col du Rahmné",
@@ -148966,6 +150550,22 @@
     "lat": 45.712521,
     "lng": 6.301207,
     "altitude": 848
+  },
+  {
+    "name": "Belvédère de Vieugy",
+    "slug": "belvedere-de-vieugy",
+    "lat": 45.852075,
+    "lng": 6.101086,
+    "altitude": 848,
+    "id": "41e82fd8-dc96-5984-bfce-edf051921539"
+  },
+  {
+    "name": "Panorama de l'Oratoire",
+    "slug": "panorama-de-loratoire",
+    "lat": 45.785926,
+    "lng": 6.192992,
+    "altitude": 848,
+    "id": "85d50a72-92ea-58da-a042-fb15891c85a9"
   },
   {
     "name": "Hohbuehl",
@@ -149438,6 +151038,14 @@
     "lat": 45.567578,
     "lng": 6.029675,
     "altitude": 842
+  },
+  {
+    "name": "Belvédère de Reyvroz",
+    "slug": "belvedere-de-reyvroz",
+    "lat": 46.325896,
+    "lng": 6.560978,
+    "altitude": 842,
+    "id": "224c732d-14d4-5fc2-aded-9b9491984e15"
   },
   {
     "name": "Le Devin",
@@ -149936,6 +151544,14 @@
     "id": "c4229d43-8adc-5b9c-b1d5-16b822f83799"
   },
   {
+    "name": "Tourbière de Cerin",
+    "slug": "tourbiere-de-cerin",
+    "lat": 45.778974,
+    "lng": 5.56487,
+    "altitude": 835,
+    "id": "69c9362a-fb81-5bb5-960a-10d8b8aeb11a"
+  },
+  {
     "name": "Le Haquin",
     "slug": "le-haquin",
     "lat": 47.757976,
@@ -150134,6 +151750,14 @@
     "lng": 0.904928,
     "altitude": 833,
     "id": "bc97ca02-b74f-5521-87e9-33780d33c308"
+  },
+  {
+    "name": "Bélvédère de la Corbière",
+    "slug": "belvedere-de-la-corbiere",
+    "lat": 46.470921,
+    "lng": 5.920124,
+    "altitude": 833,
+    "id": "e17eb3a6-8d0c-5bdc-83ab-5cb7f683c553"
   },
   {
     "name": "Poirière",
@@ -151256,6 +152880,14 @@
     "altitude": 821
   },
   {
+    "name": "Belvédère des Voies de l'Épine",
+    "slug": "belvedere-des-voies-de-lepine",
+    "lat": 45.554118,
+    "lng": 5.825298,
+    "altitude": 821,
+    "id": "7d8bf803-69ea-5d4b-8d36-ac53e9c24092"
+  },
+  {
     "name": "Brame-Faim",
     "slug": "brame-faim",
     "lat": 44.058974,
@@ -151326,6 +152958,14 @@
     "lng": 5.379859,
     "altitude": 820,
     "id": "fe01c437-f0ec-599a-a637-13a368cfc5ed"
+  },
+  {
+    "name": "Belvédère de l'Albanais",
+    "slug": "belvedere-de-lalbanais",
+    "lat": 45.798676,
+    "lng": 5.876464,
+    "altitude": 820,
+    "id": "6fe16e0e-17ba-505c-ae77-3e441f4a9c24"
   },
   {
     "name": "Montagne du Mulet",
@@ -151752,6 +153392,14 @@
     "id": "5c429d68-6ddb-516e-b3fa-0cdb3193096e"
   },
   {
+    "name": "Belvédère du Cinquétral",
+    "slug": "belvedere-du-cinquetral",
+    "lat": 46.421785,
+    "lng": 5.874148,
+    "altitude": 815,
+    "id": "34c017b4-a69f-544c-8383-737cb30349ef"
+  },
+  {
     "name": "La Poya",
     "slug": "la-poya",
     "lat": 45.219395,
@@ -151830,6 +153478,14 @@
     "lng": -1.770741,
     "altitude": 814,
     "id": "8e86aea9-b55a-5d6a-814b-4bfdfe4a6c72"
+  },
+  {
+    "name": "La Cadette dei Pensieri",
+    "slug": "la-cadette-dei-pensieri",
+    "lat": 45.698613,
+    "lng": 7.159724,
+    "altitude": 814,
+    "id": "27b3f697-79af-5333-9ee8-bd475eb5da6d"
   },
   {
     "name": "Hohrupf",
@@ -153136,6 +154792,14 @@
     "id": "8f2c2c2c-f1e4-5e3a-970a-fa5f2ae20da8"
   },
   {
+    "name": "Belvédère des Tours de César",
+    "slug": "belvedere-des-tours-de-cesar",
+    "lat": 45.796391,
+    "lng": 5.873025,
+    "altitude": 800,
+    "id": "e3a213d3-debb-5506-ac27-5ca2c5628e2e"
+  },
+  {
     "name": "Mont Frol",
     "slug": "mont-frol",
     "lat": 45.415745,
@@ -153224,6 +154888,14 @@
     "id": "e2f054d8-6681-5e46-b6f3-439d03f54572"
   },
   {
+    "name": "Vue sur Gapençais & Écrins",
+    "slug": "vue-sur-gapencais-ecrins",
+    "lat": 44.458118,
+    "lng": 6.003358,
+    "altitude": 799,
+    "id": "b7a20108-0b4a-5bdd-93b6-f58409817bcf"
+  },
+  {
     "name": "Puy Couyaud",
     "slug": "puy-couyaud",
     "lat": 45.74917,
@@ -153262,6 +154934,14 @@
     "lng": 7.116676,
     "altitude": 798,
     "id": "c366228e-5a36-5556-8249-644febfbbc0c"
+  },
+  {
+    "name": "Belvédère de la Drayère",
+    "slug": "belvedere-de-la-drayere",
+    "lat": 45.576664,
+    "lng": 5.811198,
+    "altitude": 798,
+    "id": "ad4cb1c9-779d-5886-8102-0c1b3f303f5e"
   },
   {
     "name": "Puy la Chaume",
@@ -153374,6 +155054,14 @@
     "lng": 6.906291,
     "altitude": 797,
     "id": "23bef186-116f-5f84-85af-fd29e6037b02"
+  },
+  {
+    "name": "Bevédère de Peney",
+    "slug": "bevedere-de-peney",
+    "lat": 46.157004,
+    "lng": 5.663859,
+    "altitude": 797,
+    "id": "62c37a9e-d9eb-5a38-94de-4a8a75d32aa4"
   },
   {
     "name": "Col de Martimpré",
@@ -154134,6 +155822,14 @@
     "lng": -0.617573,
     "altitude": 788,
     "id": "d11c31b5-70a0-55de-9c3d-9308cccf27f1"
+  },
+  {
+    "name": "Belvédère du Pic d'Oliferne",
+    "slug": "belvedere-du-pic-doliferne",
+    "lat": 46.319001,
+    "lng": 5.588454,
+    "altitude": 788,
+    "id": "5319e92e-2f18-5618-accd-79017f165fbf"
   },
   {
     "name": "Monte Craviale",
@@ -155016,6 +156712,14 @@
     "id": "b8fa9445-cc2a-531d-85a2-e2b02a5b8d13"
   },
   {
+    "name": "La Jaÿsinia",
+    "slug": "la-jaysinia",
+    "lat": 46.085436,
+    "lng": 6.726848,
+    "altitude": 778,
+    "id": "de325296-d3e9-5d9f-9223-62f992e4e943"
+  },
+  {
     "name": "La Grande Porte",
     "slug": "la-grande-porte",
     "lat": 45.388395,
@@ -155680,6 +157384,14 @@
     "id": "4baa585b-b8f1-53c6-be8b-1a2d7bcf86b0"
   },
   {
+    "name": "Belvédère du Crêt des Bruyères",
+    "slug": "belvedere-du-cret-des-bruyeres",
+    "lat": 45.875225,
+    "lng": 6.121673,
+    "altitude": 770,
+    "id": "2bae06e4-9654-5bf3-816f-e98108bcbae8"
+  },
+  {
     "name": "Roche du Chapeau",
     "slug": "roche-du-chapeau",
     "lat": 48.307963,
@@ -155846,6 +157558,14 @@
     "lng": -1.927571,
     "altitude": 768,
     "id": "cb5c4497-cbc8-5963-b95d-5b0e10bbfb60"
+  },
+  {
+    "name": "Belvédère des Gélinottes",
+    "slug": "belvedere-des-gelinottes",
+    "lat": 45.878542,
+    "lng": 6.124588,
+    "altitude": 768,
+    "id": "4e2cdfee-008f-501d-b892-cc7cc2a9bcde"
   },
   {
     "name": "Puy Parry",
@@ -156400,6 +158120,14 @@
     "id": "d2449dd0-1bac-529b-b400-8e6a16ed958d"
   },
   {
+    "name": "Le Tongea",
+    "slug": "le-tongea",
+    "lat": 46.438305,
+    "lng": 5.728418,
+    "altitude": 760,
+    "id": "1f1c78a7-474c-54ab-8b88-31e9eb7fc953"
+  },
+  {
     "name": "Buchberg",
     "slug": "buchberg",
     "lat": 47.782575,
@@ -156552,6 +158280,14 @@
     "altitude": 758
   },
   {
+    "name": "Observatoire Hubert Favre",
+    "slug": "observatoire-hubert-favre",
+    "lat": 45.716145,
+    "lng": 6.574233,
+    "altitude": 758,
+    "id": "53c4cc62-5760-526b-9d12-658b4238e004"
+  },
+  {
     "name": "Les Collets",
     "slug": "les-collets",
     "lat": 44.43415,
@@ -156702,6 +158438,14 @@
     "lng": -1.795991,
     "altitude": 755,
     "id": "db86c404-3125-5c3b-a940-4ff3847c63a5"
+  },
+  {
+    "name": "Point de vue du Plan d'Acier",
+    "slug": "point-de-vue-du-plan-dacier",
+    "lat": 46.389092,
+    "lng": 5.835822,
+    "altitude": 755,
+    "id": "cb57b94e-3cbb-5189-9227-a6ad694ebff9"
   },
   {
     "name": "Puy Desgeorges",
@@ -156902,6 +158646,14 @@
     "lat": 45.97103,
     "lng": 5.990908,
     "altitude": 753
+  },
+  {
+    "name": "Pierre à Faille",
+    "slug": "pierre-a-faille",
+    "lat": 46.172743,
+    "lng": 7.015496,
+    "altitude": 753,
+    "id": "61d29968-2435-51fc-aea8-b22b44cd60cb"
   },
   {
     "name": "Le Grand Alhan",
@@ -157976,6 +159728,14 @@
     "id": "172536b1-ec97-59aa-9bd8-2e9f4e59009d"
   },
   {
+    "name": "La Cascade de Coeur",
+    "slug": "la-cascade-de-coeur",
+    "lat": 45.931885,
+    "lng": 6.718817,
+    "altitude": 738,
+    "id": "097a583f-8263-553b-916f-1c25639b22d2"
+  },
+  {
     "name": "Pravena",
     "slug": "pravena",
     "lat": 45.098464,
@@ -158102,6 +159862,14 @@
     "lat": 45.953772,
     "lng": 5.995704,
     "altitude": 736
+  },
+  {
+    "name": "Tour médiévale",
+    "slug": "tour-medievale",
+    "lat": 44.319371,
+    "lng": 5.874218,
+    "altitude": 736,
+    "id": "f8265f43-093f-57ad-97b8-4c95562161c5"
   },
   {
     "name": "Geisskopf",
@@ -158512,6 +160280,14 @@
     "id": "9fa11b47-17de-5237-affb-be957d5edabe"
   },
   {
+    "name": "Crêt du Chable",
+    "slug": "cret-du-chable",
+    "lat": 46.161333,
+    "lng": 6.221147,
+    "altitude": 730,
+    "id": "1415336f-6258-5e50-9406-2237000f2209"
+  },
+  {
     "name": "Truc Ciapetto",
     "slug": "truc-ciapetto",
     "lat": 45.037817,
@@ -158814,6 +160590,22 @@
     "lng": 6.751998,
     "altitude": 726,
     "id": "7a8211e6-c20f-5255-b2ca-57ca9b7ed8d8"
+  },
+  {
+    "name": "Point de vue « des Tables »",
+    "slug": "point-de-vue-des-tables",
+    "lat": 45.748036,
+    "lng": 5.828479,
+    "altitude": 726,
+    "id": "2a3cca18-f28d-5eaf-8fbd-7f7024b7aeb4"
+  },
+  {
+    "name": "La Tête d'Henri IV",
+    "slug": "la-tete-dhenri-iv",
+    "lat": 46.427756,
+    "lng": 5.733686,
+    "altitude": 726,
+    "id": "6c7a5ec8-4217-564b-9b8b-99f652f67aa1"
   },
   {
     "name": "Triebelskopf",
@@ -161360,6 +163152,14 @@
     "id": "9343f641-dd6b-5dc3-b0cc-4468349a83de"
   },
   {
+    "name": "Belvédère de l'Arpettaz",
+    "slug": "belvedere-de-larpettaz",
+    "lat": 45.902479,
+    "lng": 6.285206,
+    "altitude": 698,
+    "id": "8927d625-f616-5cee-a7ca-2fd113b3c498"
+  },
+  {
     "name": "Puig de les Eres",
     "slug": "puig-de-les-eres",
     "lat": 42.461573,
@@ -161494,6 +163294,14 @@
     "lng": -0.701207,
     "altitude": 696,
     "id": "38bcf365-4b9f-5cfd-8963-5a508f95c63a"
+  },
+  {
+    "name": "Belvédère du Jai",
+    "slug": "belvedere-du-jai",
+    "lat": 46.414907,
+    "lng": 5.816157,
+    "altitude": 696,
+    "id": "52d0d6ea-927b-5919-af40-ee1a40292a57"
   },
   {
     "name": "Col de Longeroye",
@@ -162192,6 +164000,14 @@
     "id": "6b5c0954-cc30-588b-ac5e-6f8800928a81"
   },
   {
+    "name": "Réservoir de la Combe",
+    "slug": "reservoir-de-la-combe",
+    "lat": 45.964284,
+    "lng": 5.99441,
+    "altitude": 685,
+    "id": "2f90a1a7-7b7b-5431-9406-c94a89099d99"
+  },
+  {
     "name": "Notre-Dame des Hauteurs",
     "slug": "notre-dame-des-hauteurs",
     "lat": 44.607273,
@@ -162440,6 +164256,14 @@
     "id": "461e850e-5a5e-57e1-b337-b082bb478d69"
   },
   {
+    "name": "Belvédère de la Biche",
+    "slug": "belvedere-de-la-biche",
+    "lat": 45.694989,
+    "lng": 5.845995,
+    "altitude": 682,
+    "id": "b16c9351-1325-5c2d-9f78-ebcb1186a38d"
+  },
+  {
     "name": "Col de Chamont",
     "slug": "col-de-chamont",
     "lat": 48.171905,
@@ -162606,6 +164430,14 @@
     "lng": 0.762269,
     "altitude": 680,
     "id": "460b1f4a-44ae-5a1a-b617-646a62ebc8d7"
+  },
+  {
+    "name": "Croix de Sainte-Catherine",
+    "slug": "croix-de-sainte-catherine",
+    "lat": 45.872354,
+    "lng": 6.112074,
+    "altitude": 680,
+    "id": "b8bb0160-6336-5cb1-a8cb-12f0efb7aab2"
   },
   {
     "name": "Col des croix",
@@ -163016,6 +164848,22 @@
     "id": "495bfe34-c0f7-5f84-8b26-c2ca5549ca56"
   },
   {
+    "name": "Panorama sur Vizille",
+    "slug": "panorama-sur-vizille",
+    "lat": 45.084379,
+    "lng": 5.802193,
+    "altitude": 674,
+    "id": "e5b38636-10a0-5888-beab-f6d64c46d05c"
+  },
+  {
+    "name": "Poggio Oddone",
+    "slug": "poggio-oddone",
+    "lat": 44.957074,
+    "lng": 7.195574,
+    "altitude": 674,
+    "id": "6098ab01-8aac-54fc-b1dd-fa563028e001"
+  },
+  {
     "name": "Belvédère de Sorémont",
     "slug": "belvedere-de-soremont",
     "lat": 48.231793,
@@ -163376,6 +165224,14 @@
     "id": "338dc3db-416c-56e5-bd6e-49d264347d0b"
   },
   {
+    "name": "Passerelle des Thermes",
+    "slug": "passerelle-des-thermes",
+    "lat": 45.894971,
+    "lng": 6.707379,
+    "altitude": 669,
+    "id": "cd63674e-8c54-5acd-b668-61c8561bb92d"
+  },
+  {
     "name": "Haut du Pré du Four",
     "slug": "haut-du-pre-du-four",
     "lat": 48.478659,
@@ -163430,6 +165286,14 @@
     "lng": -1.675515,
     "altitude": 668,
     "id": "f98c8940-01dd-53f5-b3e4-81f42f85f7a2"
+  },
+  {
+    "name": "Attention bord de falaise",
+    "slug": "attention-bord-de-falaise",
+    "lat": 46.018009,
+    "lng": 6.627488,
+    "altitude": 668,
+    "id": "73ce651b-5e63-58c5-a2dd-d79a97c17631"
   },
   {
     "name": "Col de l'Altenberg",
@@ -163848,6 +165712,14 @@
     "id": "2ca29637-ed76-50eb-9e17-fc61304657fa"
   },
   {
+    "name": "Belvédère du Pas de l'Échelle",
+    "slug": "belvedere-du-pas-de-lechelle",
+    "lat": 45.885379,
+    "lng": 6.127625,
+    "altitude": 662,
+    "id": "1b1a6194-2148-518b-bc37-a3f7cb97d64a"
+  },
+  {
     "name": "Roche du Banbois",
     "slug": "roche-du-banbois",
     "lat": 48.239546,
@@ -163960,6 +165832,14 @@
     "id": "19bc5dfa-38ec-527c-b865-ae70b6815aca"
   },
   {
+    "name": "Vallon de Foron",
+    "slug": "vallon-de-foron",
+    "lat": 46.109412,
+    "lng": 6.592363,
+    "altitude": 660,
+    "id": "2a2ed202-e037-543a-9f61-4db55e154893"
+  },
+  {
     "name": "Feuerstein",
     "slug": "feuerstein",
     "lat": 48.61269,
@@ -164006,6 +165886,14 @@
     "lng": 0.920763,
     "altitude": 659,
     "id": "856ceb56-8b70-5b74-9dea-4288b2515a30"
+  },
+  {
+    "name": "Belvédère de Maria Mâtre",
+    "slug": "belvedere-de-maria-matre",
+    "lat": 46.164992,
+    "lng": 5.58867,
+    "altitude": 659,
+    "id": "0b9e2a88-7b8b-56b5-8ce8-a18da26d06be"
   },
   {
     "name": "Katzenstein",
@@ -164070,6 +165958,14 @@
     "lng": 2.334242,
     "altitude": 658,
     "id": "fc9b40a2-b582-520e-915e-9b967fe49546"
+  },
+  {
+    "name": "La Barme",
+    "slug": "la-barme",
+    "lat": 45.576614,
+    "lng": 6.16824,
+    "altitude": 658,
+    "id": "2d577874-faca-5643-a5c1-9a61429f1c69"
   },
   {
     "name": "Le Clochet",
@@ -164152,6 +166048,22 @@
     "altitude": 656
   },
   {
+    "name": "Belvédère des ponts",
+    "slug": "belvedere-des-ponts",
+    "lat": 46.012786,
+    "lng": 6.110982,
+    "altitude": 656,
+    "id": "1ee163ba-b500-5503-ba8e-bdba04a8cb23"
+  },
+  {
+    "name": "Belvédère des gorges",
+    "slug": "belvedere-des-gorges",
+    "lat": 46.013556,
+    "lng": 6.109893,
+    "altitude": 656,
+    "id": "9360ef32-7dbf-5470-81d6-b3e05e247606"
+  },
+  {
     "name": "Sommet de Monure",
     "slug": "sommet-de-monure",
     "lat": 45.387891,
@@ -164214,6 +166126,14 @@
     "lat": 45.971536,
     "lng": 5.912576,
     "altitude": 655
+  },
+  {
+    "name": "Belvédère du Châtelet",
+    "slug": "belvedere-du-chatelet",
+    "lat": 46.422596,
+    "lng": 5.644354,
+    "altitude": 655,
+    "id": "8b52468e-03e2-5f14-a3ee-9b0e6fdc3f5c"
   },
   {
     "name": "Schild",
@@ -164328,6 +166248,14 @@
     "id": "acb44010-636a-53af-b7c4-51b881a2e62a"
   },
   {
+    "name": "Croix Tête de Beurre",
+    "slug": "croix-tete-de-beurre",
+    "lat": 45.543813,
+    "lng": 5.998885,
+    "altitude": 653,
+    "id": "d5c8d442-514b-5987-be0c-5628c2b20dca"
+  },
+  {
     "name": "Puy de Chaud",
     "slug": "puy-de-chaud",
     "lat": 46.013978,
@@ -164430,6 +166358,14 @@
     "lng": 0.636135,
     "altitude": 651,
     "id": "6727bb9b-fac6-532d-99da-abe1fb6e078b"
+  },
+  {
+    "name": "Belvédère de la Crête",
+    "slug": "belvedere-de-la-crete",
+    "lat": 45.843787,
+    "lng": 6.204301,
+    "altitude": 651,
+    "id": "43973484-5da5-57a5-bd93-21c66f0cc2d4"
   },
   {
     "name": "Place des Canaris",
@@ -164560,6 +166496,14 @@
     "id": "1d923e5c-1ec4-57cf-8de3-ce1ee65a2bdb"
   },
   {
+    "name": "La Parchale",
+    "slug": "la-parchale",
+    "lat": 45.661608,
+    "lng": 5.954847,
+    "altitude": 649,
+    "id": "05050590-634f-5198-8ce0-51fc44840f6f"
+  },
+  {
     "name": "Col du Frankenbourg",
     "slug": "col-du-frankenbourg",
     "lat": 48.295721,
@@ -164616,6 +166560,14 @@
     "id": "0513ddaa-8a8a-5a4f-9ecc-46cab94eaec5"
   },
   {
+    "name": "Belvédère Saint-Joseph",
+    "slug": "belvedere-saint-joseph",
+    "lat": 45.700488,
+    "lng": 5.609836,
+    "altitude": 648,
+    "id": "0bc9496a-cdc0-5cf4-b450-a2a9fe6dac2d"
+  },
+  {
     "name": "Col du Sickertbach",
     "slug": "col-du-sickertbach",
     "lat": 47.803163,
@@ -164670,6 +166622,14 @@
     "lng": -1.721893,
     "altitude": 647,
     "id": "d716f2d0-2153-5d91-903d-3b1bd3546fa2"
+  },
+  {
+    "name": "La Tour Sans Venin",
+    "slug": "la-tour-sans-venin",
+    "lat": 45.172247,
+    "lng": 5.668398,
+    "altitude": 647,
+    "id": "4c602d2f-234e-5a01-bf66-ddc8291ba449"
   },
   {
     "name": "le Cuchet",
@@ -165110,6 +167070,14 @@
     "lng": 6.374929,
     "altitude": 641,
     "id": "eb2dac4d-a6fc-567f-a172-468ba3889789"
+  },
+  {
+    "name": "Belvédère du Bief Dessous",
+    "slug": "belvedere-du-bief-dessous",
+    "lat": 46.403869,
+    "lng": 5.686868,
+    "altitude": 641,
+    "id": "a69b670c-01d5-59a0-a86a-e357397ced34"
   },
   {
     "name": "Collet de Bat",
@@ -165864,6 +167832,14 @@
     "id": "f485bdbb-6991-5e67-9030-8967f1e8c401"
   },
   {
+    "name": "Falaises du Banchet",
+    "slug": "falaises-du-banchet",
+    "lat": 45.574407,
+    "lng": 5.732713,
+    "altitude": 632,
+    "id": "deb9416e-9132-5520-8439-66e706279cdb"
+  },
+  {
     "name": "Mont Pénury",
     "slug": "mont-penury",
     "lat": 46.059088,
@@ -166280,6 +168256,14 @@
     "id": "55e524e3-688c-5341-8477-121597883d47"
   },
   {
+    "name": "Le Promontoire",
+    "slug": "le-promontoire",
+    "lat": 45.88263,
+    "lng": 6.123613,
+    "altitude": 627,
+    "id": "b400f781-4568-5e03-ba51-7ac9b82471f7"
+  },
+  {
     "name": "Molard de Monnet",
     "slug": "molard-de-monnet",
     "lat": 46.68223,
@@ -166334,6 +168318,22 @@
     "lng": 5.768834,
     "altitude": 626,
     "id": "af44bc49-13d5-5db0-8de2-f6cc5554dc14"
+  },
+  {
+    "name": "Sentier Botanique",
+    "slug": "sentier-botanique",
+    "lat": 45.65771,
+    "lng": 5.84419,
+    "altitude": 626,
+    "id": "6a4267cf-2521-53b4-891e-1d45c13a3116"
+  },
+  {
+    "name": "Voiles de Landeyron",
+    "slug": "voiles-de-landeyron",
+    "lat": 46.171356,
+    "lng": 5.595543,
+    "altitude": 626,
+    "id": "ab58c6dc-5b6a-58bb-b697-5f5885effa27"
   },
   {
     "name": "Col du Mont de Fourche",
@@ -166904,6 +168904,14 @@
     "id": "f6ef6d25-50e5-5ac7-b157-8efaaea58b02"
   },
   {
+    "name": "Belvédère de Recorba",
+    "slug": "belvedere-de-recorba",
+    "lat": 45.648843,
+    "lng": 5.70444,
+    "altitude": 620,
+    "id": "26c700e0-2223-5397-8458-7e80b08828a5"
+  },
+  {
     "name": "La Roca Parpaiola",
     "slug": "la-roca-parpaiola",
     "lat": 45.055604,
@@ -167264,6 +169272,22 @@
     "id": "8b8c22b6-e09f-5e0c-8906-9215ee5c698e"
   },
   {
+    "name": "Sources de l'Allondon",
+    "slug": "sources-de-lallondon",
+    "lat": 46.302078,
+    "lng": 6.02634,
+    "altitude": 615,
+    "id": "4746b650-4fae-5d07-8ad5-51d50fa87268"
+  },
+  {
+    "name": "Belvédère des Bourlaches",
+    "slug": "belvedere-des-bourlaches",
+    "lat": 46.456572,
+    "lng": 5.672209,
+    "altitude": 615,
+    "id": "184705f5-daba-54c3-b2bc-f9b6c1dce595"
+  },
+  {
     "name": "Amselkopf",
     "slug": "amselkopf",
     "lat": 47.822313,
@@ -167374,6 +169398,22 @@
     "lng": 0.446541,
     "altitude": 613,
     "id": "64044266-84f1-517b-9d4d-30e367044662"
+  },
+  {
+    "name": "La Pierre qui vire",
+    "slug": "la-pierre-qui-vire",
+    "lat": 46.326589,
+    "lng": 5.635052,
+    "altitude": 613,
+    "id": "16be8876-dc3e-571f-9911-413709d01ece"
+  },
+  {
+    "name": "Panorama sur l'Avant-Pays Savoyard",
+    "slug": "panorama-sur-lavant-pays-savoyard",
+    "lat": 45.722082,
+    "lng": 5.824587,
+    "altitude": 613,
+    "id": "f0d8a1f4-7de3-5ab1-b457-9ffcf2230f22"
   },
   {
     "name": "Geissfels",
@@ -167782,6 +169822,14 @@
     "lng": 2.079734,
     "altitude": 607,
     "id": "7bcd823d-a3dd-5e0d-8888-b14601ce4842"
+  },
+  {
+    "name": "Belvédère du Regardoir",
+    "slug": "belvedere-du-regardoir",
+    "lat": 46.445254,
+    "lng": 5.708022,
+    "altitude": 607,
+    "id": "e70af86a-aec6-547a-b585-c8a279bd2551"
   },
   {
     "name": "Petit Noll",
@@ -168976,6 +171024,14 @@
     "id": "9468bda4-e007-546e-9dae-582bcbd8db12"
   },
   {
+    "name": "Belvédère du Poulet",
+    "slug": "belvedere-du-poulet",
+    "lat": 46.360992,
+    "lng": 5.516116,
+    "altitude": 593,
+    "id": "d59bacca-50a5-5efd-be52-a08100f1d0a9"
+  },
+  {
     "name": "Peugstein",
     "slug": "peugstein",
     "lat": 48.61146,
@@ -169110,6 +171166,22 @@
     "lng": 2.152931,
     "altitude": 591,
     "id": "270d9f97-7390-54ee-898f-3adaeba74d3c"
+  },
+  {
+    "name": "Grotte des Fées",
+    "slug": "grotte-des-fees",
+    "lat": 45.735556,
+    "lng": 5.903807,
+    "altitude": 591,
+    "id": "64e6d815-9164-504d-b8e0-f5f7570d05a1"
+  },
+  {
+    "name": "Belvédère de Monnetay",
+    "slug": "belvedere-de-monnetay",
+    "lat": 46.454681,
+    "lng": 5.516269,
+    "altitude": 591,
+    "id": "91ae77ff-3fb6-534b-aa07-9a98b4ad39db"
   },
   {
     "name": "Signal d'Alaric",
@@ -169480,6 +171552,22 @@
     "id": "abda1c1c-0bfc-53a7-9d00-a243ab7735f2"
   },
   {
+    "name": "Plateforme de Vision",
+    "slug": "plateforme-de-vision",
+    "lat": 45.707998,
+    "lng": 5.856299,
+    "altitude": 586,
+    "id": "3801618c-6e85-529e-8f19-8294be3b5490"
+  },
+  {
+    "name": "Plateforme de Repos",
+    "slug": "plateforme-de-repos",
+    "lat": 45.707852,
+    "lng": 5.856534,
+    "altitude": 586,
+    "id": "a01305b6-b56b-55d6-a7f7-6a276de7ed92"
+  },
+  {
     "name": "Puech de Poujol",
     "slug": "puech-de-poujol",
     "lat": 44.701183,
@@ -169494,6 +171582,30 @@
     "lat": 45.999581,
     "lng": 5.911519,
     "altitude": 585
+  },
+  {
+    "name": "Château des Sarrasins",
+    "slug": "chateau-des-sarrasins",
+    "lat": 45.872144,
+    "lng": 5.795553,
+    "altitude": 585,
+    "id": "42fbb28b-60ae-5e4d-864c-447519d02225"
+  },
+  {
+    "name": "Belvédère d'Ontex Grumeau",
+    "slug": "belvedere-dontex-grumeau",
+    "lat": 45.749218,
+    "lng": 5.831682,
+    "altitude": 585,
+    "id": "46cb0952-13f4-5ada-8ab4-5e694a18a7af"
+  },
+  {
+    "name": "San Pietro in Vincoli",
+    "slug": "san-pietro-in-vincoli",
+    "lat": 44.926544,
+    "lng": 7.24932,
+    "altitude": 585,
+    "id": "635adc54-dfd4-550b-b7cf-b780e871b503"
   },
   {
     "name": "Punta del Grillo",
@@ -169640,6 +171752,14 @@
     "id": "3580941a-5611-5d01-9b2a-1c266c0ac550"
   },
   {
+    "name": "Belvédère de Rupt",
+    "slug": "belvedere-de-rupt",
+    "lat": 46.36843,
+    "lng": 5.631337,
+    "altitude": 583,
+    "id": "4f5e9859-b3c3-514c-9fe0-9c575b0ea9b7"
+  },
+  {
     "name": "Bal di Maschi",
     "slug": "bal-di-maschi",
     "lat": 45.056948,
@@ -169742,6 +171862,22 @@
     "lng": 2.160605,
     "altitude": 581,
     "id": "f852ffa4-acd7-5ad3-8670-98241692a7e1"
+  },
+  {
+    "name": "La Serraz",
+    "slug": "la-serraz",
+    "lat": 45.768562,
+    "lng": 6.231754,
+    "altitude": 581,
+    "id": "f9f23c6b-97aa-55d7-bbf4-d1d5be91e116"
+  },
+  {
+    "name": "Belvédère EDF de Monteynard-Avignonet",
+    "slug": "belvedere-edf-de-monteynard-avignonet",
+    "lat": 44.959856,
+    "lng": 5.688029,
+    "altitude": 581,
+    "id": "2a4fefff-3fb4-50ab-bad1-5d6d36e97001"
   },
   {
     "name": "Col du Grumbach",
@@ -169880,6 +172016,14 @@
     "altitude": 579
   },
   {
+    "name": "Vue de dessus de la Grande Cascade",
+    "slug": "vue-de-dessus-de-la-grande-cascade",
+    "lat": 45.596387,
+    "lng": 5.974164,
+    "altitude": 579,
+    "id": "77d0430f-97c3-5bb1-ab47-d2c9fa2fc582"
+  },
+  {
     "name": "La Brosse",
     "slug": "la-brosse",
     "lat": 47.731504,
@@ -169950,6 +172094,14 @@
     "lng": -1.792107,
     "altitude": 578,
     "id": "d87c5427-deb8-5e4a-8b04-90bb73297021"
+  },
+  {
+    "name": "Belvédère de l'Hermitage",
+    "slug": "belvedere-de-lhermitage",
+    "lat": 46.387732,
+    "lng": 5.869082,
+    "altitude": 578,
+    "id": "501f0ec1-66c2-5dab-b194-c9ba06511795"
   },
   {
     "name": "Parmont",
@@ -170440,6 +172592,14 @@
     "id": "e580d57d-0fe0-544b-a48f-ba3b6b692e5c"
   },
   {
+    "name": "Belvédère des Champs Palards",
+    "slug": "belvedere-des-champs-palards",
+    "lat": 46.421783,
+    "lng": 5.686816,
+    "altitude": 571,
+    "id": "cb7d2fee-ba3c-586b-bfc4-28ebd8f83cab"
+  },
+  {
     "name": "Col de Pressembois",
     "slug": "col-de-pressembois",
     "lat": 45.177977,
@@ -170616,6 +172776,14 @@
     "id": "380c26f7-6c85-5b85-ac38-a0b7eccc5634"
   },
   {
+    "name": "Gorges de la Méouge",
+    "slug": "gorges-de-la-meouge",
+    "lat": 44.277917,
+    "lng": 5.79264,
+    "altitude": 568,
+    "id": "d5b92f55-e166-5a7e-a0ee-027a6f6ce02f"
+  },
+  {
     "name": "Croix de Côte Curt",
     "slug": "croix-de-cote-curt",
     "lat": 45.382235,
@@ -170750,6 +172918,22 @@
     "lng": -1.623303,
     "altitude": 566,
     "id": "22346b90-85f2-51f7-81b2-b434cb2a21fd"
+  },
+  {
+    "name": "Point de vue sur les lacs de Chevelu",
+    "slug": "point-de-vue-sur-les-lacs-de-chevelu",
+    "lat": 45.698429,
+    "lng": 5.838562,
+    "altitude": 566,
+    "id": "87765dbc-e96d-53fa-8716-0f00d98e1ae6"
+  },
+  {
+    "name": "Belvédère du tilleul",
+    "slug": "belvedere-du-tilleul",
+    "lat": 46.393794,
+    "lng": 5.583973,
+    "altitude": 566,
+    "id": "a7652e51-7af9-5c33-b528-cb51d29ff0d7"
   },
   {
     "name": "Saegenkopf",
@@ -171256,6 +173440,22 @@
     "id": "7160b589-9a45-59f0-b16c-e4b83e3b5d09"
   },
   {
+    "name": "Belvédère des Maisons Fortes",
+    "slug": "belvedere-des-maisons-fortes",
+    "lat": 45.683605,
+    "lng": 5.825155,
+    "altitude": 559,
+    "id": "98d949a5-0c59-5479-85de-0266262c5e80"
+  },
+  {
+    "name": "Saut à l'élastique",
+    "slug": "saut-a-lelastique",
+    "lat": 44.881138,
+    "lng": 5.793722,
+    "altitude": 559,
+    "id": "942e1e0e-8abf-57e5-b23f-cafed71e52fd"
+  },
+  {
     "name": "Puy Clavard",
     "slug": "puy-clavard",
     "lat": 46.03998,
@@ -171560,6 +173760,14 @@
     "altitude": 556
   },
   {
+    "name": "Belvédère du Grand Bec",
+    "slug": "belvedere-du-grand-bec",
+    "lat": 45.559189,
+    "lng": 5.733305,
+    "altitude": 556,
+    "id": "f8d9989a-4151-552c-8a22-6ab860fd2769"
+  },
+  {
     "name": "Stumpfenkopf",
     "slug": "stumpfenkopf",
     "lat": 48.037991,
@@ -171718,6 +173926,14 @@
     "lng": 7.168804,
     "altitude": 553,
     "id": "281f2aaa-38ae-5bc8-9f50-e9cdc24f207b"
+  },
+  {
+    "name": "Torre del Colle",
+    "slug": "torre-del-colle",
+    "lat": 45.114722,
+    "lng": 7.37179,
+    "altitude": 553,
+    "id": "2ad11af6-40d7-5449-8081-0c18737c8fcd"
   },
   {
     "name": "Pointhaie",
@@ -172520,6 +174736,14 @@
     "id": "1281862f-be01-569d-af7e-5a6a01b368ef"
   },
   {
+    "name": "Site Panoramique des Fils",
+    "slug": "site-panoramique-des-fils",
+    "lat": 45.632694,
+    "lng": 5.688267,
+    "altitude": 541,
+    "id": "94f41e49-80e5-56d2-9146-91f9cb5fe189"
+  },
+  {
     "name": "Heidenschlossberg",
     "slug": "heidenschlossberg",
     "lat": 48.620021,
@@ -172814,6 +175038,14 @@
     "lng": 6.592607,
     "altitude": 537,
     "id": "fe29fd23-1abc-5453-89d3-365512bb67cd"
+  },
+  {
+    "name": "Belvédère de La Boissière",
+    "slug": "belvedere-de-la-boissiere",
+    "lat": 46.424178,
+    "lng": 5.523704,
+    "altitude": 537,
+    "id": "782b7f5b-b857-54bd-92f0-6f9e20ff58f5"
   },
   {
     "name": "Wuestenberg",
@@ -173232,6 +175464,22 @@
     "id": "c9fd145b-7599-5922-8be2-f64c105966ec"
   },
   {
+    "name": "Cascade de la Sandezanne",
+    "slug": "cascade-de-la-sandezanne",
+    "lat": 46.167804,
+    "lng": 5.810895,
+    "altitude": 531,
+    "id": "dcce54a7-1aac-5236-99e1-80fc3ada0b26"
+  },
+  {
+    "name": "La source de la Doye",
+    "slug": "la-source-de-la-doye",
+    "lat": 46.154168,
+    "lng": 5.608732,
+    "altitude": 531,
+    "id": "0cbb4933-b669-5514-b24c-22f541d8d149"
+  },
+  {
     "name": "Costa di Monte Oliveto",
     "slug": "costa-di-monte-oliveto",
     "lat": 44.901975,
@@ -173640,6 +175888,14 @@
     "id": "2a32e80e-66ca-5f9d-84f8-aeed6b52bf9f"
   },
   {
+    "name": "Belvédère du pierrier",
+    "slug": "belvedere-du-pierrier",
+    "lat": 45.87131,
+    "lng": 5.730317,
+    "altitude": 524,
+    "id": "c0a9c891-77cc-5d47-b162-55e2b7fad5ec"
+  },
+  {
     "name": "Iroïko Ordokia",
     "slug": "iroiko-ordokia",
     "lat": 43.181457,
@@ -173726,6 +175982,14 @@
     "lng": 7.178808,
     "altitude": 523,
     "id": "50378445-635a-5098-8968-c4bc7c5a78de"
+  },
+  {
+    "name": "Vue panoramique sur la combe de Savoie",
+    "slug": "vue-panoramique-sur-la-combe-de-savoie",
+    "lat": 45.579799,
+    "lng": 6.185845,
+    "altitude": 523,
+    "id": "a04466c5-893c-58a5-b7ce-49132b6f86cc"
   },
   {
     "name": "Warrinchâtel",
@@ -173902,6 +176166,22 @@
     "lng": 6.951967,
     "altitude": 520,
     "id": "c85dd1fe-96f7-5de2-8dc4-9e89efcb16ca"
+  },
+  {
+    "name": "Point de vue sur le massif du Mont Blanc",
+    "slug": "point-de-vue-sur-le-massif-du-mont-blanc",
+    "lat": 46.290893,
+    "lng": 6.056382,
+    "altitude": 520,
+    "id": "75ce4bf8-ca7c-5cf3-a689-562b4a5e27d9"
+  },
+  {
+    "name": "Pierre des Deux Évêques",
+    "slug": "pierre-des-deux-eveques",
+    "lat": 45.778663,
+    "lng": 5.795417,
+    "altitude": 520,
+    "id": "38266a14-2809-50cc-baa5-fa7cd48f64f1"
   },
   {
     "name": "Rittersberg",
@@ -174120,6 +176400,22 @@
     "id": "c2205946-269c-5b43-9093-b72846b02a6a"
   },
   {
+    "name": "Tabussard",
+    "slug": "tabussard",
+    "lat": 46.376305,
+    "lng": 6.852637,
+    "altitude": 517,
+    "id": "23125a65-82dc-5015-8faf-d149bff1d407"
+  },
+  {
+    "name": "miroir de la faille sismique du Vuache",
+    "slug": "miroir-de-la-faille-sismique-du-vuache",
+    "lat": 45.954006,
+    "lng": 6.048457,
+    "altitude": 517,
+    "id": "c96c9820-b239-57d4-bbf9-e0d0316a8266"
+  },
+  {
     "name": "Schweizerberg",
     "slug": "schweizerberg",
     "lat": 48.687624,
@@ -174216,6 +176512,14 @@
     "id": "ab4200a9-ea57-55f1-be4e-aa31f4c66dab"
   },
   {
+    "name": "Ronda",
+    "slug": "ronda",
+    "lat": 45.724153,
+    "lng": 5.851886,
+    "altitude": 515,
+    "id": "345c60a4-b022-536c-91d7-c32d9b2bf37f"
+  },
+  {
     "name": "Col du Campérié",
     "slug": "col-du-camperie",
     "lat": 42.810721,
@@ -174230,6 +176534,14 @@
     "lng": 1.754844,
     "altitude": 514,
     "id": "c2c84e78-bb98-553c-9b26-72fbe17fda5b"
+  },
+  {
+    "name": "Belvédère de la Pierre qui Vire",
+    "slug": "belvedere-de-la-pierre-qui-vire",
+    "lat": 46.327017,
+    "lng": 5.635711,
+    "altitude": 514,
+    "id": "6a2d6698-c94f-54b1-962c-4272734faa54"
   },
   {
     "name": "Mirat",
@@ -174310,6 +176622,22 @@
     "lng": 6.15516,
     "altitude": 513,
     "id": "37fb0c93-d10a-5e38-96c8-211cf9209e65"
+  },
+  {
+    "name": "Pont de l'Abîme",
+    "slug": "pont-de-labime",
+    "lat": 45.764732,
+    "lng": 6.056292,
+    "altitude": 513,
+    "id": "5c77620c-f2f2-580c-95c6-a395b71850a0"
+  },
+  {
+    "name": "Les Gorges de la Vieze",
+    "slug": "les-gorges-de-la-vieze",
+    "lat": 46.248056,
+    "lng": 6.941368,
+    "altitude": 513,
+    "id": "4b37a57e-c167-5123-848c-e9b6f1d76413"
   },
   {
     "name": "Scheltzenburg",
@@ -174432,6 +176760,14 @@
     "id": "82ca8e8d-48c9-58a4-bcaa-794822420c88"
   },
   {
+    "name": "Belvédère Croix Rouge",
+    "slug": "belvedere-croix-rouge",
+    "lat": 45.594529,
+    "lng": 5.932335,
+    "altitude": 512,
+    "id": "ea307698-6576-55b7-9aa5-02133c7ffe7f"
+  },
+  {
     "name": "Gemsenberg",
     "slug": "gemsenberg",
     "lat": 48.682776,
@@ -174488,6 +176824,14 @@
     "altitude": 511
   },
   {
+    "name": "Chaos du Chéran",
+    "slug": "chaos-du-cheran",
+    "lat": 45.765889,
+    "lng": 6.056079,
+    "altitude": 511,
+    "id": "74d5e5eb-6cbb-5b29-9fca-1b90a4c201cd"
+  },
+  {
     "name": "Le Bigot - Commune de Saint-Martin-d'Hères",
     "slug": "le-bigot-commune-de-saint-martin-dheres",
     "lat": 45.159796,
@@ -174542,6 +176886,14 @@
     "lng": 7.022024,
     "altitude": 510,
     "id": "e2485ea2-4756-5eb6-af74-33a6ea69f1ea"
+  },
+  {
+    "name": "Belvédère de Léaz",
+    "slug": "belvedere-de-leaz",
+    "lat": 46.098721,
+    "lng": 5.889061,
+    "altitude": 510,
+    "id": "90e8d127-f655-541a-ba3b-287e795f5855"
   },
   {
     "name": "Ehrbergkopf",
@@ -174654,6 +177006,14 @@
     "lng": 6.020916,
     "altitude": 508,
     "id": "780e6b8e-e6bd-5deb-8dec-ed948a55791c"
+  },
+  {
+    "name": "Au Chanais",
+    "slug": "au-chanais",
+    "lat": 46.348048,
+    "lng": 5.647895,
+    "altitude": 508,
+    "id": "3cec38dd-a8e2-5077-a5f4-cff8c1cfbfcc"
   },
   {
     "name": "Col de la Sablière",
@@ -174928,6 +177288,14 @@
     "id": "4500e1e3-16aa-5645-9106-ceecd30b8ac9"
   },
   {
+    "name": "Sources de l'Allemogne",
+    "slug": "sources-de-lallemogne",
+    "lat": 46.244391,
+    "lng": 5.983771,
+    "altitude": 503,
+    "id": "025f6e07-1fea-5007-8037-ed009542e20c"
+  },
+  {
     "name": "Istilxarreta",
     "slug": "istilxarreta",
     "lat": 43.247836,
@@ -174998,6 +177366,22 @@
     "lng": 5.060998,
     "altitude": 502,
     "id": "b1b0f82d-11c5-52d7-9235-577052a0f8d1"
+  },
+  {
+    "name": "Visitation",
+    "slug": "visitation",
+    "lat": 45.892917,
+    "lng": 6.126572,
+    "altitude": 502,
+    "id": "a351e57b-d6a1-5e93-bb06-62b24972cf9a"
+  },
+  {
+    "name": "Gouanne aux Loups",
+    "slug": "gouanne-aux-loups",
+    "lat": 45.715882,
+    "lng": 5.906398,
+    "altitude": 502,
+    "id": "f1c33617-d950-54b9-be46-e16aba8533bb"
   },
   {
     "name": "Pech Gros",
@@ -175136,6 +177520,22 @@
     "id": "bf52b0ff-abc2-5a35-ab52-9dac789c691a"
   },
   {
+    "name": "Église de Luins",
+    "slug": "eglise-de-luins",
+    "lat": 46.446537,
+    "lng": 6.272823,
+    "altitude": 499,
+    "id": "5a457b20-848f-58bf-9d66-9890f94d9035"
+  },
+  {
+    "name": "Vue sur les portes de la Maurienne",
+    "slug": "vue-sur-les-portes-de-la-maurienne",
+    "lat": 45.604293,
+    "lng": 6.249646,
+    "altitude": 499,
+    "id": "2835eee1-b7f1-50b4-a2c8-5cffad510570"
+  },
+  {
     "name": "Belvédère de la Tuilière",
     "slug": "belvedere-de-la-tuiliere",
     "lat": 43.733971,
@@ -175168,6 +177568,14 @@
     "id": "e879229c-94c5-5d77-8196-c572959e665d"
   },
   {
+    "name": "Belvédère de Corsuet",
+    "slug": "belvedere-de-corsuet",
+    "lat": 45.717942,
+    "lng": 5.909156,
+    "altitude": 495,
+    "id": "44bd65c3-a6fc-57a9-b417-276604f7c142"
+  },
+  {
     "name": "Rocher JL Huck",
     "slug": "rocher-jl-huck",
     "lat": 48.710787,
@@ -175190,6 +177598,22 @@
     "lng": -1.622029,
     "altitude": 493,
     "id": "419a1218-54c4-5dd1-a4f1-b36be98b01e0"
+  },
+  {
+    "name": "Lac de Vouglans",
+    "slug": "lac-de-vouglans",
+    "lat": 46.403363,
+    "lng": 5.669362,
+    "altitude": 490,
+    "id": "481c1fe2-4531-5371-b94b-00d7d23d23a3"
+  },
+  {
+    "name": "Le banc des dames",
+    "slug": "le-banc-des-dames",
+    "lat": 45.548434,
+    "lng": 5.738234,
+    "altitude": 490,
+    "id": "4123f2c0-fefb-5c30-b53e-3e39e5568c2c"
   },
   {
     "name": "Colline de la Vierge",
@@ -175240,6 +177664,22 @@
     "id": "d9004f87-ab4f-5920-9723-933c2489d0f5"
   },
   {
+    "name": "Belvédère du Barrage",
+    "slug": "belvedere-du-barrage",
+    "lat": 46.393872,
+    "lng": 5.666926,
+    "altitude": 484,
+    "id": "cb57db6e-472e-59de-a2e3-80aadbe21971"
+  },
+  {
+    "name": "Belvédère Vauban",
+    "slug": "belvedere-vauban",
+    "lat": 45.198706,
+    "lng": 5.725305,
+    "altitude": 484,
+    "id": "5cd3ded2-8ef5-526d-b641-753102f26336"
+  },
+  {
     "id": "b069a909-1963-50d6-b1dc-36c8621f8d81",
     "name": "Belvédère Côte Rousse",
     "slug": "belvedere-cote-rousse",
@@ -175248,12 +177688,28 @@
     "altitude": 480
   },
   {
+    "name": "Point de vue Pont des Pierres",
+    "slug": "point-de-vue-pont-des-pierres",
+    "lat": 46.162771,
+    "lng": 5.811114,
+    "altitude": 480,
+    "id": "c5268768-f30a-578a-916c-673f9bf18188"
+  },
+  {
     "name": "Vue sur le château du Haut-Koenigsbourg",
     "slug": "vue-sur-le-chateau-du-haut-koenigsbourg",
     "lat": 48.212978,
     "lng": 7.327201,
     "altitude": 479,
     "id": "6dc3394b-43e7-583d-a69a-88f7c83dd149"
+  },
+  {
+    "name": "Belvédère de Gerbaix",
+    "slug": "belvedere-de-gerbaix",
+    "lat": 45.44676,
+    "lng": 5.785515,
+    "altitude": 477,
+    "id": "5b4ce96c-2da6-567b-851e-9a273f784d46"
   },
   {
     "id": "90c1a7f5-5d75-5785-80c3-3230aa1cbfe0",
@@ -175288,12 +177744,28 @@
     "id": "d2fa4ada-9fad-50c1-87f0-6bc68a84eed6"
   },
   {
+    "name": "Plage",
+    "slug": "plage",
+    "lat": 45.943063,
+    "lng": 6.161216,
+    "altitude": 472,
+    "id": "6d53067a-f995-50c8-8f86-47a5a03447ec"
+  },
+  {
     "name": "Colline du Bûcher",
     "slug": "colline-du-bucher",
     "lat": 47.85709,
     "lng": 7.039836,
     "altitude": 471,
     "id": "a51f2c37-af5d-579e-9e27-16b4f6dc7d51"
+  },
+  {
+    "name": "Belvédère Sud",
+    "slug": "belvedere-sud",
+    "lat": 45.585704,
+    "lng": 5.927407,
+    "altitude": 471,
+    "id": "c514cad4-b5f2-5dee-b101-00ad5841d695"
   },
   {
     "name": "Rocher du Fantôme",
@@ -175320,6 +177792,14 @@
     "id": "0dc8f44b-99d1-5446-9aff-69c9574533e3"
   },
   {
+    "name": "Terrasse des Géologues",
+    "slug": "terrasse-des-geologues",
+    "lat": 45.198665,
+    "lng": 5.724345,
+    "altitude": 467,
+    "id": "9922fdbf-ac98-56e7-8cf7-8497ce34c09b"
+  },
+  {
     "name": "Roc des Corbeaux",
     "slug": "roc-des-corbeaux",
     "lat": 43.074016,
@@ -175344,6 +177824,38 @@
     "id": "813b2b54-dac5-5a58-91d2-dc4ba2e1eca0"
   },
   {
+    "name": "Belvédère d Échazeaux",
+    "slug": "belvedere-d-echazeaux",
+    "lat": 46.263381,
+    "lng": 5.500749,
+    "altitude": 459,
+    "id": "0bb5ea89-271e-54ad-8fd5-5d0e4f84bf9a"
+  },
+  {
+    "name": "Belvédère La Racine",
+    "slug": "belvedere-la-racine",
+    "lat": 45.58476,
+    "lng": 5.92672,
+    "altitude": 458,
+    "id": "63951e4c-a041-5f03-bda8-0fb3984f9df0"
+  },
+  {
+    "name": "Belvédére des Calloudes",
+    "slug": "belvedere-des-calloudes",
+    "lat": 45.509234,
+    "lng": 6.056963,
+    "altitude": 455,
+    "id": "c956a3f7-6548-560b-b474-1109ef00196b"
+  },
+  {
+    "name": "Vue panoramique sur Annecy",
+    "slug": "vue-panoramique-sur-annecy",
+    "lat": 45.897824,
+    "lng": 6.126847,
+    "altitude": 455,
+    "id": "65a1b364-8402-5585-926e-c6de0c119099"
+  },
+  {
     "name": "Rocher du Grauschlag",
     "slug": "rocher-du-grauschlag",
     "lat": 48.514116,
@@ -175360,12 +177872,28 @@
     "id": "8126ae38-ac43-5a4d-ba26-19dff2d9d13f"
   },
   {
+    "name": "Belvédère sur lac de Barterand",
+    "slug": "belvedere-sur-lac-de-barterand",
+    "lat": 45.786029,
+    "lng": 5.750954,
+    "altitude": 453,
+    "id": "b45cf83d-c553-5ee4-bd55-82ee013c1de6"
+  },
+  {
     "id": "0a51c8a0-c454-5f5a-819f-dfbdc9bbafb8",
     "name": "Belvédère Piot",
     "slug": "belvedere-piot",
     "lat": 45.581914,
     "lng": 5.926037,
     "altitude": 450
+  },
+  {
+    "name": "Belvédère Sur La Frate",
+    "slug": "belvedere-sur-la-frate",
+    "lat": 46.474191,
+    "lng": 5.677111,
+    "altitude": 450,
+    "id": "fdce436f-2c1e-539e-8e04-8f8e629fc040"
   },
   {
     "name": "Chapelle St-Laurent",
@@ -175382,6 +177910,22 @@
     "lat": 45.580233,
     "lng": 5.926067,
     "altitude": 445
+  },
+  {
+    "name": "Lake Geneva Overlook",
+    "slug": "lake-geneva-overlook",
+    "lat": 46.239644,
+    "lng": 6.133224,
+    "altitude": 445,
+    "id": "7145862c-c193-541c-a373-a5e04fd4a25a"
+  },
+  {
+    "name": "panorama du Grésivaudan",
+    "slug": "panorama-du-gresivaudan",
+    "lat": 45.224258,
+    "lng": 5.884386,
+    "altitude": 445,
+    "id": "b7559509-c2a2-5e38-b752-2e6f8f8ab1e4"
   },
   {
     "name": "Côte Beauregard",
@@ -175424,6 +177968,30 @@
     "id": "8cac5080-df8b-5b8c-82cb-8daa30ec4193"
   },
   {
+    "name": "Belvédère de Pierre Châtel",
+    "slug": "belvedere-de-pierre-chatel",
+    "lat": 45.703498,
+    "lng": 5.725016,
+    "altitude": 441,
+    "id": "1c9a22b2-5833-5e91-a0c0-d09b98b44a7e"
+  },
+  {
+    "name": "Belvédère du Rhône",
+    "slug": "belvedere-du-rhone",
+    "lat": 45.701111,
+    "lng": 5.721637,
+    "altitude": 438,
+    "id": "dd0a5628-b50f-5f33-9c73-d865fbca9dc0"
+  },
+  {
+    "name": "Belvédère de Saint-Alban-Leysse",
+    "slug": "belvedere-de-saint-alban-leysse",
+    "lat": 45.590289,
+    "lng": 5.951568,
+    "altitude": 438,
+    "id": "9f486e24-4914-5765-b176-2aaaaca6bec5"
+  },
+  {
     "name": "Les Chaux",
     "slug": "les-chaux",
     "lat": 47.061706,
@@ -175454,6 +178022,14 @@
     "lng": 6.916318,
     "altitude": 432,
     "id": "bd10a425-d649-5b5f-94cb-c2364e941d38"
+  },
+  {
+    "name": "Buvette Farquenoud",
+    "slug": "buvette-farquenoud",
+    "lat": 46.390732,
+    "lng": 6.538243,
+    "altitude": 426,
+    "id": "8a23f843-19d9-5f95-9544-ccd367fb4fd5"
   },
   {
     "name": "Jardin Chinois",
@@ -175512,6 +178088,22 @@
     "id": "20f5f98c-94bb-5e8b-b799-4fb2948ebf9b"
   },
   {
+    "name": "Belvédère de la Roche Aux Corneilles",
+    "slug": "belvedere-de-la-roche-aux-corneilles",
+    "lat": 46.455655,
+    "lng": 5.702291,
+    "altitude": 420,
+    "id": "9ef43fa9-eee0-5e3f-8e68-e0393f9916fa"
+  },
+  {
+    "name": "Gorges de Thurignin",
+    "slug": "gorges-de-thurignin",
+    "lat": 45.89174,
+    "lng": 5.670601,
+    "altitude": 418,
+    "id": "8f452e2f-a69f-5ce2-b148-e8c3f80b8f9b"
+  },
+  {
     "name": "Point de vue de la Fetola",
     "slug": "point-de-vue-de-la-fetola",
     "lat": 45.265179,
@@ -175552,6 +178144,46 @@
     "id": "c7a01c0a-2157-5dbc-8025-531e0a45ca22"
   },
   {
+    "name": "Les Mées",
+    "slug": "les-mees",
+    "lat": 44.033017,
+    "lng": 5.985949,
+    "altitude": 408,
+    "id": "b43da8be-a150-5851-ba32-50c1a9ec1458"
+  },
+  {
+    "name": "Croix de Beauvoir",
+    "slug": "croix-de-beauvoir",
+    "lat": 45.823564,
+    "lng": 5.853771,
+    "altitude": 405,
+    "id": "23c5544d-2e36-589e-a147-20759edee6ef"
+  },
+  {
+    "name": "Point de vue sur les Alpes",
+    "slug": "point-de-vue-sur-les-alpes",
+    "lat": 45.569988,
+    "lng": 5.521297,
+    "altitude": 405,
+    "id": "25a8a46f-bbd8-5a08-968a-2aa1df6d86b8"
+  },
+  {
+    "name": "Perte de la Valserine",
+    "slug": "perte-de-la-valserine",
+    "lat": 46.12335,
+    "lng": 5.820602,
+    "altitude": 403,
+    "id": "200c559a-ae8a-5308-88ac-002e2ee5900b"
+  },
+  {
+    "name": "Au dessus de l'eau",
+    "slug": "au-dessus-de-leau",
+    "lat": 46.203442,
+    "lng": 6.131493,
+    "altitude": 403,
+    "id": "f706eeab-eec3-5d14-8931-6df3506fa4c4"
+  },
+  {
     "name": "Panaroma sur la Vallée du Gave de Pau",
     "slug": "panaroma-sur-la-vallee-du-gave-de-pau",
     "lat": 43.053592,
@@ -175560,12 +178192,60 @@
     "id": "825ea82d-aa44-5be9-a685-f0be072cf197"
   },
   {
+    "name": "Belvédère de l'Observatoire",
+    "slug": "belvedere-de-lobservatoire",
+    "lat": 46.199975,
+    "lng": 6.152583,
+    "altitude": 396,
+    "id": "0460e5a9-9f1a-5a5b-bc83-999dd8da6408"
+  },
+  {
+    "name": "Vue sur Albertville, la combe de Savoie",
+    "slug": "vue-sur-albertville-la-combe-de-savoie",
+    "lat": 45.670355,
+    "lng": 6.395963,
+    "altitude": 394,
+    "id": "3c94b440-c71b-5bb0-b0b6-6e158448a50e"
+  },
+  {
+    "name": "Vue sur Albertville",
+    "slug": "vue-sur-albertville",
+    "lat": 45.670795,
+    "lng": 6.396125,
+    "altitude": 394,
+    "id": "c8315b58-caf2-5d84-b73b-e88bc85b5268"
+  },
+  {
     "name": "Belvédère du Plo de la Bise",
     "slug": "belvedere-du-plo-de-la-bise",
     "lat": 43.481498,
     "lng": 2.371856,
     "altitude": 393,
     "id": "e7088c39-82b0-50b2-b021-8f2addeae03c"
+  },
+  {
+    "name": "Esplanade du Château",
+    "slug": "esplanade-du-chateau",
+    "lat": 46.382009,
+    "lng": 6.240963,
+    "altitude": 392,
+    "id": "20d0d0cf-8859-51f2-9663-9a720e2ac252"
+  },
+  {
+    "name": "Vue sur les Belledonnes et la Combe de Savoie",
+    "slug": "vue-sur-les-belledonnes-et-la-combe-de-savoie",
+    "lat": 45.602319,
+    "lng": 6.251906,
+    "altitude": 392,
+    "id": "3dabde3c-ef80-547c-9eb9-65ef7226a21c"
+  },
+  {
+    "name": "Chercher les contrastes",
+    "slug": "chercher-les-contrastes",
+    "lat": 45.655496,
+    "lng": 5.620873,
+    "altitude": 392,
+    "id": "bcee57f9-b646-540c-8c63-bb3e7cfd1d5a"
   },
   {
     "name": "Rocher du Diable",
@@ -175584,12 +178264,28 @@
     "id": "50ad9fc9-7631-5cb3-b192-81979fe82ced"
   },
   {
+    "name": "Les Essarts",
+    "slug": "les-essarts",
+    "lat": 45.634374,
+    "lng": 5.904853,
+    "altitude": 387,
+    "id": "22b6c6f6-9628-5b34-ad4d-0ce233c3a308"
+  },
+  {
     "name": "Table d'Orientation de Castets",
     "slug": "table-dorientation-de-castets",
     "lat": 43.126161,
     "lng": -0.61613,
     "altitude": 386,
     "id": "e34a2f43-61f8-5538-bce0-3aceaa3d7558"
+  },
+  {
+    "name": "La Pierre Noire",
+    "slug": "la-pierre-noire",
+    "lat": 45.808507,
+    "lng": 5.797522,
+    "altitude": 386,
+    "id": "2d776c22-2f66-5b1c-ab44-2c2811ef455a"
   },
   {
     "name": "Le Kiosque",
@@ -175656,12 +178352,28 @@
     "id": "e7e67d18-7e6a-595e-a4dd-af0c4a72dad3"
   },
   {
+    "name": "Foto-Spot Château de Coppet",
+    "slug": "foto-spot-chateau-de-coppet",
+    "lat": 46.314765,
+    "lng": 6.192483,
+    "altitude": 378,
+    "id": "f380c69b-b1b7-5200-ad66-0ffd949dccde"
+  },
+  {
     "name": "Rocher du Breitkopf",
     "slug": "rocher-du-breitkopf",
     "lat": 48.745278,
     "lng": 7.318518,
     "altitude": 377,
     "id": "029fc628-1027-5cfa-b9dc-00dfcbbac233"
+  },
+  {
+    "name": "Corniche",
+    "slug": "corniche",
+    "lat": 46.052811,
+    "lng": 5.810714,
+    "altitude": 377,
+    "id": "f768310c-debb-5a76-b0f7-241320efa41d"
   },
   {
     "name": "Passerelle de Mazamet",
@@ -175680,12 +178392,52 @@
     "id": "4475b2fe-c6cc-56e3-ade5-20240276491a"
   },
   {
+    "name": "Cascade de Cerveyrieu",
+    "slug": "cascade-de-cerveyrieu",
+    "lat": 45.879278,
+    "lng": 5.678551,
+    "altitude": 372,
+    "id": "8ab063fc-8e0c-5db1-9338-18153932e89b"
+  },
+  {
+    "name": "Gouffre du diable",
+    "slug": "gouffre-du-diable",
+    "lat": 45.883254,
+    "lng": 5.688675,
+    "altitude": 372,
+    "id": "a6ce6847-e54a-557e-b643-9c6e5813a410"
+  },
+  {
+    "name": "Point info",
+    "slug": "point-info",
+    "lat": 45.558094,
+    "lng": 5.885558,
+    "altitude": 370,
+    "id": "30304351-35ab-519e-8afe-67677d581bc4"
+  },
+  {
+    "name": "La pointe de la Jonction",
+    "slug": "la-pointe-de-la-jonction",
+    "lat": 46.201312,
+    "lng": 6.12205,
+    "altitude": 368,
+    "id": "2132338a-2917-5421-9d02-988ec48ff738"
+  },
+  {
     "name": "belvédaire de Chaulieu",
     "slug": "belvedaire-de-chaulieu",
     "lat": 48.735802,
     "lng": -0.862003,
     "altitude": 367,
     "id": "ca3818f1-6f7a-55e7-b63e-f85230fc3d0f"
+  },
+  {
+    "name": "Observatoire",
+    "slug": "observatoire",
+    "lat": 45.810806,
+    "lng": 5.961266,
+    "altitude": 366,
+    "id": "882a9a5e-5bc2-52cc-aba0-726ca64c2362"
   },
   {
     "name": "Coll de Banyuls.",
@@ -175712,6 +178464,14 @@
     "id": "c245e91b-dca1-5822-891a-8a5d666101db"
   },
   {
+    "name": "Plan d'eau amont",
+    "slug": "plan-deau-amont",
+    "lat": 46.054451,
+    "lng": 5.812295,
+    "altitude": 358,
+    "id": "c5b5f95a-5685-5f89-a9b8-b55bce9aa5b4"
+  },
+  {
     "name": "Baztango begiratokia",
     "slug": "baztango-begiratokia",
     "lat": 43.123649,
@@ -175728,12 +178488,36 @@
     "id": "4136466b-6a2a-5cf8-8dfb-f771f7009228"
   },
   {
+    "name": "Observatoire \"Castor\"",
+    "slug": "observatoire-castor",
+    "lat": 46.177713,
+    "lng": 6.011362,
+    "altitude": 355,
+    "id": "f739d7e1-7e02-596d-b7fb-d5ed773d8526"
+  },
+  {
+    "name": "Belvédère de la Cascade",
+    "slug": "belvedere-de-la-cascade",
+    "lat": 45.996278,
+    "lng": 5.794919,
+    "altitude": 353,
+    "id": "b07096ec-dd83-57d1-ac15-9275f1267648"
+  },
+  {
     "name": "Belvédère des Gingeolles",
     "slug": "belvedere-des-gingeolles",
     "lat": 45.227682,
     "lng": 5.647169,
     "altitude": 350,
     "id": "4cca857e-1997-55e8-9085-cfabea6b77d8"
+  },
+  {
+    "name": "Point de vue sur le Rhône",
+    "slug": "point-de-vue-sur-le-rhone",
+    "lat": 46.178021,
+    "lng": 6.013827,
+    "altitude": 348,
+    "id": "7d8a7d35-df03-5a8b-99cc-014bcecc8b67"
   },
   {
     "name": "Le Seignadou",
@@ -175760,6 +178544,14 @@
     "id": "d5b5085b-7a9b-5eb6-9dbe-367943a2fb3c"
   },
   {
+    "name": "Passerelle",
+    "slug": "passerelle",
+    "lat": 46.052018,
+    "lng": 5.811086,
+    "altitude": 341,
+    "id": "6164e80c-9285-5bc4-b7eb-3104ec27062f"
+  },
+  {
     "name": "Plan de la Gascagne",
     "slug": "plan-de-la-gascagne",
     "lat": 43.487038,
@@ -175776,12 +178568,44 @@
     "id": "0e7f9ac8-d7c2-536a-a039-f2ed7e5ce0ab"
   },
   {
+    "name": "Saut à ski",
+    "slug": "saut-a-ski",
+    "lat": 46.049184,
+    "lng": 5.809735,
+    "altitude": 336,
+    "id": "5a28a0d1-5300-5b75-97c3-5734338b716d"
+  },
+  {
+    "name": "Terrasse de Montgelas",
+    "slug": "terrasse-de-montgelas",
+    "lat": 45.560442,
+    "lng": 5.921274,
+    "altitude": 335,
+    "id": "9ef1f2ea-77f5-5586-9932-8065ca829814"
+  },
+  {
     "name": "Puente Románico",
     "slug": "puente-romanico",
     "lat": 42.671081,
     "lng": -1.818885,
     "altitude": 334,
     "id": "37ae01c4-1de4-599c-b428-0fb6ca9ae3b3"
+  },
+  {
+    "name": "Barrage",
+    "slug": "barrage",
+    "lat": 46.052994,
+    "lng": 5.812064,
+    "altitude": 333,
+    "id": "922f04d4-3074-50a6-ac98-060a0544a66c"
+  },
+  {
+    "name": "Belvédère des Lades",
+    "slug": "belvedere-des-lades",
+    "lat": 46.072838,
+    "lng": 5.809465,
+    "altitude": 328,
+    "id": "1636970f-cb5e-560e-b7db-5ab4e4d8c8b3"
   },
   {
     "name": "Torre 2",
@@ -175798,6 +178622,14 @@
     "lng": -1.09042,
     "altitude": 326,
     "id": "eb5f316b-0649-5a2c-8dd2-a2327f7b9ef7"
+  },
+  {
+    "name": "Belvédère aval",
+    "slug": "belvedere-aval",
+    "lat": 46.047382,
+    "lng": 5.807987,
+    "altitude": 325,
+    "id": "9ebd6af7-7a00-5c16-99b7-7a80ed76756c"
   },
   {
     "name": "Belvédère du Sabot",
@@ -175822,6 +178654,14 @@
     "lng": 6.48445,
     "altitude": 315,
     "id": "ea7e1bcc-040d-57d7-9575-b46fa926a036"
+  },
+  {
+    "name": "Belvédère principal",
+    "slug": "belvedere-principal",
+    "lat": 46.050738,
+    "lng": 5.810925,
+    "altitude": 315,
+    "id": "3d185f1a-22e5-5eee-a70d-3fa25aaf49cb"
   },
   {
     "name": "Witzigfelsen",
@@ -175920,12 +178760,52 @@
     "id": "ac47bf34-74e6-5a3f-95ec-2ae2e127fb8a"
   },
   {
+    "name": "Belvédère du Bois Vidal",
+    "slug": "belvedere-du-bois-vidal",
+    "lat": 45.681703,
+    "lng": 5.915561,
+    "altitude": 285,
+    "id": "8d4ba5bb-24f5-5535-b8e5-4ac92d4b348a"
+  },
+  {
     "name": "Vue sur Mulhouse",
     "slug": "vue-sur-mulhouse",
     "lat": 47.729382,
     "lng": 7.309651,
     "altitude": 284,
     "id": "9330001f-5d33-5de8-8acb-5a0b0085a636"
+  },
+  {
+    "name": "Gorges du Sierroz - site classé",
+    "slug": "gorges-du-sierroz-site-classe",
+    "lat": 45.717633,
+    "lng": 5.920089,
+    "altitude": 283,
+    "id": "874a9d9a-d5b8-5be7-8642-c26c7a2b5df9"
+  },
+  {
+    "name": "Vue sur l'Arclusaz",
+    "slug": "vue-sur-larclusaz",
+    "lat": 45.556361,
+    "lng": 6.172589,
+    "altitude": 281,
+    "id": "2bdcfe7b-1587-5475-8139-3dfaef5b5399"
+  },
+  {
+    "name": "Observation",
+    "slug": "observation",
+    "lat": 45.645534,
+    "lng": 5.913827,
+    "altitude": 278,
+    "id": "57c02ca9-98ca-5170-9ed6-2257b451be21"
+  },
+  {
+    "name": "Marais de Vuillerme",
+    "slug": "marais-de-vuillerme",
+    "lat": 45.625049,
+    "lng": 5.929392,
+    "altitude": 276,
+    "id": "d8f97909-b6d4-51a4-9ad5-950bf7f795ce"
   },
   {
     "name": "Gibbon",
@@ -175960,6 +178840,30 @@
     "id": "b5e029e5-410d-50c7-9939-1be791320fd9"
   },
   {
+    "name": "Canon de Vions",
+    "slug": "canon-de-vions",
+    "lat": 45.830566,
+    "lng": 5.800266,
+    "altitude": 259,
+    "id": "5f0cb78c-147c-56d0-9c3e-55c2ec22ff38"
+  },
+  {
+    "name": "Point de Vue du Banc",
+    "slug": "point-de-vue-du-banc",
+    "lat": 45.847772,
+    "lng": 5.77957,
+    "altitude": 252,
+    "id": "78874fe7-2212-5d14-9f2c-b79efde5c090"
+  },
+  {
+    "name": "Belvédère de la Grande Molière",
+    "slug": "belvedere-de-la-grande-moliere",
+    "lat": 45.654815,
+    "lng": 5.894391,
+    "altitude": 245,
+    "id": "e90bf8f4-0945-5ef5-a0c6-5c7a8368803f"
+  },
+  {
     "name": "Table d'orientation du Puntous",
     "slug": "table-dorientation-du-puntous",
     "lat": 43.448933,
@@ -175968,12 +178872,36 @@
     "id": "c731afc5-1b39-561a-9328-e76957abad4a"
   },
   {
+    "name": "Le mur des sens",
+    "slug": "le-mur-des-sens",
+    "lat": 45.707699,
+    "lng": 5.88908,
+    "altitude": 231,
+    "id": "b2cecac1-1fcb-599f-a182-e19dfd3cca5e"
+  },
+  {
+    "name": "Vue panoramique sur le lac du Bourget et la Dent du Chat",
+    "slug": "vue-panoramique-sur-le-lac-du-bourget-et-la-dent-du-chat",
+    "lat": 45.698439,
+    "lng": 5.885508,
+    "altitude": 231,
+    "id": "36bf4c8c-301c-512f-bd7d-1558c59ec4dd"
+  },
+  {
     "name": "Gorges du Brian",
     "slug": "gorges-du-brian",
     "lat": 43.356481,
     "lng": 2.743955,
     "altitude": 226,
     "id": "72a1e3fa-e698-5629-ab71-f88a4f354109"
+  },
+  {
+    "name": "Belvédère du Tombeau de Boisson",
+    "slug": "belvedere-du-tombeau-de-boisson",
+    "lat": 45.704278,
+    "lng": 5.747927,
+    "altitude": 220,
+    "id": "541b2419-7a9f-549c-9999-5df9f764ce4f"
   },
   {
     "name": "Point de vue Penn ar Hoat ar Gorré",

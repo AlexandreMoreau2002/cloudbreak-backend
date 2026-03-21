@@ -121,4 +121,5 @@ Chaque feature implementée a sa documentation dans `docs/` :
 - [Auth Supabase JWT](docs/story-2-1-auth-supabase.md)
 - [Algorithme score mer de nuage](docs/story-3-1-algorithme-score.md)
 - [Seed base de données des sommets](docs/story-3-2-seed-sommets.md)
+- [Gestion des données sommets — guide opérationnel](docs/peaks-data-management.md)
 - [Refactoring domain/ layer](docs/story-refactor-domain-layer.md)

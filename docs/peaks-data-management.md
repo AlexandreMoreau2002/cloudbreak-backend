@@ -179,9 +179,34 @@ Si une requête échoue avec 429 ou timeout : attendre 60 secondes et relancer u
 
 | Priorité | Action | Impact |
 |----------|--------|--------|
-| MVP | France entière ✅ | 13 898 sommets |
+| MVP | France entière ✅ | 22 397 entrées |
 | Post-MVP | Score popularité (nb vues, altitude) | Meilleur tri dans la recherche |
+| Post-MVP | **Contribution utilisateur** — voir ci-dessous | Base communautaire |
 | V2 | Alpes suisses + italiennes | +8 000 sommets |
 | V2 | Pyrénées espagnoles | +3 000 sommets |
 | V2 | Inclusion cols `mountain_pass` | Spots iconiques manquants |
 | V3 | Synchronisation OSM automatique (cron) | Données toujours à jour |
+
+### Post-MVP — Contribution utilisateur de spots
+
+**Idée :** permettre à l'utilisateur de soumettre un spot manquant directement depuis l'app. Il fournit les coordonnées GPS (tap sur la carte ou saisie manuelle) et un nom. Un LLM normalise la saisie (slug, capitalisation, déduplication probable) avant insertion en base de production.
+
+**Flow envisagé :**
+```
+App mobile → POST /api/v1/peaks/suggest
+  { lat, lng, name (saisi par l'user) }
+  ↓
+Backend → LLM (Claude Haiku) normalise :
+  - nom → "col du galibier" → "Col du Galibier"
+  - slug → "col-du-galibier"
+  - vérifie si doublon probable (slug existant à < 500m)
+  ↓
+Insertion en DB avec statut "pending"
+  ↓
+Modération légère (admin) ou auto-validation si confiance haute
+```
+
+**Points d'attention :**
+- Modération nécessaire — éviter le spam / noms farfelus
+- L'altitude est récupérée automatiquement via Open-Meteo Elevation (même logique que generate_peaks.py)
+- UUID déterministe sur le slug normalisé — cohérent avec le reste de la base

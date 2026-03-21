@@ -137,3 +137,49 @@ docker exec cloudbreak-db psql -U postgres -d cloudbreak -c "SELECT COUNT(*) FRO
 ```
 
 Ensuite : **story 3.3** — `GET /api/v1/peaks/search?q=` + `GET /api/v1/peaks/{slug}`
+
+---
+
+## Problème rencontré — run partiel qui écrase les données
+
+### Ce qui s'est passé
+
+Lors du dernier relancement de `generate_peaks.py`, plusieurs régions ont eu des 504/429 (Overpass rate-limit + Open-Meteo rate-limit). Le script écrit le résultat **en entier et en une seule fois** à la fin — il a donc produit un `peaks_data.json` de seulement ~16 700 entrées au lieu des 22 000+ précédentes, écrasant le fichier commité.
+
+### Comment on a récupéré
+
+```bash
+# 1. Récupérer le fichier peaks_data.json du dernier commit (avant l'écrasement)
+git show HEAD:app/db/peaks_data.json > /tmp/peaks_previous.json
+
+# 2. Fusionner : garder l'ancien + ajouter les nouveaux slugs du run partiel
+python3 -c "
+import json
+from pathlib import Path
+
+prev = json.loads(open('/tmp/peaks_previous.json').read())
+curr = json.loads(Path('app/db/peaks_data.json').read_text())
+
+prev_slugs = {p['slug'] for p in prev}
+new_entries = [p for p in curr if p['slug'] not in prev_slugs]
+
+merged = prev + new_entries
+merged.sort(key=lambda p: -p.get('altitude', 0))
+Path('app/db/peaks_data.json').write_text(json.dumps(merged, ensure_ascii=False, indent=2))
+print(f'Fusionné : {len(merged)} entrées ({len(new_entries)} nouvelles)')
+"
+
+# 3. Re-seeder
+docker exec cloudbreak-db psql -U postgres -d cloudbreak -c "DELETE FROM peaks;"
+source .venv/bin/activate && python -m app.db.seed
+
+# 4. Vérifier
+docker exec cloudbreak-db psql -U postgres -d cloudbreak -c "SELECT COUNT(*) FROM peaks;"
+```
+
+### À retenir pour les prochains runs
+
+- **Commiter avant de relancer le script** — si le run plante, `git show HEAD:app/db/peaks_data.json` permet de récupérer la version précédente
+- **Attendre 1-2h entre deux runs** — Overpass et Open-Meteo ont des quotas qui se rechargent
+- **Le script écrase tout** — il ne fait pas de merge automatique. Si des régions échouent, le fichier produit est incomplet. Toujours fusionner avec la version précédente via le snippet ci-dessus si le count final est inférieur au précédent
+- **Vérifier le count avant de commiter** : si `len(peaks)` < nombre précédent dans le log → ne pas commiter, fusionner d'abord

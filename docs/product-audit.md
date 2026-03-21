@@ -25,9 +25,11 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 | Données météo Open-Meteo | ✅ Appel réel (gratuit, sans clé) |
 | Cache Redis 10 min | ✅ Actif |
 | Auth JWT Supabase | ✅ Validé localement |
-| 10 sommets en base de données | ✅ Seedés |
+| 64 sommets en base de données | ✅ Seedés (Alpes, Vosges, Massif Central, Provence) |
+| Index idx_peaks_name | ✅ Migration Alembic |
+| Script génération Overpass API | ✅ scripts/generate_peaks.py |
 | Migrations DB | ✅ Alembic |
-| Tests — 76 tests, 100% coverage | ✅ |
+| Tests — 78 tests, 100% coverage | ✅ |
 | CI pipeline | ✅ GitHub Actions |
 | Domain layer (`app/domain/`) — logique métier pure (zero I/O) | ✅ Refactorisé |
 

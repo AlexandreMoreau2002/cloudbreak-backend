@@ -189392,6 +189392,14 @@
     "id": "ed4ec306-3c89-5400-afeb-a00555c2096b"
   },
   {
+    "id": "0192acaf-b631-511e-bc50-88b084ea0767",
+    "name": "Butte Montmartre — Sacré-Cœur",
+    "slug": "sacre-coeur",
+    "lat": 48.8867,
+    "lng": 2.3431,
+    "altitude": 130
+  },
+  {
     "name": "Belvédère du Barrage de Malpasset",
     "slug": "belvedere-du-barrage-de-malpasset",
     "lat": 43.511508,

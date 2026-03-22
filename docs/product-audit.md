@@ -1,6 +1,6 @@
 # Cloudbreak — Audit produit
 
-_Dernière mise à jour : 2026-03-21_
+_Dernière mise à jour : 2026-03-22_
 
 ---
 
@@ -25,9 +25,9 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 | Données météo Open-Meteo | ✅ Appel réel (gratuit, sans clé) |
 | Cache Redis 10 min | ✅ Actif |
 | Auth JWT Supabase | ✅ Validé localement |
-| 64 sommets en base de données | ✅ Seedés (Alpes, Vosges, Massif Central, Provence) |
+| 22 397 entrées en base (sommets, cols, viewpoints) | ✅ Seedés — toute la France |
 | Index idx_peaks_name | ✅ Migration Alembic |
-| Script génération Overpass API | ✅ scripts/generate_peaks.py |
+| Script génération Overpass API + Open-Meteo elevation | ✅ scripts/generate_peaks.py |
 | Migrations DB | ✅ Alembic |
 | Tests — 78 tests, 100% coverage | ✅ |
 | CI pipeline | ✅ GitHub Actions |
@@ -80,9 +80,7 @@ Exemple : sommet à 1720m, nuages qui commencent à 2500m → l'observateur est 
 
 ### Malus saisonnier
 
-En été (juin-juillet-août) : score multiplié par 0.75.
-La convection thermique estivale empêche la formation de mers de nuage stables.
-Les meilleures périodes : **automne et printemps**.
+Supprimé — la présence ou l'absence de nuages bas détermine le verdict directement. Pas de coefficient saisonnier dans la version actuelle.
 
 ---
 
@@ -107,16 +105,19 @@ Recalibrer les poids en fonction des cas vrais vs faux.
 
 ---
 
-## Les 64 sommets disponibles
+## Les 22 397 entrées disponibles
 
-Données issues d'OpenStreetMap (Overpass API) + compléments manuels pour les Vosges et Massif Central.
+Données issues d'OpenStreetMap (Overpass API) + enrichissement altitude Open-Meteo + entrées manuelles.
 
-| Massif | Nb sommets | Exemples |
+| Source | Nb entrées | Exemples |
 |--------|-----------|---------|
-| Alpes françaises | ~40 | Mont Blanc (4807m), Aiguille du Midi (3842m), La Tournette (2351m), Col de la Croix-Fry (1477m) |
-| Vosges | ~9 | Grand Ballon (1424m), Hohneck (1363m), Champ du Feu (1099m) |
-| Massif Central | ~8 | Puy de Sancy (1885m), Puy de Dôme (1465m), Mont Aigoual (1567m) |
-| Autres | ~7 | Mont Ventoux (1912m), Pic du Midi de Bigorre (2877m), Roc'h Trévezel (384m) |
+| Pyrénées | ~6 566 | Vignemale (3298m), Pic du Midi de Bigorre (2877m) |
+| Alpes Sud | ~4 185 | Mont Blanc (4807m), Aiguille du Midi (3842m) |
+| Alpes Nord | ~2 479 | La Tournette (2351m), Col de la Croix-Fry (1477m) |
+| Massif Central | ~765 | Puy de Sancy (1885m), Mont Aigoual (1567m) |
+| Vosges | ~409 | Grand Ballon (1424m), Champ du Feu (1099m) |
+| Viewpoints urbains | ~570 | La Bastille (476m), Fourvière (295m), Mont Saint-Clair (176m) |
+| Autres (saddles, manuels…) | reste | — |
 
 Pour régénérer depuis OpenStreetMap : `python scripts/generate_peaks.py`
 
@@ -124,9 +125,8 @@ Pour régénérer depuis OpenStreetMap : `python scripts/generate_peaks.py`
 
 ## Prochaines étapes produit
 
-1. **Connecter l'app mobile** à ce backend
-2. **Endpoint recherche** — permettre de chercher un sommet par nom
-3. **Freemium** — quota 1 consultation/jour pour les non-abonnés
-4. **Élargir la base de sommets** — aujourd'hui 64, objectif 500+ pour le lancement
-5. **Validations terrain** — les utilisateurs confirment ou infirment le score avec une photo
-6. **Recalibration de l'algo** — après 50+ validations terrain
+1. **Story 3-3** — endpoint recherche (`GET /api/v1/peaks/search?q=` + `GET /api/v1/peaks/{slug}`) — premier truc visible depuis l'app
+2. **Story 3-4** — écran principal ScoreCard mobile (connecter l'app au backend)
+3. **Freemium** — quota 1 consultation/jour pour les non-abonnés (epic 4)
+4. **Validations terrain** — les utilisateurs confirment ou infirment le score avec une photo
+5. **Recalibration de l'algo** — après 50+ validations terrain

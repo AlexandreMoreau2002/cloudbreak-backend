@@ -2,7 +2,7 @@
 
 ## Ce qu'on a aujourd'hui
 
-**21 574 entrées** couvrant toute la France : sommets, cols, viewpoints urbains iconiques, issus d'OpenStreetMap + entrées manuelles.
+**22 397 entrées** couvrant toute la France : sommets, cols, viewpoints urbains iconiques, issus d'OpenStreetMap + entrées manuelles.
 
 | Source | Entrées | Altitude min |
 |--------|---------|-------------|
@@ -82,12 +82,9 @@ Exemples pour futures extensions :
 ```bash
 cd backend
 source .venv/bin/activate
-python scripts/generate_peaks.py > /tmp/new_peaks_data.json 2>/tmp/generate_log.txt
-
-# Vérifier le résultat
-cat /tmp/generate_log.txt
-# Remplacer le fichier source
-cp /tmp/new_peaks_data.json app/db/peaks_data.json
+python scripts/generate_peaks.py
+# → écrit directement app/db/peaks_data.json
+# ⚠️  Si le count final < count précédent (run partiel), voir retro-seed-sommets-et-spots.md
 ```
 
 ### Étape 4 — Re-seeder en dev

@@ -10,7 +10,7 @@
 | `app/models/favorite.py` | Modèle SQLAlchemy `Favorite` — table `user_favorites` (UUID PK, user_id, peak_id FK, created_at) |
 | `app/api/v1/endpoints/peaks.py` | 5 endpoints : search, detail, add_favorite, remove_favorite, list_favorites |
 | `alembic/versions/d7e8f9a0b1c2_create_user_favorites.py` | Migration : table `user_favorites` + index `user_id` + contrainte unique `(user_id, peak_id)` |
-| `tests/test_api_peaks.py` | 6 tests : search 200 / liste vide / 422 / 401, detail 200 / 404 |
+| `tests/test_api_peaks.py` | 6 tests : search 200 / liste vide / 422 / 403, detail 200 / 404 |
 | `tests/test_api_favorites.py` | 8 tests : add 201 / doublon 409 / peak 404 / 401, remove 204 / 404, list 200 / 401 |
 
 ### Fichiers modifiés

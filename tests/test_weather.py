@@ -9,9 +9,11 @@ Ce service :
 """
 
 import json
-import pytest
 from dataclasses import asdict
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
 from app.services.weather import WeatherService
 from app.domain.weather_types import WeatherData
 

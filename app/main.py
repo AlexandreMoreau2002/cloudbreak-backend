@@ -6,8 +6,8 @@ from fastapi import FastAPI
 
 from app.api.v1.endpoints.user import router as user_router
 from app.api.v1.endpoints.score import router as score_router
-from app.api.v1.endpoints.health import router as health_router
 from app.api.v1.endpoints.peaks import router as peaks_router
+from app.api.v1.endpoints.health import router as health_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

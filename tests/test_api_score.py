@@ -11,9 +11,11 @@ On mocke :
 Pour tester uniquement la logique de l'endpoint lui-même.
 """
 
+from unittest.mock import AsyncMock, patch, MagicMock
+
 import pytest
 from httpx import AsyncClient, ASGITransport
-from unittest.mock import AsyncMock, patch, MagicMock
+
 from app.main import app
 from app.domain.weather_types import WeatherData
 

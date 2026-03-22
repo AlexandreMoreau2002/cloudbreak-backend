@@ -1,8 +1,10 @@
 import json
 import time
+
 import pytest
 from jose import jwt
 from jose.backends import ECKey
+
 from app.core.security import decode_supabase_jwt
 
 # Paire de clés ECC P-256 éphémère — tests uniquement

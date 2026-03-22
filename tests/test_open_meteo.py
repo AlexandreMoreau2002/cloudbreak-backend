@@ -7,10 +7,11 @@ Couvre :
 - Paramètre hour : index dans les données horaires
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
-from app.domain.weather_types import PressureLevelData
 
+import pytest
+
+from app.domain.weather_types import PressureLevelData
 from app.services.weather_providers.open_meteo import (
     OpenMeteoProvider,
     _estimate_cloud_base_skewt,

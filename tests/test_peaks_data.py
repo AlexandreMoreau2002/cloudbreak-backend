@@ -10,11 +10,10 @@ Lancer avec : make validate  (ou pytest tests/test_peaks_data.py)
 """
 
 import json
+import os
 from pathlib import Path
 
 import pytest
-
-import os
 
 _default = Path(__file__).parent.parent / "app" / "db" / "peaks_data.json"
 PEAKS_FILE = Path(os.environ.get("PEAKS_FILE", _default))

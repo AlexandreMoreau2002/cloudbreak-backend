@@ -1,7 +1,8 @@
 import asyncio
 from alembic import context
-from app.db.session import Base
 from app.core.config import settings
+from app.db.session import Base
+import app.models  # noqa: F401 — importe les modèles pour que Alembic les détecte
 from logging.config import fileConfig
 from sqlalchemy.ext.asyncio import create_async_engine
 

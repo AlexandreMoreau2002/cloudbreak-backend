@@ -1,0 +1,141 @@
+# Peaks & Favoris — tests manuels
+#
+# Prérequis dans .vscode/settings.json > rest-client.environmentVariables > local :
+#   "baseUrl": "http://localhost:8000"
+#   "jwt": "<token Supabase — copié depuis les logs mobile>"
+#
+# Slugs vérifiés en DB (SELECT slug, name, altitude FROM peaks WHERE ...) :
+#   mont-ventoux        1910m
+#   grand-ballon        1424m
+#   ballon-dalsace      1248m
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RECHERCHE PEAKS
+# ─────────────────────────────────────────────────────────────────────────────
+
+###
+# ✅ Recherche "mont" → liste de peaks
+GET {{baseUrl}}/api/v1/peaks/search?q=mont
+Authorization: Bearer {{jwt}}
+
+###
+# ✅ Recherche "puy" → Puy de Dôme + autres
+GET {{baseUrl}}/api/v1/peaks/search?q=puy
+Authorization: Bearer {{jwt}}
+
+###
+# ✅ Recherche qui retourne liste vide
+GET {{baseUrl}}/api/v1/peaks/search?q=zzzinexistant
+Authorization: Bearer {{jwt}}
+
+###
+# ❌ q trop court (1 char) → 422
+GET {{baseUrl}}/api/v1/peaks/search?q=m
+Authorization: Bearer {{jwt}}
+
+###
+# ❌ Sans JWT → 403
+GET {{baseUrl}}/api/v1/peaks/search?q=mont
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DÉTAIL PEAK
+# ─────────────────────────────────────────────────────────────────────────────
+
+###
+# ✅ Détail Mont Ventoux (1910m)
+GET {{baseUrl}}/api/v1/peaks/mont-ventoux
+Authorization: Bearer {{jwt}}
+
+###
+# ✅ Détail Grand Ballon (1424m)
+GET {{baseUrl}}/api/v1/peaks/grand-ballon
+Authorization: Bearer {{jwt}}
+
+###
+# ❌ Slug inexistant → 404 PEAK_NOT_FOUND
+GET {{baseUrl}}/api/v1/peaks/slug-qui-nexiste-pas
+Authorization: Bearer {{jwt}}
+
+###
+# ❌ Sans JWT → 403
+GET {{baseUrl}}/api/v1/peaks/puy-de-dome
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FAVORIS — AJOUTER
+# Récupérer un peak_id valide via la recherche ci-dessus d'abord
+# ─────────────────────────────────────────────────────────────────────────────
+
+###
+# ✅ Ajouter Mont Ventoux en favori → 201
+POST {{baseUrl}}/api/v1/user/favorites
+Authorization: Bearer {{jwt}}
+Content-Type: application/json
+
+{
+  "peak_id": "0728f7c7-a0c9-5fb0-b87d-d9edc8696840"
+}
+
+###
+# ❌ Ajouter même peak en doublon → 409 ALREADY_EXISTS
+POST {{baseUrl}}/api/v1/user/favorites
+Authorization: Bearer {{jwt}}
+Content-Type: application/json
+
+{
+  "peak_id": "0728f7c7-a0c9-5fb0-b87d-d9edc8696840"
+}
+
+###
+# ❌ peak_id inexistant → 404 PEAK_NOT_FOUND
+POST {{baseUrl}}/api/v1/user/favorites
+Authorization: Bearer {{jwt}}
+Content-Type: application/json
+
+{
+  "peak_id": "00000000-0000-0000-0000-000000000000"
+}
+
+###
+# ❌ Sans JWT → 403
+POST {{baseUrl}}/api/v1/user/favorites
+Content-Type: application/json
+
+{
+  "peak_id": "11111111-0000-0000-0000-000000000001"
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FAVORIS — LISTER
+# ─────────────────────────────────────────────────────────────────────────────
+
+###
+# ✅ Lister mes favoris → 200 avec peak info
+GET {{baseUrl}}/api/v1/user/favorites
+Authorization: Bearer {{jwt}}
+
+###
+# ❌ Sans JWT → 403
+GET {{baseUrl}}/api/v1/user/favorites
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FAVORIS — SUPPRIMER
+# ─────────────────────────────────────────────────────────────────────────────
+
+###
+# ✅ Supprimer Mont Ventoux des favoris → 204
+DELETE {{baseUrl}}/api/v1/user/favorites/0728f7c7-a0c9-5fb0-b87d-d9edc8696840
+Authorization: Bearer {{jwt}}
+
+###
+# ❌ Supprimer un favori inexistant → 404 NOT_FOUND
+DELETE {{baseUrl}}/api/v1/user/favorites/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{jwt}}
+
+###
+# ❌ Sans JWT → 403
+DELETE {{baseUrl}}/api/v1/user/favorites/0728f7c7-a0c9-5fb0-b87d-d9edc8696840

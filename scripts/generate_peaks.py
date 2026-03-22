@@ -3,6 +3,7 @@ Génère peaks_data.json pour seed.py via Overpass API (OpenStreetMap).
 
 Tags OSM interrogés :
   - natural=peak     → sommets (ele >= 500m, depuis OSM)
+  - natural=volcano  → volcans (ele >= 500m) — ex: Puy de Dôme, Chaîne des Puys, La Réunion
   - natural=saddle   → cols/passages (ele >= 500m, depuis OSM)
   - tourism=viewpoint → belvédères (ele non requis — altitude via Open-Meteo)
     → filtre : elevation >= 80m (capture La Bastille, Fourvière, Mont Saint-Clair…)
@@ -37,6 +38,7 @@ from typing import Any
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 ELEVATION_URL = "https://api.open-meteo.com/v1/elevation"
 OUTPUT_FILE = Path(__file__).parent.parent / "app" / "db" / "peaks_data.json"
+OUTPUT_FILE_TMP = Path(__file__).parent.parent / "app" / "db" / "peaks_data_new.json"
 
 Bbox = tuple[float, float, float, float]
 
@@ -58,7 +60,8 @@ MIN_ALT_SADDLE = 500
 # Seuil pour viewpoints (altitude enrichie via Open-Meteo)
 MIN_ALT_VIEWPOINT = 80
 
-# Cols obligatoires absents du tag natural=peak dans OSM (mountain_pass)
+# Entrées manuelles : cols absents d'OSM natural=peak + viewpoints urbains iconiques
+# (les viewpoints OSM peuvent être perdus lors d'un rate-limit Open-Meteo)
 MANUAL_ENTRIES: list[dict[str, Any]] = [
     {
         "name": "Col de la Croix-Fry",
@@ -66,6 +69,49 @@ MANUAL_ENTRIES: list[dict[str, Any]] = [
         "lat": 45.9075,
         "lng": 6.5015,
         "altitude": 1477,
+    },
+    # Viewpoints urbains iconiques — filet de sécurité anti rate-limit
+    {
+        "name": "La Bastille",
+        "slug": "la-bastille",
+        "lat": 45.1947,
+        "lng": 5.7230,
+        "altitude": 476,
+    },
+    {
+        "name": "Colline de Fourvière",
+        "slug": "colline-de-fourviere",
+        "lat": 45.7613,
+        "lng": 4.8221,
+        "altitude": 295,
+    },
+    {
+        "name": "Mont Saint-Clair",
+        "slug": "mont-saint-clair",
+        "lat": 43.3993,
+        "lng": 3.6988,
+        "altitude": 176,
+    },
+    {
+        "name": "Butte Montmartre",
+        "slug": "butte-montmartre",
+        "lat": 48.8867,
+        "lng": 2.3431,
+        "altitude": 130,
+    },
+    {
+        "name": "Colline du Château",
+        "slug": "colline-du-chateau",
+        "lat": 43.6963,
+        "lng": 7.2767,
+        "altitude": 92,
+    },
+    {
+        "name": "Butte Montmartre — Sacré-Cœur",
+        "slug": "sacre-coeur",
+        "lat": 48.8867,
+        "lng": 2.3431,
+        "altitude": 130,
     },
 ]
 
@@ -81,23 +127,53 @@ def slugify(name: str) -> str:
     return re.sub(r"[-\s]+", "-", slug).strip("-")
 
 
+def _fetch_overpass_with_retry(query: str, label: str) -> dict[str, Any]:
+    """Appel Overpass avec retry exponentiel (3 tentatives max)."""
+    for attempt in range(3):
+        try:
+            response = httpx.post(OVERPASS_URL, data={"data": query}, timeout=100)
+            if response.status_code in (429, 504):
+                wait = 60 * (2**attempt)  # 60s, 120s, 240s
+                print(
+                    f"    ⏳ {response.status_code} {label} — attente {wait}s"
+                    f" (tentative {attempt + 1}/3)",
+                    file=sys.stderr,
+                )
+                time.sleep(wait)
+                continue
+            response.raise_for_status()
+            return response.json()  # type: ignore[no-any-return]
+        except httpx.TimeoutException:
+            wait = 30 * (2**attempt)
+            print(
+                f"    ⏳ timeout réseau {label} — attente {wait}s" f" (tentative {attempt + 1}/3)",
+                file=sys.stderr,
+            )
+            if attempt < 2:
+                time.sleep(wait)
+    return {}
+
+
 def query_peaks_saddles(bbox: tuple[float, float, float, float]) -> list[dict[str, Any]]:
-    """Requête peaks + saddles avec [ele] dans OSM."""
+    """Requête peaks + volcans + saddles avec [ele] dans OSM."""
     south, west, north, east = bbox
     query = f"""
-[out:json][timeout:60];
+[out:json][timeout:90];
 (
   node["natural"="peak"]["name"]["ele"]({south},{west},{north},{east});
+  node["natural"="volcano"]["name"]["ele"]({south},{west},{north},{east});
   node["natural"="saddle"]["name"]["ele"]({south},{west},{north},{east});
 );
 out body;
 """
-    response = httpx.post(OVERPASS_URL, data={"data": query}, timeout=70)
-    response.raise_for_status()
-    data = response.json()
+    data = _fetch_overpass_with_retry(query, "peaks/saddles")
+
+    if not data:
+        print("    ⚠️  échec peaks/saddles après 3 tentatives", file=sys.stderr)
+        return []
 
     if "timed out" in data.get("remark", ""):
-        print("    ⚠️  timeout peaks/saddles", file=sys.stderr)
+        print("    ⚠️  timeout Overpass peaks/saddles", file=sys.stderr)
         return []
 
     results = []
@@ -112,10 +188,11 @@ out body;
         except ValueError:
             continue
 
-        if tags.get("natural") == "peak":
+        natural = tags.get("natural")
+        if natural in ("peak", "volcano"):
             if altitude < MIN_ALT_PEAK:
                 continue
-            node_type = "natural=peak"
+            node_type = f"natural={natural}"
         else:
             if altitude < MIN_ALT_SADDLE:
                 continue
@@ -139,16 +216,18 @@ def query_viewpoints(bbox: tuple[float, float, float, float]) -> list[dict[str, 
     """Requête viewpoints sans filtre [ele] — altitude enrichie après via Open-Meteo."""
     south, west, north, east = bbox
     query = f"""
-[out:json][timeout:60];
+[out:json][timeout:90];
 node["tourism"="viewpoint"]["name"]({south},{west},{north},{east});
 out body;
 """
-    response = httpx.post(OVERPASS_URL, data={"data": query}, timeout=70)
-    response.raise_for_status()
-    data = response.json()
+    data = _fetch_overpass_with_retry(query, "viewpoints")
+
+    if not data:
+        print("    ⚠️  échec viewpoints après 3 tentatives", file=sys.stderr)
+        return []
 
     if "timed out" in data.get("remark", ""):
-        print("    ⚠️  timeout viewpoints", file=sys.stderr)
+        print("    ⚠️  timeout Overpass viewpoints", file=sys.stderr)
         return []
 
     results = []
@@ -171,6 +250,37 @@ out body;
     return results
 
 
+def _fetch_elevations_with_retry(lats: str, lngs: str, batch_num: int) -> list[float]:
+    """Appel Open-Meteo avec retry exponentiel (3 tentatives max)."""
+    for attempt in range(3):
+        try:
+            resp = httpx.get(
+                ELEVATION_URL,
+                params={"latitude": lats, "longitude": lngs},
+                timeout=30,
+            )
+            if resp.status_code == 429:
+                wait = 30 * (2**attempt)  # 30s, 60s, 120s
+                print(
+                    f"    ⏳ 429 batch {batch_num} — attente {wait}s"
+                    f" (tentative {attempt + 1}/3)",
+                    file=sys.stderr,
+                )
+                time.sleep(wait)
+                continue
+            resp.raise_for_status()
+            result: list[float] = resp.json().get("elevation", [])
+            return result
+        except Exception as e:
+            print(
+                f"    ⚠️  Open-Meteo batch {batch_num} tentative {attempt + 1}/3 : {e}",
+                file=sys.stderr,
+            )
+            if attempt < 2:
+                time.sleep(15)
+    return []
+
+
 def enrich_elevations(viewpoints: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Enrichit l'altitude des viewpoints via Open-Meteo Elevation API (batch 100)."""
     if not viewpoints:
@@ -185,17 +295,7 @@ def enrich_elevations(viewpoints: list[dict[str, Any]]) -> list[dict[str, Any]]:
         lats = ",".join(str(p["lat"]) for p in batch)
         lngs = ",".join(str(p["lng"]) for p in batch)
 
-        try:
-            resp = httpx.get(
-                ELEVATION_URL,
-                params={"latitude": lats, "longitude": lngs},
-                timeout=30,
-            )
-            resp.raise_for_status()
-            elevations: list[float] = resp.json().get("elevation", [])
-        except Exception as e:
-            print(f"    ⚠️  Open-Meteo elevation batch {i//batch_size + 1} : {e}", file=sys.stderr)
-            elevations = [0.0] * len(batch)
+        elevations = _fetch_elevations_with_retry(lats, lngs, batch_num=i // batch_size + 1)
 
         for point, elev in zip(batch, elevations):
             altitude = int(elev) if elev is not None else 0
@@ -203,7 +303,7 @@ def enrich_elevations(viewpoints: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 enriched.append({**point, "altitude": altitude})
 
         if i + batch_size < total:
-            time.sleep(0.5)  # légère pause entre les batches Open-Meteo
+            time.sleep(2)  # pause entre les batches Open-Meteo (évite le 429)
 
     print(
         f"    → viewpoints enrichis : {len(enriched)}/{total} ≥ {MIN_ALT_VIEWPOINT}m",
@@ -240,7 +340,7 @@ def main() -> None:
             all_peaks_saddles.extend(ps)
         except Exception as e:
             print(f"    ❌ peaks/saddles : {e}", file=sys.stderr)
-        time.sleep(5)
+        time.sleep(15)  # pause généreuse entre peaks et viewpoints
 
         # --- Viewpoints (sans ele dans OSM) ---
         try:
@@ -249,7 +349,7 @@ def main() -> None:
             all_viewpoints_raw.extend(vp)
         except Exception as e:
             print(f"    ❌ viewpoints : {e}", file=sys.stderr)
-        time.sleep(7)
+        time.sleep(20)  # pause généreuse entre régions
 
     # Enrichir les altitudes des viewpoints via Open-Meteo
     print(
@@ -277,15 +377,22 @@ def main() -> None:
 
     peaks.sort(key=lambda p: -p["altitude"])
 
-    with OUTPUT_FILE.open("w", encoding="utf-8") as f:
+    with OUTPUT_FILE_TMP.open("w", encoding="utf-8") as f:
         json.dump(peaks, f, ensure_ascii=False, indent=2)
 
-    print(f"\n✅ {len(peaks)} entrées → {OUTPUT_FILE}", file=sys.stderr)
+    print(f"\n✅ {len(peaks)} entrées → {OUTPUT_FILE_TMP}", file=sys.stderr)
+    print(
+        "\n⚠️  Fichier écrit dans peaks_data_new.json — PAS encore dans peaks_data.json."
+        "\n   Vérifier avec : pytest tests/test_peaks_data.py --peaks-file=peaks_data_new.json"
+        "\n   Puis valider  : mv app/db/peaks_data_new.json app/db/peaks_data.json",
+        file=sys.stderr,
+    )
 
     print("\nVérification des spots clés :", file=sys.stderr)
     slugs = {p["slug"] for p in peaks}
     key_spots = [
         "mont-blanc",
+        "puy-de-dome",
         "col-de-la-croix-fry",
         "champ-du-feu",
         "la-bastille",

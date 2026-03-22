@@ -1,6 +1,6 @@
 # Cloudbreak — Audit produit
 
-_Dernière mise à jour : 2026-03-21_
+_Dernière mise à jour : 2026-03-22_
 
 ---
 
@@ -25,9 +25,11 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 | Données météo Open-Meteo | ✅ Appel réel (gratuit, sans clé) |
 | Cache Redis 10 min | ✅ Actif |
 | Auth JWT Supabase | ✅ Validé localement |
-| 10 sommets en base de données | ✅ Seedés |
+| 22 397 entrées en base (sommets, cols, viewpoints) | ✅ Seedés — toute la France |
+| Index idx_peaks_name | ✅ Migration Alembic |
+| Script génération Overpass API + Open-Meteo elevation | ✅ scripts/generate_peaks.py |
 | Migrations DB | ✅ Alembic |
-| Tests — 76 tests, 100% coverage | ✅ |
+| Tests — 78 tests, 100% coverage | ✅ |
 | CI pipeline | ✅ GitHub Actions |
 | Domain layer (`app/domain/`) — logique métier pure (zero I/O) | ✅ Refactorisé |
 
@@ -78,9 +80,7 @@ Exemple : sommet à 1720m, nuages qui commencent à 2500m → l'observateur est 
 
 ### Malus saisonnier
 
-En été (juin-juillet-août) : score multiplié par 0.75.
-La convection thermique estivale empêche la formation de mers de nuage stables.
-Les meilleures périodes : **automne et printemps**.
+Supprimé — la présence ou l'absence de nuages bas détermine le verdict directement. Pas de coefficient saisonnier dans la version actuelle.
 
 ---
 
@@ -105,28 +105,28 @@ Recalibrer les poids en fonction des cas vrais vs faux.
 
 ---
 
-## Les 10 sommets disponibles
+## Les 22 397 entrées disponibles
 
-| Sommet | Altitude | Région | Intérêt mer de nuage |
-|--------|----------|--------|----------------------|
-| Puy de Dôme | 1465m | Auvergne | ⭐⭐⭐ Iconique |
-| Mont Ventoux | 1912m | Provence | ⭐⭐⭐ Classique |
-| Crêt de la Neige | 1720m | Jura | ⭐⭐⭐ Très favorable |
-| Grand Ballon | 1424m | Vosges | ⭐⭐⭐ Favorable |
-| Ballon d'Alsace | 1247m | Vosges | ⭐⭐ Correct |
-| Mont Aigoual | 1567m | Cévennes | ⭐⭐ Correct |
-| Mont Salève | 1379m | Haute-Savoie | ⭐⭐ Correct |
-| Pic Saint-Loup | 658m | Languedoc | ⭐ Rare (altitude basse) |
-| Roc'h Trevezel | 384m | Bretagne | ⭐ Rare (altitude basse) |
-| Pic du Midi de Bigorre | 2877m | Pyrénées | ⭐ Rare (trop haut) |
+Données issues d'OpenStreetMap (Overpass API) + enrichissement altitude Open-Meteo + entrées manuelles.
+
+| Source | Nb entrées | Exemples |
+|--------|-----------|---------|
+| Pyrénées | ~6 566 | Vignemale (3298m), Pic du Midi de Bigorre (2877m) |
+| Alpes Sud | ~4 185 | Mont Blanc (4807m), Aiguille du Midi (3842m) |
+| Alpes Nord | ~2 479 | La Tournette (2351m), Col de la Croix-Fry (1477m) |
+| Massif Central | ~765 | Puy de Sancy (1885m), Mont Aigoual (1567m) |
+| Vosges | ~409 | Grand Ballon (1424m), Champ du Feu (1099m) |
+| Viewpoints urbains | ~570 | La Bastille (476m), Fourvière (295m), Mont Saint-Clair (176m) |
+| Autres (saddles, manuels…) | reste | — |
+
+Pour régénérer depuis OpenStreetMap : `python scripts/generate_peaks.py`
 
 ---
 
 ## Prochaines étapes produit
 
-1. **Connecter l'app mobile** à ce backend
-2. **Endpoint recherche** — permettre de chercher un sommet par nom
-3. **Freemium** — quota 1 consultation/jour pour les non-abonnés
-4. **Élargir la base de sommets** — aujourd'hui 10, objectif 500+ pour le lancement
-5. **Validations terrain** — les utilisateurs confirment ou infirment le score avec une photo
-6. **Recalibration de l'algo** — après 50+ validations terrain
+1. **Story 3-3** — endpoint recherche (`GET /api/v1/peaks/search?q=` + `GET /api/v1/peaks/{slug}`) — premier truc visible depuis l'app
+2. **Story 3-4** — écran principal ScoreCard mobile (connecter l'app au backend)
+3. **Freemium** — quota 1 consultation/jour pour les non-abonnés (epic 4)
+4. **Validations terrain** — les utilisateurs confirment ou infirment le score avec une photo
+5. **Recalibration de l'algo** — après 50+ validations terrain

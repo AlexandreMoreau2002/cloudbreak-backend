@@ -29,7 +29,9 @@ cp .env.example .env
 Le backend tourne **toujours sous Docker** — même setup que la prod.
 
 ```bash
-make dev      # démarrer db + redis
+make dev      # démarrer db + redis + api
+make migrate  # appliquer les migrations Alembic
+make seed     # insérer les données initiales (sommets)
 make down     # arrêter
 make logs     # suivre les logs en temps réel
 ```
@@ -80,13 +82,14 @@ make test         # pytest --cov uniquement
 app/
 ├── api/v1/endpoints/   # Routes HTTP (health, score, peaks, auth...)
 ├── core/               # config.py, errors.py
-├── db/                 # session.py SQLAlchemy
+├── db/                 # session.py + seed.py (données initiales)
 ├── domain/             # Logique métier pure (zero I/O) — score, weather_types
 ├── models/             # ORM SQLAlchemy
 ├── schemas/            # Pydantic Request/Response
 ├── services/           # Intégrations I/O (cache Redis, providers HTTP)
 └── main.py             # Point d'entrée FastAPI
 alembic/                # Migrations DB
+scripts/                # Outils dev (generate_peaks.py — régénération sommets via OSM)
 tests/                  # Tests unitaires
 tests/features/         # Tests de feature (flux HTTP complets)
 docs/                   # Documentation par feature
@@ -104,7 +107,7 @@ cp .env.example .env
 |----------|-------------|
 | `DATABASE_URL` | URL PostgreSQL async (`postgresql+asyncpg://...`) |
 | `REDIS_URL` | URL Redis (`redis://localhost:6379`) |
-| `WEATHER_API_KEY` | Clé API OpenWeather ou Weatherbit |
+| `WEATHER_API_KEY` | Non requis — Open-Meteo est gratuit sans clé |
 | `SUPABASE_URL` | URL du projet Supabase |
 | `SUPABASE_KEY` | Clé publique Supabase (validation JWT locale) |
 | `POSTHOG_API_KEY` | Clé PostHog analytics |
@@ -115,4 +118,8 @@ cp .env.example .env
 Chaque feature implementée a sa documentation dans `docs/` :
 
 - [Setup squelette FastAPI](docs/story-1-2-setup-backend.md)
+- [Auth Supabase JWT](docs/story-2-1-auth-supabase.md)
+- [Algorithme score mer de nuage](docs/story-3-1-algorithme-score.md)
+- [Seed base de données des sommets](docs/story-3-2-seed-sommets.md)
+- [Gestion des données sommets — guide opérationnel](docs/peaks-data-management.md)
 - [Refactoring domain/ layer](docs/story-refactor-domain-layer.md)

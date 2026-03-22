@@ -29,13 +29,15 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 | Index idx_peaks_name | ✅ Migration Alembic |
 | Script génération Overpass API + Open-Meteo elevation | ✅ scripts/generate_peaks.py |
 | Migrations DB | ✅ Alembic |
-| Tests — 78 tests, 100% coverage | ✅ |
+| Tests — 92 tests, 100% coverage | ✅ |
 | CI pipeline | ✅ GitHub Actions |
 | Domain layer (`app/domain/`) — logique métier pure (zero I/O) | ✅ Refactorisé |
 
+| Recherche sommets (`GET /api/v1/peaks/search` + `GET /api/v1/peaks/{slug}`) | ✅ ILIKE, limit 20 |
+| Favoris (`POST/DELETE/GET /api/v1/user/favorites`) | ✅ Avec peak info jointe |
+
 ### Ce qui n'existe pas encore
 
-- Endpoint recherche de sommets (`GET /api/v1/peaks/search`)
 - Gestion des abonnements / freemium / quota Redis
 - Endpoint validations terrain (`POST /api/v1/validations`)
 - Notifications push
@@ -125,7 +127,7 @@ Pour régénérer depuis OpenStreetMap : `python scripts/generate_peaks.py`
 
 ## Prochaines étapes produit
 
-1. **Story 3-3** — endpoint recherche (`GET /api/v1/peaks/search?q=` + `GET /api/v1/peaks/{slug}`) — premier truc visible depuis l'app
+1. **Story 3-3 mobile** — hooks + écrans search/favoris (phase 3, en attente validation)
 2. **Story 3-4** — écran principal ScoreCard mobile (connecter l'app au backend)
 3. **Freemium** — quota 1 consultation/jour pour les non-abonnés (epic 4)
 4. **Validations terrain** — les utilisateurs confirment ou infirment le score avec une photo

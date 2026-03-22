@@ -1,7 +1,8 @@
-from app.core.config import settings
-from app.core.security import decode_supabase_jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from app.core.config import settings
+from app.core.security import decode_supabase_jwt
 
 bearer_scheme = HTTPBearer()
 

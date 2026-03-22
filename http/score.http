@@ -4,55 +4,53 @@
 #   "baseUrl": "http://localhost:8000"
 #   "jwt": "<token Supabase — copié depuis les logs mobile>"
 #
-# IDs disponibles après `make seed` :
-#   Puy de Dôme         : 11111111-0000-0000-0000-000000000001  (1465m)
-#   Mont Ventoux        : 11111111-0000-0000-0000-000000000002  (1912m)
-#   Crêt de la Neige    : 11111111-0000-0000-0000-000000000003  (1720m)
-#   Grand Ballon        : 11111111-0000-0000-0000-000000000004  (1424m)
-#   Ballon d'Alsace     : 11111111-0000-0000-0000-000000000005  (1247m)
-#   Pic Saint-Loup      : 11111111-0000-0000-0000-000000000006  (658m)
-#   Mont Salève         : 11111111-0000-0000-0000-000000000007  (1379m)
-#   Roc'h Trevezel      : 11111111-0000-0000-0000-000000000008  (384m)
-#   Pic du Midi Bigorre : 11111111-0000-0000-0000-000000000009  (2877m)
-#   Mont Aigoual        : 11111111-0000-0000-0000-000000000010  (1567m)
+# IDs réels en DB (UUID5 générés depuis le slug) :
+#   Mont Blanc              : 95b3d052-884a-59f4-8509-5e4869f0b468  (4807m)
+#   Pic du Midi de Bigorre  : dce6fffe-591e-5c14-80e2-1d3927fde489  (2877m)
+#   Mont Ventoux            : 0728f7c7-a0c9-5fb0-b87d-d9edc8696840  (1910m)
+#   Puy de Dôme             : 42cd96c1-c2c0-5cd0-8534-3931e696790b  (1464m)
+#   La Bastille (Grenoble)  : 90c1a7f5-5d75-5785-80c3-3230aa1cbfe0  (476m)
+#
+# 💡 Astuce : récupère un peak_id via GET /api/v1/peaks/search?q=nom
+
 
 ###
 # ✅ Score Puy de Dôme — heure par défaut (6h matin, idéal mer de nuage)
-GET {{baseUrl}}/api/v1/score?peak_id=11111111-0000-0000-0000-000000000001&date=2026-03-22
+GET {{baseUrl}}/api/v1/score?peak_id=42cd96c1-c2c0-5cd0-8534-3931e696790b&date=2026-03-22
 Authorization: Bearer {{jwt}}
 
 ###
 # ✅ Score Puy de Dôme — heure personnalisée (8h)
-GET {{baseUrl}}/api/v1/score?peak_id=11111111-0000-0000-0000-000000000001&date=2026-03-22&hour=8
+GET {{baseUrl}}/api/v1/score?peak_id=42cd96c1-c2c0-5cd0-8534-3931e696790b&date=2026-03-22&hour=8
 Authorization: Bearer {{jwt}}
 
 ###
 # ✅ Score Mont Ventoux
-GET {{baseUrl}}/api/v1/score?peak_id=11111111-0000-0000-0000-000000000002&date=2026-03-22
+GET {{baseUrl}}/api/v1/score?peak_id=0728f7c7-a0c9-5fb0-b87d-d9edc8696840&date=2026-03-22
 Authorization: Bearer {{jwt}}
 
 ###
-# ✅ Score Crêt de la Neige (Jura — très favorable mer de nuage)
-GET {{baseUrl}}/api/v1/score?peak_id=11111111-0000-0000-0000-000000000003&date=2026-03-22
+# ✅ Score Mont Blanc (4807m — très haut, mer de nuage rare)
+GET {{baseUrl}}/api/v1/score?peak_id=95b3d052-884a-59f4-8509-5e4869f0b468&date=2026-03-22
 Authorization: Bearer {{jwt}}
 
 ###
-# ✅ Score Pic du Midi de Bigorre (2877m — haut, rare)
-GET {{baseUrl}}/api/v1/score?peak_id=11111111-0000-0000-0000-000000000009&date=2026-03-22
+# ✅ Score Pic du Midi de Bigorre (2877m)
+GET {{baseUrl}}/api/v1/score?peak_id=dce6fffe-591e-5c14-80e2-1d3927fde489&date=2026-03-22
 Authorization: Bearer {{jwt}}
 
 ###
-# ✅ Score Roc'h Trevezel (384m — Bretagne, altitude basse)
-GET {{baseUrl}}/api/v1/score?peak_id=11111111-0000-0000-0000-000000000008&date=2026-03-22
+# ✅ Score La Bastille Grenoble (476m — viewpoint urbain)
+GET {{baseUrl}}/api/v1/score?peak_id=90c1a7f5-5d75-5785-80c3-3230aa1cbfe0&date=2026-03-22
 Authorization: Bearer {{jwt}}
 
 ###
-# ❌ Sans JWT → 401
-GET {{baseUrl}}/api/v1/score?peak_id=11111111-0000-0000-0000-000000000001&date=2026-03-22
+# ❌ Sans JWT → 403
+GET {{baseUrl}}/api/v1/score?peak_id=42cd96c1-c2c0-5cd0-8534-3931e696790b&date=2026-03-22
 
 ###
-# ❌ Token invalide → 401
-GET {{baseUrl}}/api/v1/score?peak_id=11111111-0000-0000-0000-000000000001&date=2026-03-22
+# ❌ Token invalide → 403
+GET {{baseUrl}}/api/v1/score?peak_id=42cd96c1-c2c0-5cd0-8534-3931e696790b&date=2026-03-22
 Authorization: Bearer token.invalide.ici
 
 ###
@@ -62,10 +60,10 @@ Authorization: Bearer {{jwt}}
 
 ###
 # ❌ Date manquante → 422
-GET {{baseUrl}}/api/v1/score?peak_id=11111111-0000-0000-0000-000000000001
+GET {{baseUrl}}/api/v1/score?peak_id=42cd96c1-c2c0-5cd0-8534-3931e696790b
 Authorization: Bearer {{jwt}}
 
 ###
 # ❌ Heure hors limites (hour=25) → 422
-GET {{baseUrl}}/api/v1/score?peak_id=11111111-0000-0000-0000-000000000001&date=2026-03-22&hour=25
+GET {{baseUrl}}/api/v1/score?peak_id=42cd96c1-c2c0-5cd0-8534-3931e696790b&date=2026-03-22&hour=25
 Authorization: Bearer {{jwt}}

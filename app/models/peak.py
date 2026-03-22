@@ -1,7 +1,8 @@
 """Modèle SQLAlchemy — table peaks."""
 
-from app.db.session import Base
 from sqlalchemy import Column, Float, Integer, String
+
+from app.db.session import Base
 
 
 class Peak(Base):

@@ -133,6 +133,23 @@ pip-audit  # à installer : pip install pip-audit
 
 ---
 
+## 2026-03-23 Story 3-4 — Ecran Principal ScoreCard
+
+### WARNING
+- **[fetchService.ts:51]** `apiFetch` propage `body?.detail` de l'API comme message d'erreur brut dans le `Error` thrown. Ce message remonte dans `useScore` (ligne 33) et est stocké verbatim dans `scoreState.error`. L'ecran `index.tsx` filtre correctement avant affichage (lignes 59-62), mais le message brut reste accessible dans l'objet d'etat — tout futur consommateur qui rendrait directement `scoreState.error` pourrait exposer des details internes du backend (ex: message Pydantic, code d'erreur interne). Recommandation : sanitiser a la sortie de `useScore` plutot qu'au niveau de chaque ecran consommateur — remplacer le message brut par une cle i18n generique avant de le stocker dans le state `error`.
+
+### INFO
+- **[useScore.ts:22]** Token JWT logue uniquement comme booleen (`token: !!token`) en mode DEBUG — la valeur brute n'est jamais loggee. Pattern correct.
+- **[fetchService.ts:36]** URL complete loggee en mode DEBUG mais le token est dans le header `Authorization`, jamais dans l'URL ni dans les logs. Pas de fuite possible.
+- **[devConfig.ts:13]** `DEBUG = __DEV__ && true` — `__DEV__` est `false` en build de production Expo/Metro, tous les `console.debug` sont morts en prod. Comportement verifie.
+- **[SelectedPeakContext.tsx]** Context stocke uniquement en memoire React state (id, name, slug, lat, lng, altitude) — pas d'AsyncStorage, pas de SecureStore, pas de persistence. Aucune donnee sensible dans ce context.
+- **[index.tsx:18]** Token extrait de `session?.access_token` issu du SDK Supabase — le SDK gere son propre stockage securise, le token n'est pas manipule directement par l'app. Correct.
+- **[index.tsx:59-62]** Messages d'erreur filtres via cle i18n avant affichage (`home.serviceUnavailable` / `home.errorGeneric`) — le message brut de l'API n'est jamais rendu dans l'UI sur cet ecran.
+- **[ScoreCard.tsx]** Composant purement presentationnel — affiche uniquement `peak_name`, `peak_altitude`, `score`, `verdict` (donnees non-sensibles). Aucune logique auth, aucun acces token.
+- **[api/score.ts:23]** `peak_id` passe comme query param valide par le backend via SQLAlchemy ORM — pas d'injection possible.
+
+---
+
 ## Checklist avant mise en prod
 
 - [ ] Variables `.env` renseignées sur le VPS (jamais en clair dans le code)

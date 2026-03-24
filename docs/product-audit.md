@@ -1,6 +1,6 @@
 # Cloudbreak — Audit produit
 
-_Dernière mise à jour : 2026-03-22_
+_Dernière mise à jour : 2026-03-24_
 
 ---
 
@@ -42,7 +42,6 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 - Endpoint validations terrain (`POST /api/v1/validations`)
 - Notifications push
 - Déploiement VPS (infra prod)
-- App mobile connectée à ce backend
 
 ---
 
@@ -127,8 +126,7 @@ Pour régénérer depuis OpenStreetMap : `python scripts/generate_peaks.py`
 
 ## Prochaines étapes produit
 
-1. **Story 3-3 mobile** — hooks + écrans search/favoris (phase 3, en attente validation)
-2. **Story 3-4** — écran principal ScoreCard mobile (connecter l'app au backend)
-3. **Freemium** — quota 1 consultation/jour pour les non-abonnés (epic 4)
-4. **Validations terrain** — les utilisateurs confirment ou infirment le score avec une photo
-5. **Recalibration de l'algo** — après 50+ validations terrain
+1. **Story 3-5** — détail conditions météo + fenêtre temporelle + stabilité (mobile)
+2. **Freemium** — quota 1 consultation/jour pour les non-abonnés (epic 4)
+3. **Validations terrain** — les utilisateurs confirment ou infirment le score avec une photo
+4. **Recalibration de l'algo** — après 50+ validations terrain

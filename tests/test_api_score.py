@@ -17,7 +17,7 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 
 from app.main import app
-from app.domain.weather_types import WeatherData
+from app.domain.weather_types import PressureLevelData, WeatherData
 
 
 MOCK_USER = {"id": "user-123", "email": "alex@test.com"}
@@ -40,6 +40,22 @@ MOCK_WEATHER = WeatherData(
     pressure=1015.0,
     cloud_cover_low=50.0,
     month=10,
+    pressure_levels=[
+        PressureLevelData(
+            pressure_hpa=925,
+            altitude_m=800,
+            temperature_c=5.0,
+            relative_humidity=90.0,
+            dew_point_spread=1.0,
+        ),
+        PressureLevelData(
+            pressure_hpa=850,
+            altitude_m=1500,
+            temperature_c=9.0,
+            relative_humidity=80.0,
+            dew_point_spread=2.0,
+        ),
+    ],
 )
 
 
@@ -75,10 +91,40 @@ async def test_score_retourne_200_avec_jwt_valide(auth_override: None) -> None:
     data = response.json()
     assert "score" in data
     assert "verdict" in data
+    assert "label" in data
+    assert "context_message" in data
     assert "cloud_base" in data
+    assert "peak_slug" in data
+    assert "optimal_window_start" in data
+    assert "optimal_window_end" in data
+    assert "sunrise" in data
+    assert "stability_hours" in data
     assert "conditions" in data
+    assert "cloud_layer_viz" in data
     assert data["verdict"] in ("none", "high", "medium", "low")
     assert 0 <= data["score"] <= 100
+    assert data["label"]
+    assert data["context_message"]
+    assert data["peak_slug"] == "mont-blanc"
+    assert data["optimal_window_start"]
+    assert data["optimal_window_end"]
+    assert data["sunrise"]
+    assert isinstance(data["stability_hours"], int)
+    assert data["conditions"]["cloud_base_m"] == 800
+    assert data["conditions"]["humidity_pct"] == 85.0
+    assert data["conditions"]["wind_speed_kmh"] == 8.0
+    assert data["conditions"]["pressure_hpa"] == 1015.0
+    assert data["conditions"]["cloud_cover_low_pct"] == 50.0
+    assert data["cloud_layer_viz"]["summit_altitude"] == 1500
+    assert data["cloud_layer_viz"]["cloud_base"] == 800
+    assert len(data["cloud_layer_viz"]["pressure_levels"]) == 2
+    labels = {
+        "none": "Pas de mer de nuage",
+        "high": "Lève-toi tôt, ça vaut le coup",
+        "medium": "Ça peut le faire",
+        "low": "Pas ce coup-ci",
+    }
+    assert data["label"] == labels[data["verdict"]]
 
 
 @pytest.mark.asyncio

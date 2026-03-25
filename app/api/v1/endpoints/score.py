@@ -30,10 +30,15 @@ from app.models.peak import Peak
 from app.db.session import get_db
 from app.core.config import settings
 from app.core.errors import ErrorCode
-from app.domain.score import calculate_score
+from app.domain.score import build_score_presentation, calculate_score
 from app.services.weather import WeatherService
 from app.core.dependencies import get_current_user
-from app.schemas.score import ScoreConditionsSchema, ScoreResponse
+from app.schemas.score import (
+    PressureLevelSchema,
+    ScoreCloudLayerVizSchema,
+    ScoreConditionsSchema,
+    ScoreResponse,
+)
 from app.services.weather_providers.open_meteo import OpenMeteoProvider
 
 logger = logging.getLogger(__name__)
@@ -83,6 +88,14 @@ async def get_score(
         ) from exc
 
     result = calculate_score(weather, peak_altitude=int(peak.altitude))
+    presentation = build_score_presentation(
+        result=result,
+        weather=weather,
+        date=date,
+        lat=float(peak.lat),
+        lng=float(peak.lng),
+        peak_altitude=int(peak.altitude),
+    )
 
     logger.info(
         "score_calculated",
@@ -98,13 +111,41 @@ async def get_score(
     return ScoreResponse(
         score=result["score"],
         verdict=result["verdict"],
+        label=presentation["label"],
+        context_message=presentation["context_message"],
         cloud_base=result["cloud_base"],
+        peak_slug=str(peak.slug),
+        optimal_window_start=presentation["optimal_window_start"],
+        optimal_window_end=presentation["optimal_window_end"],
+        sunrise=presentation["sunrise"],
+        stability_hours=presentation["stability_hours"],
         conditions=ScoreConditionsSchema(
             cloud_base_score=cond["cloud_base_score"],
             humidity_score=cond["humidity_score"],
             wind_score=cond["wind_score"],
             inversion_score=cond["inversion_score"],
             pressure_score=cond["pressure_score"],
+            cloud_base_m=result["cloud_base"],
+            humidity_pct=float(weather.humidity),
+            wind_speed_kmh=float(weather.wind_speed),
+            inversion_delta_c=float(weather.temperature_850hpa - weather.temperature_925hpa),
+            inversion_detected=bool(weather.temperature_850hpa > weather.temperature_925hpa),
+            pressure_hpa=float(weather.pressure),
+            cloud_cover_low_pct=float(weather.cloud_cover_low),
+        ),
+        cloud_layer_viz=ScoreCloudLayerVizSchema(
+            summit_altitude=int(peak.altitude),
+            cloud_base=result["cloud_base"],
+            pressure_levels=[
+                PressureLevelSchema(
+                    pressure_hpa=level.pressure_hpa,
+                    altitude_m=level.altitude_m,
+                    temperature_c=level.temperature_c,
+                    relative_humidity=level.relative_humidity,
+                    dew_point_spread=level.dew_point_spread,
+                )
+                for level in weather.pressure_levels
+            ],
         ),
         peak_name=str(peak.name),
         peak_altitude=int(peak.altitude),

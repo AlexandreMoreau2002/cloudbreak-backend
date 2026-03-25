@@ -12,13 +12,21 @@ Score conditionnel (seulement si conditions non bloquantes) :
 
 from app.domain.score import (
     _cloud_base_component,
+    _estimate_stability_hours,
+    _estimate_sunrise_minutes,
+    _context_message,
     _humidity_component,
     _inversion_component,
+    _optimal_window_from_sunrise,
     _pressure_component,
+    _verdict_label,
     _wind_component,
+    build_score_presentation,
     calculate_score,
 )
-from app.domain.weather_types import WeatherData
+from app.domain.score import ScoreConditions, ScoreResult
+from app.domain.weather_types import PressureLevelData, WeatherData
+from typing import cast
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -411,3 +419,249 @@ class TestStructureRetour:
             peak_altitude=1500,
         )
         assert result["score"] <= 100
+
+
+# ── Helpers de présentation ──────────────────────────────────────────────────
+
+
+class TestPresentationHelpers:
+    def test_verdict_label_couvre_tous_les_cas(self) -> None:
+        assert _verdict_label("high") == "Lève-toi tôt, ça vaut le coup"
+        assert _verdict_label("medium") == "Ça peut le faire"
+        assert _verdict_label("low") == "Pas ce coup-ci"
+        assert _verdict_label("none") == "Pas de mer de nuage"
+
+    def test_context_message_ete_score_faible(self) -> None:
+        result = calculate_score(
+            weather(
+                cloud_base=1400,
+                humidity=45.0,
+                wind_speed=12.0,
+                temperature_925hpa=14.0,
+                temperature_850hpa=12.0,
+                pressure=1008.0,
+                cloud_cover_low=10.0,
+                month=7,
+            ),
+            peak_altitude=1500,
+        )
+        assert result["score"] == 0
+        assert (
+            _context_message(
+                result,
+                weather(cloud_base=1400, cloud_cover_low=10.0, month=7),
+                peak_altitude=1500,
+            )
+            == "Pas de mer de nuage — mais ciel parfaitement dégagé au-dessus de 2400m ☀️"
+        )
+
+    def test_context_message_detecte_le_facteur_dominant(self) -> None:
+        result = calculate_score(
+            weather(
+                cloud_base=500,
+                humidity=92.0,
+                wind_speed=34.0,
+                temperature_925hpa=2.0,
+                temperature_850hpa=9.0,
+                pressure=1028.0,
+                cloud_cover_low=55.0,
+                month=10,
+            ),
+            peak_altitude=1500,
+        )
+        assert (
+            _context_message(
+                result,
+                weather(
+                    cloud_base=500,
+                    humidity=92.0,
+                    wind_speed=34.0,
+                    temperature_925hpa=2.0,
+                    temperature_850hpa=9.0,
+                    pressure=1028.0,
+                    cloud_cover_low=55.0,
+                    month=10,
+                ),
+                1500,
+            )
+            == "Pas de mer de nuage aujourd'hui : le vent disperse la couche."
+        )
+
+    def test_estimate_stability_hours_cas_bloquants(self) -> None:
+        none_result = cast(
+            ScoreResult,
+            {
+                "score": 0,
+                "verdict": "none",
+                "cloud_base": 0,
+                "conditions": cast(ScoreConditions, {}),
+            },
+        )
+        assert _estimate_stability_hours(none_result, weather(cloud_cover_low=10.0)) == 6
+        assert _estimate_stability_hours(none_result, weather(cloud_cover_low=20.0)) == 8
+
+    def test_estimate_stability_hours_paliers(self) -> None:
+        base_conditions = cast(
+            ScoreConditions,
+            {
+                "cloud_base_score": 1.0,
+                "humidity_score": 1.0,
+                "wind_score": 1.0,
+                "inversion_score": 1.0,
+                "pressure_score": 1.0,
+            },
+        )
+        assert (
+            _estimate_stability_hours(
+                cast(
+                    ScoreResult,
+                    {
+                        "score": 80,
+                        "verdict": "high",
+                        "cloud_base": 800,
+                        "conditions": base_conditions,
+                    },
+                ),
+                weather(),
+            )
+            == 48
+        )
+        assert (
+            _estimate_stability_hours(
+                cast(
+                    ScoreResult,
+                    {
+                        "score": 70,
+                        "verdict": "high",
+                        "cloud_base": 800,
+                        "conditions": cast(
+                            ScoreConditions,
+                            {
+                                "cloud_base_score": 0.8,
+                                "humidity_score": 0.0,
+                                "wind_score": 0.7,
+                                "inversion_score": 0.6,
+                                "pressure_score": 0.6,
+                            },
+                        ),
+                    },
+                ),
+                weather(),
+            )
+            == 36
+        )
+        assert (
+            _estimate_stability_hours(
+                cast(
+                    ScoreResult,
+                    {
+                        "score": 40,
+                        "verdict": "medium",
+                        "cloud_base": 800,
+                        "conditions": cast(
+                            ScoreConditions,
+                            {
+                                "cloud_base_score": 0.0,
+                                "humidity_score": 0.0,
+                                "wind_score": 0.0,
+                                "inversion_score": 0.0,
+                                "pressure_score": 0.0,
+                            },
+                        ),
+                    },
+                ),
+                weather(),
+            )
+            == 18
+        )
+        assert (
+            _estimate_stability_hours(
+                cast(
+                    ScoreResult,
+                    {
+                        "score": 39,
+                        "verdict": "low",
+                        "cloud_base": 800,
+                        "conditions": cast(
+                            ScoreConditions,
+                            {
+                                "cloud_base_score": 0.0,
+                                "humidity_score": 0.0,
+                                "wind_score": 0.0,
+                                "inversion_score": 0.0,
+                                "pressure_score": 0.0,
+                            },
+                        ),
+                    },
+                ),
+                weather(),
+            )
+            == 8
+        )
+
+    def test_estimate_sunrise_minutes_et_fenetre(self) -> None:
+        sunrise_minutes = _estimate_sunrise_minutes("2026-10-15", 45.83, 6.86)
+        assert sunrise_minutes is not None
+        assert _optimal_window_from_sunrise(sunrise_minutes, 48) == (
+            _optimal_window_from_sunrise(sunrise_minutes, 48)[0],
+            _optimal_window_from_sunrise(sunrise_minutes, 48)[1],
+        )
+        assert _optimal_window_from_sunrise(None, 48) == (None, None)
+        assert _estimate_sunrise_minutes("2026-12-21", 80.0, 0.0) is None
+
+    def test_build_score_presentation(self) -> None:
+        result = cast(
+            ScoreResult,
+            {
+                "score": 82,
+                "verdict": "high",
+                "cloud_base": 700,
+                "conditions": cast(
+                    ScoreConditions,
+                    {
+                        "cloud_base_score": 1.0,
+                        "humidity_score": 1.0,
+                        "wind_score": 1.0,
+                        "inversion_score": 1.0,
+                        "pressure_score": 1.0,
+                    },
+                ),
+            },
+        )
+        weather_data = WeatherData(
+            cloud_base=700,
+            humidity=92.0,
+            wind_speed=5.0,
+            temperature_2m=10.0,
+            temperature_850hpa=8.0,
+            temperature_925hpa=2.0,
+            pressure=1028.0,
+            cloud_cover_low=75.0,
+            month=10,
+            pressure_levels=[
+                PressureLevelData(
+                    pressure_hpa=925,
+                    altitude_m=750,
+                    temperature_c=3.2,
+                    relative_humidity=88.0,
+                    dew_point_spread=1.5,
+                ),
+            ],
+        )
+        presentation = build_score_presentation(
+            result=result,
+            weather=weather_data,
+            date="2026-10-15",
+            lat=45.83,
+            lng=6.86,
+            peak_altitude=1500,
+        )
+        assert presentation["label"] == "Lève-toi tôt, ça vaut le coup"
+        assert presentation["stability_hours"] == 48
+        assert presentation["sunrise"] is not None
+        assert presentation["context_message"]
+        assert presentation["optimal_window_start"] is not None
+        assert presentation["optimal_window_end"] is not None
+        assert presentation["cloud_layer_viz"]["summit_altitude"] == 1500
+        assert presentation["cloud_layer_viz"]["cloud_base"] == 700
+        assert presentation["cloud_layer_viz"]["pressure_levels"][0]["pressure_hpa"] == 925

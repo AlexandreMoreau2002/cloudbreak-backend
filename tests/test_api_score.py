@@ -11,12 +11,10 @@ On mocke :
 Pour tester uniquement la logique de l'endpoint lui-même.
 """
 
-from unittest.mock import AsyncMock, patch, MagicMock
-
 import pytest
-from httpx import AsyncClient, ASGITransport
-
 from app.main import app
+from httpx import AsyncClient, ASGITransport
+from unittest.mock import AsyncMock, patch, MagicMock
 from app.domain.weather_types import PressureLevelData, WeatherData
 
 
@@ -29,6 +27,7 @@ MOCK_PEAK.slug = "mont-blanc"
 MOCK_PEAK.lat = 45.83
 MOCK_PEAK.lng = 6.86
 MOCK_PEAK.altitude = 1500
+MOCK_PEAK.region = "Massif du Mont-Blanc"
 
 MOCK_WEATHER = WeatherData(
     cloud_base=800,
@@ -38,7 +37,7 @@ MOCK_WEATHER = WeatherData(
     temperature_850hpa=9.0,
     temperature_925hpa=5.0,
     pressure=1015.0,
-    cloud_cover_low=50.0,
+    cloud_cover_low=55.0,
     month=10,
     pressure_levels=[
         PressureLevelData(
@@ -91,10 +90,12 @@ async def test_score_retourne_200_avec_jwt_valide(auth_override: None) -> None:
     data = response.json()
     assert "score" in data
     assert "verdict" in data
-    assert "label" in data
-    assert "context_message" in data
+    assert "label_code" in data
+    assert "context_code" in data
+    assert "context_params" in data
     assert "cloud_base" in data
     assert "peak_slug" in data
+    assert "peak_region" in data
     assert "optimal_window_start" in data
     assert "optimal_window_end" in data
     assert "sunrise" in data
@@ -103,9 +104,13 @@ async def test_score_retourne_200_avec_jwt_valide(auth_override: None) -> None:
     assert "cloud_layer_viz" in data
     assert data["verdict"] in ("none", "high", "medium", "low")
     assert 0 <= data["score"] <= 100
-    assert data["label"]
-    assert data["context_message"]
+    assert data["label_code"]
+    assert data["context_code"]
     assert data["peak_slug"] == "mont-blanc"
+    assert data["peak_region"] == "Massif du Mont-Blanc"
+    assert data["label_code"] == "score.label.high"
+    assert data["context_code"] == "score.context.high.stable_window"
+    assert data["context_params"] == {"cloud_base_gap_m": 700}
     assert data["optimal_window_start"]
     assert data["optimal_window_end"]
     assert data["sunrise"]
@@ -114,17 +119,10 @@ async def test_score_retourne_200_avec_jwt_valide(auth_override: None) -> None:
     assert data["conditions"]["humidity_pct"] == 85.0
     assert data["conditions"]["wind_speed_kmh"] == 8.0
     assert data["conditions"]["pressure_hpa"] == 1015.0
-    assert data["conditions"]["cloud_cover_low_pct"] == 50.0
+    assert data["conditions"]["cloud_cover_low_pct"] == 55.0
     assert data["cloud_layer_viz"]["summit_altitude"] == 1500
     assert data["cloud_layer_viz"]["cloud_base"] == 800
     assert len(data["cloud_layer_viz"]["pressure_levels"]) == 2
-    labels = {
-        "none": "Pas de mer de nuage",
-        "high": "Lève-toi tôt, ça vaut le coup",
-        "medium": "Ça peut le faire",
-        "low": "Pas ce coup-ci",
-    }
-    assert data["label"] == labels[data["verdict"]]
 
 
 @pytest.mark.asyncio

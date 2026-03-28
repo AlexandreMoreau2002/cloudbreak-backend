@@ -14,3 +14,4 @@ class Peak(Base):
     lat = Column(Float, nullable=False)
     lng = Column(Float, nullable=False)
     altitude = Column(Integer, nullable=False)
+    region = Column(String, nullable=True)

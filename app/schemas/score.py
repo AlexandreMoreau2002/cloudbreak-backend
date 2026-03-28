@@ -38,8 +38,12 @@ class ScoreConditionsSchema(BaseModel):
 class ScoreResponse(BaseModel):
     score: int = Field(ge=0, le=100, description="Score de probabilité en %")
     verdict: str = Field(description="none | high | medium | low")
-    label: str = Field(description="Texte humain associé au verdict")
-    context_message: str = Field(description="Message contextuel lorsque le score est défavorable")
+    label_code: str = Field(description="Clé i18n stable associée au verdict")
+    context_code: str = Field(description="Clé i18n stable du message contextuel")
+    context_params: dict[str, str | int | float | bool | None] = Field(
+        default_factory=dict,
+        description="Paramètres interpolables pour le message contextuel",
+    )
     cloud_base: int = Field(description="Altitude de la base des nuages en mètres")
     peak_slug: str = Field(description="Slug du sommet pour le deep link")
     optimal_window_start: str | None = Field(
@@ -59,3 +63,4 @@ class ScoreResponse(BaseModel):
     cloud_layer_viz: ScoreCloudLayerVizSchema
     peak_name: str
     peak_altitude: int
+    peak_region: str | None = None

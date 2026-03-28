@@ -19,21 +19,23 @@ Stratégie générale :
 
 Usage :
     python scripts/generate_peaks.py
-    # Écrit directement app/db/peaks_data.json
+    # Écrit app/db/peaks_data_new.json déjà enrichi avec region
 
 Prérequis :
     pip install httpx  (déjà dans requirements)
 """
 
-import json
 import re
 import sys
+import json
 import time
 import uuid
 import httpx
+import argparse
 import unicodedata
-from pathlib import Path
 from typing import Any
+from pathlib import Path
+from peak_region_enrichment import enrich_peaks
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 ELEVATION_URL = "https://api.open-meteo.com/v1/elevation"
@@ -116,11 +118,28 @@ MANUAL_ENTRIES: list[dict[str, Any]] = [
 ]
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--use-nominatim",
+        action="store_true",
+        help="Enrichit aussi region via Nominatim pour les peaks hors couverture locale.",
+    )
+    parser.add_argument(
+        "--nominatim-limit",
+        type=int,
+        default=None,
+        help="Limite le nombre d'appels Nominatim pour un run de test.",
+    )
+    return parser.parse_args()
+
+
 def make_id(slug: str) -> str:
     return str(uuid.uuid5(uuid.NAMESPACE_URL, f"cloudbreak:peak:{slug}"))
 
 
 def slugify(name: str) -> str:
+    name = name.replace("œ", "oe").replace("Œ", "Oe").replace("æ", "ae").replace("Æ", "Ae")
     nfkd = unicodedata.normalize("NFKD", name)
     ascii_str = nfkd.encode("ascii", "ignore").decode("ascii")
     slug = re.sub(r"[^\w\s-]", "", ascii_str.lower())
@@ -322,6 +341,7 @@ def deduplicate(peaks: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def main() -> None:
+    args = parse_args()
     all_peaks_saddles: list[dict[str, Any]] = []
     all_viewpoints_raw: list[dict[str, Any]] = []
 
@@ -375,6 +395,13 @@ def main() -> None:
         p["id"] = make_id(p["slug"])
         p.pop("type", None)
 
+    peaks, region_stats = enrich_peaks(
+        peaks,
+        overwrite_existing=True,
+        use_nominatim=args.use_nominatim,
+        nominatim_limit=args.nominatim_limit,
+    )
+
     peaks.sort(key=lambda p: -p["altitude"])
 
     with OUTPUT_FILE_TMP.open("w", encoding="utf-8") as f:
@@ -387,6 +414,14 @@ def main() -> None:
         "\n   Puis valider  : mv app/db/peaks_data_new.json app/db/peaks_data.json",
         file=sys.stderr,
     )
+    enriched_regions = sum(1 for peak in peaks if peak.get("region"))
+    print(
+        f"\n📍 region enrichie : {enriched_regions}/{len(peaks)} "
+        f"({enriched_regions / len(peaks):.1%})",
+        file=sys.stderr,
+    )
+    for key, value in region_stats.items():
+        print(f"   - {key}: {value}", file=sys.stderr)
 
     print("\nVérification des spots clés :", file=sys.stderr)
     slugs = {p["slug"] for p in peaks}

@@ -19,27 +19,25 @@ Erreurs :
 """
 
 import logging
-from typing import Annotated, Any
-
-import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
+import redis.asyncio as aioredis
 from app.models.peak import Peak
+from typing import Annotated, Any
 from app.db.session import get_db
 from app.core.config import settings
 from app.core.errors import ErrorCode
-from app.domain.score import build_score_presentation, calculate_score
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.weather import WeatherService
 from app.core.dependencies import get_current_user
-from app.schemas.score import (
-    PressureLevelSchema,
-    ScoreCloudLayerVizSchema,
-    ScoreConditionsSchema,
-    ScoreResponse,
-)
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from app.domain.score import build_score_presentation, calculate_score
 from app.services.weather_providers.open_meteo import OpenMeteoProvider
+from app.schemas.score import (
+    ScoreResponse,
+    PressureLevelSchema,
+    ScoreConditionsSchema,
+    ScoreCloudLayerVizSchema,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +48,10 @@ router = APIRouter(prefix="/api/v1", tags=["score"])
 _provider = OpenMeteoProvider()
 _redis = aioredis.from_url(settings.redis_url, decode_responses=False)  # type: ignore[no-untyped-call]
 weather_service = WeatherService(redis=_redis, provider=_provider)
+
+
+def _optional_region(value: object) -> str | None:
+    return value if isinstance(value, str) else None
 
 
 async def get_peak_by_id(peak_id: str, db: AsyncSession) -> Peak | None:
@@ -96,7 +98,6 @@ async def get_score(
         lng=float(peak.lng),
         peak_altitude=int(peak.altitude),
     )
-
     logger.info(
         "score_calculated",
         extra={
@@ -111,8 +112,9 @@ async def get_score(
     return ScoreResponse(
         score=result["score"],
         verdict=result["verdict"],
-        label=presentation["label"],
-        context_message=presentation["context_message"],
+        label_code=presentation["label_code"],
+        context_code=presentation["context_code"],
+        context_params=presentation["context_params"],
         cloud_base=result["cloud_base"],
         peak_slug=str(peak.slug),
         optimal_window_start=presentation["optimal_window_start"],
@@ -149,4 +151,5 @@ async def get_score(
         ),
         peak_name=str(peak.name),
         peak_altitude=int(peak.altitude),
+        peak_region=_optional_region(peak.region),
     )

@@ -5,9 +5,10 @@
 | Fichier | Rôle |
 |---------|------|
 | `app/db/peaks_data.json` | 22 031 entrées — source de données brute |
-| `app/db/seed.py` | Script d'insertion en DB (lit peaks_data.json) |
+| `app/db/seed.py` | Script d'upsert en DB (lit peaks_data.json) |
 | `alembic/versions/c1a2b3d4e5f6_add_idx_peaks_name.py` | Migration : index `idx_peaks_name` sur `peaks.name` |
 | `scripts/generate_peaks.py` | Script de régénération depuis Overpass API + Open-Meteo |
+| `scripts/enrich_region.py` | Script d'enrichissement local du champ `region` |
 
 ---
 
@@ -94,20 +95,22 @@ Pour chaque nœud OSM :
 
 Les 22 031 entrées sont dans `app/db/peaks_data.json` (~2.5MB). `seed.py` lit ce fichier — **aucun appel réseau à runtime**. Le fichier est commité dans le repo.
 
-### 6. Le seed est idempotent
+### 6. Le seed est idempotent sur `slug`
 
 ```python
-result = await session.execute(text("SELECT COUNT(*) FROM peaks"))
-count = result.scalar()
-if count and count > 0:
-    # Table déjà peuplée — on ne fait rien
-    return
+stmt = insert(Peak).values(peaks_data)
+stmt.on_conflict_do_update(
+    index_elements=[Peak.slug],
+    set_={...}
+)
 ```
 
-Pour re-seeder, vider la table d'abord :
+Pour remettre la DB en phase avec `peaks_data.json`, il suffit donc de relancer :
 ```bash
-docker exec cloudbreak-db psql -U postgres -d cloudbreak -c "DELETE FROM peaks;"
+make seed
 ```
+
+Le wipe manuel de la table n'est plus obligatoire pour un simple enrichissement de données.
 
 ### 7. Migration Alembic — index idx_peaks_name
 
@@ -142,7 +145,7 @@ Relancer quand Overpass a rechargé (attendre 1-2h après un run) :
 ```bash
 source .venv/bin/activate
 python scripts/generate_peaks.py
-docker exec cloudbreak-db psql -U postgres -d cloudbreak -c "DELETE FROM peaks;"
+python scripts/enrich_region.py
 python -m app.db.seed
 ```
 
@@ -163,9 +166,11 @@ make dev
 # 2. Appliquer les migrations (inclut idx_peaks_name)
 make migrate
 
-# 3. Insérer les données (venv requis)
+# 3. Enrichir region puis insérer les données (venv requis)
+source .venv/bin/activate && python scripts/enrich_region.py
+source .venv/bin/activate && pytest tests/test_peaks_data.py
 source .venv/bin/activate && python -m app.db.seed
-# → log "seed_completed" avec count=22031
+# → log "seed_completed" avec count=... et mode=upsert_on_slug
 
 # AC 1 — vérifier le comptage
 docker exec cloudbreak-db psql -U postgres -d cloudbreak \

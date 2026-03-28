@@ -8,6 +8,7 @@ class PeakSearchResult(BaseModel):
     name: str
     slug: str
     altitude: int
+    region: str | None = None
 
 
 class PeakResponse(BaseModel):
@@ -17,3 +18,4 @@ class PeakResponse(BaseModel):
     lat: float
     lng: float
     altitude: int
+    region: str | None = None

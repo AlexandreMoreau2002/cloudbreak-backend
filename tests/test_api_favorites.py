@@ -8,11 +8,10 @@ On mocke la DB et l'auth.
 """
 
 import uuid
-from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
+from datetime import UTC, datetime
 from httpx import ASGITransport, AsyncClient
+from unittest.mock import AsyncMock, MagicMock
 
 from app.main import app
 
@@ -26,6 +25,7 @@ MOCK_PEAK.slug = "mont-blanc"
 MOCK_PEAK.lat = 45.83
 MOCK_PEAK.lng = 6.86
 MOCK_PEAK.altitude = 4808
+MOCK_PEAK.region = "Massif du Mont-Blanc"
 
 MOCK_FAV_ID = uuid.uuid4()
 MOCK_CREATED_AT = datetime(2026, 3, 22, 10, 0, 0, tzinfo=UTC)
@@ -92,6 +92,7 @@ async def test_add_favorite_retourne_201(auth_override: None) -> None:
     data = response.json()
     assert data["peak_id"] == "peak-1"
     assert data["peak"]["name"] == "Mont Blanc"
+    assert data["peak"]["region"] == "Massif du Mont-Blanc"
 
 
 @pytest.mark.asyncio
@@ -222,6 +223,7 @@ async def test_list_favorites_retourne_200(auth_override: None) -> None:
     assert len(data) == 1
     assert data[0]["peak"]["name"] == "Mont Blanc"
     assert data[0]["peak_id"] == "peak-1"
+    assert data[0]["peak"]["region"] == "Massif du Mont-Blanc"
 
 
 @pytest.mark.asyncio

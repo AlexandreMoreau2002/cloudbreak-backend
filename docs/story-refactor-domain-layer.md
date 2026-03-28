@@ -1,17 +1,21 @@
 # Refactoring : domain/ layer
 
+_Mise à jour le 2026-03-28_
+
 ## Ce qui a été fait
 
 - Créé `app/domain/` — couche domaine pure (zero I/O)
-- Déplacé `app/services/score.py` → `app/domain/score.py`
-- Déplacé `app/services/weather_providers/base.py` → `app/domain/weather_types.py`
-- Supprimé les anciens fichiers source
-- Mis à jour tous les imports dans les fichiers source et les tests
+- Déplacé la logique de score depuis `app/services/score.py` vers le domain layer
+- Déplacé les types météo partagés dans `app/domain/weather_types.py`
+- Éclaté le score en modules plus petits : `score.py`, `score_components.py`, `score_context.py`
+- Mis à jour les imports dans les routes, services et tests
 
 ## Fichiers créés
 
 - `app/domain/__init__.py` — package marker vide
-- `app/domain/score.py` — algorithme de score mer de nuage (zero I/O)
+- `app/domain/score.py` — orchestration du score mer de nuage (zero I/O)
+- `app/domain/score_components.py` — composantes métier et seuils produit
+- `app/domain/score_context.py` — sélection du contexte i18n et des paramètres
 - `app/domain/weather_types.py` — WeatherData, PressureLevelData, WeatherProvider ABC
 
 ## Fichiers modifiés (imports)
@@ -36,7 +40,12 @@
 ```
 app/domain/weather_types.py  ← types partagés (WeatherData, PressureLevelData, WeatherProvider)
      ↑
-app/domain/score.py           ← algo score (importe WeatherData depuis domain)
+app/domain/score_components.py ← composantes pures + seuils
+     ↑
+app/domain/score_context.py    ← contexte produit / i18n stable
+     ↑
+app/domain/score.py            ← orchestre score + verdict + contrat de sortie
+     ↑
 app/services/weather.py       ← cache Redis (importe depuis domain)
 app/services/weather_providers/open_meteo.py  ← HTTP provider (importe depuis domain)
      ↑
@@ -65,7 +74,9 @@ make validate
 app/
   domain/           # pure, zero I/O
     __init__.py
-    score.py        # algorithme mer de nuage
+    score.py         # orchestration score / verdict / contrat
+    score_components.py # composantes métier et seuils
+    score_context.py # contexte i18n / produit
     weather_types.py # WeatherData, PressureLevelData, WeatherProvider ABC
   services/         # I/O uniquement
     weather.py      # cache Redis
@@ -73,3 +84,11 @@ app/
       __init__.py
       open_meteo.py # provider HTTP Open-Meteo
 ```
+
+## Acceptance Criteria vérifiés
+
+- [x] la logique métier score n'importe ni Redis, ni HTTP, ni SQLAlchemy
+- [x] les types météo partagés vivent dans le domain layer
+- [x] les composantes score et le contexte produit sont isolés dans des modules dédiés
+- [x] les routes et services importent la logique métier depuis `app/domain/`
+- [x] `make validate` reste la commande de vérification de référence

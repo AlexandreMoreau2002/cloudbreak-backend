@@ -487,6 +487,168 @@ class TestPresentationHelpers:
             == "Pas de mer de nuage aujourd'hui : le vent disperse la couche."
         )
 
+    def test_context_message_couvre_autres_facteurs_et_blocages(self) -> None:
+        none_result = cast(
+            ScoreResult,
+            {
+                "score": 0,
+                "verdict": "none",
+                "cloud_base": 1700,
+                "conditions": cast(ScoreConditions, {}),
+            },
+        )
+        assert (
+            _context_message(
+                none_result,
+                weather(cloud_base=1700, cloud_cover_low=50.0),
+                peak_altitude=1500,
+            )
+            == "Pas de mer de nuage aujourd'hui : la base nuageuse passe au-dessus du sommet."
+        )
+        assert (
+            _context_message(
+                none_result,
+                weather(cloud_base=1200, cloud_cover_low=10.0),
+                peak_altitude=1500,
+            )
+            == "Pas de mer de nuage aujourd'hui : la couche basse est trop faible."
+        )
+
+        humidity_result = cast(
+            ScoreResult,
+            {
+                "score": 30,
+                "verdict": "low",
+                "cloud_base": 900,
+                "conditions": cast(
+                    ScoreConditions,
+                    {
+                        "cloud_base_score": 0.8,
+                        "humidity_score": 0.1,
+                        "wind_score": 0.7,
+                        "inversion_score": 0.9,
+                        "pressure_score": 0.8,
+                    },
+                ),
+            },
+        )
+        assert (
+            _context_message(
+                humidity_result,
+                weather(humidity=65.0),
+                peak_altitude=1500,
+            )
+            == "Pas de mer de nuage aujourd'hui : l'air reste trop sec pour accrocher la couche."
+        )
+
+        inversion_result = cast(
+            ScoreResult,
+            {
+                "score": 30,
+                "verdict": "low",
+                "cloud_base": 900,
+                "conditions": cast(
+                    ScoreConditions,
+                    {
+                        "cloud_base_score": 0.8,
+                        "humidity_score": 0.7,
+                        "wind_score": 0.6,
+                        "inversion_score": 0.1,
+                        "pressure_score": 0.8,
+                    },
+                ),
+            },
+        )
+        assert (
+            _context_message(
+                inversion_result,
+                weather(temperature_925hpa=8.0, temperature_850hpa=7.0),
+                peak_altitude=1500,
+            )
+            == "Pas de mer de nuage aujourd'hui : pas d'inversion thermique pour piéger les nuages."
+        )
+
+        pressure_result = cast(
+            ScoreResult,
+            {
+                "score": 30,
+                "verdict": "low",
+                "cloud_base": 900,
+                "conditions": cast(
+                    ScoreConditions,
+                    {
+                        "cloud_base_score": 0.8,
+                        "humidity_score": 0.7,
+                        "wind_score": 0.6,
+                        "inversion_score": 0.9,
+                        "pressure_score": 0.1,
+                    },
+                ),
+            },
+        )
+        assert (
+            _context_message(
+                pressure_result,
+                weather(pressure=1010.0),
+                peak_altitude=1500,
+            )
+            == "Pas de mer de nuage aujourd'hui : l'anticyclone est trop faible."
+        )
+
+        cloud_base_result = cast(
+            ScoreResult,
+            {
+                "score": 30,
+                "verdict": "low",
+                "cloud_base": 1450,
+                "conditions": cast(
+                    ScoreConditions,
+                    {
+                        "cloud_base_score": 0.1,
+                        "humidity_score": 0.8,
+                        "wind_score": 0.7,
+                        "inversion_score": 0.9,
+                        "pressure_score": 0.8,
+                    },
+                ),
+            },
+        )
+        assert (
+            _context_message(
+                cloud_base_result,
+                weather(cloud_base=1450),
+                peak_altitude=1500,
+            )
+            == "Pas de mer de nuage aujourd'hui : la couche nuageuse reste trop haute."
+        )
+
+        fallback_result = cast(
+            ScoreResult,
+            {
+                "score": 30,
+                "verdict": "low",
+                "cloud_base": 900,
+                "conditions": cast(
+                    ScoreConditions,
+                    {
+                        "cloud_base_score": 0.8,
+                        "humidity_score": 0.7,
+                        "wind_score": 0.6,
+                        "inversion_score": 0.9,
+                        "pressure_score": 0.8,
+                    },
+                ),
+            },
+        )
+        assert (
+            _context_message(
+                fallback_result,
+                weather(humidity=80.0, wind_speed=10.0, pressure=1020.0),
+                peak_altitude=1500,
+            )
+            == "Pas de mer de nuage aujourd'hui : conditions trop limites pour une couche stable."
+        )
+
     def test_estimate_stability_hours_cas_bloquants(self) -> None:
         none_result = cast(
             ScoreResult,
@@ -606,6 +768,8 @@ class TestPresentationHelpers:
             _optimal_window_from_sunrise(sunrise_minutes, 48)[0],
             _optimal_window_from_sunrise(sunrise_minutes, 48)[1],
         )
+        assert _optimal_window_from_sunrise(360, 18) == ("05:45", "07:00")
+        assert _optimal_window_from_sunrise(360, 8) == ("05:50", "06:45")
         assert _optimal_window_from_sunrise(None, 48) == (None, None)
         assert _estimate_sunrise_minutes("2026-12-21", 80.0, 0.0) is None
 

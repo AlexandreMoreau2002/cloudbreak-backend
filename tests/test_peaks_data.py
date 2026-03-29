@@ -102,6 +102,53 @@ def test_schema(peaks: list[dict]) -> None:
     assert not errors, f"{len(errors)} erreurs de schéma :\n" + "\n".join(errors[:10])
 
 
+@pytest.mark.parametrize(
+    ("peak", "expected_message"),
+    [
+        (
+            {"slug": "missing-fields", "lat": 45.0, "lng": 6.0},
+            "missing-fields — champs manquants",
+        ),
+        (
+            {
+                "id": 1,
+                "name": "Bad altitude",
+                "slug": "bad-altitude",
+                "lat": 45.0,
+                "lng": 6.0,
+                "altitude": 1200.5,
+            },
+            "bad-altitude — altitude doit être int",
+        ),
+        (
+            {
+                "id": 1,
+                "name": "Bad lat",
+                "slug": "bad-lat",
+                "lat": 45,
+                "lng": 6.0,
+                "altitude": 1200,
+            },
+            "bad-lat — lat doit être float",
+        ),
+        (
+            {
+                "id": 1,
+                "name": "Bad lng",
+                "slug": "bad-lng",
+                "lat": 45.0,
+                "lng": 6,
+                "altitude": 1200,
+            },
+            "bad-lng — lng doit être float",
+        ),
+    ],
+)
+def test_schema_reports_invalid_entries(peak: dict, expected_message: str) -> None:
+    with pytest.raises(AssertionError, match=expected_message):
+        test_schema([peak])
+
+
 def test_no_duplicate_slugs(peaks: list[dict]) -> None:
     """Pas de doublons de slug — la déduplication doit avoir fonctionné."""
     all_slugs = [p["slug"] for p in peaks]

@@ -1,0 +1,84 @@
+# User
+#
+# Prerequis dans .vscode/settings.json > rest-client.environmentVariables > local :
+#   "baseUrl": "http://localhost:8000"
+#   "jwt": "<token Supabase - copie depuis les logs mobile>"
+#
+# Peak id utile :
+#   Mont Ventoux : 0728f7c7-a0c9-5fb0-b87d-d9edc8696840
+
+###
+# Utilisateur courant -> 200
+GET {{baseUrl}}/api/v1/user/me
+Authorization: Bearer {{jwt}}
+
+###
+# Sans token -> 403
+GET {{baseUrl}}/api/v1/user/me
+
+###
+# Token invalide -> 401
+GET {{baseUrl}}/api/v1/user/me
+Authorization: Bearer token.invalide.ici
+
+###
+# Lister mes favoris -> 200 avec peak info
+GET {{baseUrl}}/api/v1/user/favorites
+Authorization: Bearer {{jwt}}
+
+###
+# Sans JWT -> 403
+GET {{baseUrl}}/api/v1/user/favorites
+
+###
+# Ajouter Mont Ventoux en favori -> 201
+POST {{baseUrl}}/api/v1/user/favorites
+Authorization: Bearer {{jwt}}
+Content-Type: application/json
+
+{
+  "peak_id": "0728f7c7-a0c9-5fb0-b87d-d9edc8696840"
+}
+
+###
+# Ajouter le meme peak en doublon -> 409 ALREADY_EXISTS
+POST {{baseUrl}}/api/v1/user/favorites
+Authorization: Bearer {{jwt}}
+Content-Type: application/json
+
+{
+  "peak_id": "0728f7c7-a0c9-5fb0-b87d-d9edc8696840"
+}
+
+###
+# peak_id inexistant -> 404 PEAK_NOT_FOUND
+POST {{baseUrl}}/api/v1/user/favorites
+Authorization: Bearer {{jwt}}
+Content-Type: application/json
+
+{
+  "peak_id": "00000000-0000-0000-0000-000000000000"
+}
+
+###
+# Sans JWT -> 403
+POST {{baseUrl}}/api/v1/user/favorites
+Content-Type: application/json
+
+{
+  "peak_id": "11111111-0000-0000-0000-000000000001"
+}
+
+###
+# Supprimer Mont Ventoux des favoris -> 204
+DELETE {{baseUrl}}/api/v1/user/favorites/0728f7c7-a0c9-5fb0-b87d-d9edc8696840
+Authorization: Bearer {{jwt}}
+
+###
+# Supprimer un favori inexistant -> 404 NOT_FOUND
+DELETE {{baseUrl}}/api/v1/user/favorites/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{jwt}}
+
+###
+# Sans JWT -> 403
+DELETE {{baseUrl}}/api/v1/user/favorites/0728f7c7-a0c9-5fb0-b87d-d9edc8696840

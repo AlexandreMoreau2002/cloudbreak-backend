@@ -1,17 +1,23 @@
-# Auth — tester avec un JWT Supabase valide
-# 1. Lance l'app mobile, connecte-toi, copie le token depuis les logs
-# 2. Colle-le dans rest-client.environmentVariables > local > jwt dans .vscode/settings.json
+# Auth - signup + token
 
 ###
-# GET /api/v1/user/me — utilisateur courant (nécessite JWT valide)
-GET {{baseUrl}}/api/v1/user/me
-Authorization: Bearer {{jwt}}
+# Creer un compte
+POST {{supabaseUrl}}/auth/v1/signup
+Content-Type: application/json
+apikey: {{supabaseKey}}
+
+{
+  "email": "test@cloudbreak.app",
+  "password": "motdepasse123"
+}
 
 ###
-# GET /api/v1/user/me — sans token → 403
-GET {{baseUrl}}/api/v1/user/me
+# Se connecter et recuperer access_token dans la reponse
+POST {{supabaseUrl}}/auth/v1/token?grant_type=password
+Content-Type: application/json
+apikey: {{supabaseKey}}
 
-###
-# GET /api/v1/user/me — token invalide → 401
-GET {{baseUrl}}/api/v1/user/me
-Authorization: Bearer token.invalide.ici
+{
+  "email": "test@cloudbreak.app",
+  "password": "motdepasse123"
+}

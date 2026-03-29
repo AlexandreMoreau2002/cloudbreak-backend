@@ -1,0 +1,48 @@
+# Peaks
+#
+# Prerequis dans .vscode/settings.json > rest-client.environmentVariables > local :
+#   "baseUrl": "http://localhost:8000"
+#   "jwt": "<token Supabase - copie depuis les logs mobile>"
+
+###
+# Recherche "mont"
+GET {{baseUrl}}/api/v1/peaks/search?q=mont
+Authorization: Bearer {{jwt}}
+
+###
+# Recherche "puy"
+GET {{baseUrl}}/api/v1/peaks/search?q=puy
+Authorization: Bearer {{jwt}}
+
+###
+# Recherche qui retourne liste vide
+GET {{baseUrl}}/api/v1/peaks/search?q=zzzinexistant
+Authorization: Bearer {{jwt}}
+
+###
+# q trop court -> 422
+GET {{baseUrl}}/api/v1/peaks/search?q=m
+Authorization: Bearer {{jwt}}
+
+###
+# Sans JWT -> 403
+GET {{baseUrl}}/api/v1/peaks/search?q=mont
+
+###
+# Detail Mont Ventoux
+GET {{baseUrl}}/api/v1/peaks/mont-ventoux
+Authorization: Bearer {{jwt}}
+
+###
+# Detail Grand Ballon
+GET {{baseUrl}}/api/v1/peaks/grand-ballon
+Authorization: Bearer {{jwt}}
+
+###
+# Slug inexistant -> 404 PEAK_NOT_FOUND
+GET {{baseUrl}}/api/v1/peaks/slug-qui-nexiste-pas
+Authorization: Bearer {{jwt}}
+
+###
+# Sans JWT -> 403
+GET {{baseUrl}}/api/v1/peaks/puy-de-dome

@@ -3,7 +3,7 @@ Tests de l'algorithme de score mer de nuage.
 
 Conditions bloquantes (éliminatoires → verdict "none", score 0) :
   1. cloud_base >= peak_altitude → nuages au-dessus du sommet
-  2. cloud_cover_low < 20% → ciel trop dégagé
+  2. cloud_cover_low < 45% → couche trop fragmentée
 
 Score conditionnel (seulement si conditions non bloquantes) :
   Indicateurs de qualité combinés — poids indicatifs, non calibrés.
@@ -11,15 +11,16 @@ Score conditionnel (seulement si conditions non bloquantes) :
 """
 
 from app.domain.score import (
+    _apply_score_caps,
     _cloud_base_component,
+    _context_payload,
     _estimate_stability_hours,
     _estimate_sunrise_minutes,
-    _context_message,
     _humidity_component,
     _inversion_component,
     _optimal_window_from_sunrise,
     _pressure_component,
-    _verdict_label,
+    _verdict_label_code,
     _wind_component,
     build_score_presentation,
     calculate_score,
@@ -39,7 +40,7 @@ def weather(
     temperature_925hpa: float = 5.0,
     temperature_850hpa: float = 8.0,
     pressure: float = 1018.0,
-    cloud_cover_low: float = 50.0,
+    cloud_cover_low: float = 70.0,
     month: int = 3,
 ) -> WeatherData:
     """Données météo favorables par défaut (bon cas mer de nuage)."""
@@ -78,7 +79,7 @@ class TestConditionsBloquantes:
         assert result["verdict"] == "none"
 
     def test_cloud_cover_low_insuffisant_verdict_none(self) -> None:
-        """cloud_cover_low < 20% → ciel trop dégagé → condition bloquante → verdict "none"."""
+        """cloud_cover_low < 45% → couche trop fragmentée → condition bloquante → verdict "none"."""
         result = calculate_score(weather(cloud_base=800, cloud_cover_low=10.0), peak_altitude=1500)
         assert result["score"] == 0
         assert result["verdict"] == "none"
@@ -89,9 +90,15 @@ class TestConditionsBloquantes:
         assert result["score"] == 0
         assert result["verdict"] == "none"
 
+    def test_cloud_cover_low_fragmented_verdict_none(self) -> None:
+        """cloud_cover_low juste sous 45% → pas assez de nuages bas pour scorer."""
+        result = calculate_score(weather(cloud_base=800, cloud_cover_low=44.0), peak_altitude=1500)
+        assert result["score"] == 0
+        assert result["verdict"] == "none"
+
     def test_cloud_cover_low_exactement_seuil_passe(self) -> None:
-        """cloud_cover_low = 20.0% → seuil atteint → conditions non bloquantes."""
-        result = calculate_score(weather(cloud_base=800, cloud_cover_low=20.0), peak_altitude=1500)
+        """cloud_cover_low = 45.0% → seuil atteint → conditions non bloquantes."""
+        result = calculate_score(weather(cloud_base=800, cloud_cover_low=45.0), peak_altitude=1500)
         assert result["verdict"] != "none"
 
     def test_conditions_bloquantes_retournent_zero_conditions(self) -> None:
@@ -319,13 +326,49 @@ class TestVerdict:
         assert result["score"] == 0
 
     def test_verdict_none_cloud_cover_low_bloquant(self) -> None:
-        """cloud_cover_low < 20% → ciel dégagé → verdict "none", score 0."""
+        """cloud_cover_low < 45% → couche basse trop faible → verdict "none", score 0."""
         result = calculate_score(weather(cloud_base=800, cloud_cover_low=15.0), peak_altitude=1500)
         assert result["verdict"] == "none"
         assert result["score"] == 0
 
+    def test_verdict_high_exige_55_pour_cloud_cover_low(self) -> None:
+        """cloud_cover_low < 45% → aucun score ; entre 45% et 54% → jamais high."""
+        result = calculate_score(
+            weather(
+                cloud_base=500,
+                humidity=92.0,
+                wind_speed=5.0,
+                temperature_925hpa=2.0,
+                temperature_850hpa=8.0,
+                pressure=1028.0,
+                cloud_cover_low=44.0,
+                month=10,
+            ),
+            peak_altitude=1500,
+        )
+        assert result["verdict"] == "none"
+        assert result["score"] == 0
+
+    def test_verdict_high_a_45_ne_passe_pas(self) -> None:
+        """cloud_cover_low = 45% → score possible, mais jamais high."""
+        result = calculate_score(
+            weather(
+                cloud_base=500,
+                humidity=92.0,
+                wind_speed=5.0,
+                temperature_925hpa=2.0,
+                temperature_850hpa=8.0,
+                pressure=1028.0,
+                cloud_cover_low=45.0,
+                month=10,
+            ),
+            peak_altitude=1500,
+        )
+        assert result["verdict"] != "high"
+        assert result["score"] < 70
+
     def test_verdict_low_flux_normal(self) -> None:
-        """cloud_base < sommet, cloud_cover_low >= 20%, conditions défavorables → verdict low."""
+        """cloud_base < sommet, cloud_cover_low < 45%, conditions défavorables → verdict none."""
         result = calculate_score(
             weather(
                 cloud_base=1400,  # juste sous le sommet mais toutes conditions mauvaises
@@ -339,8 +382,8 @@ class TestVerdict:
             ),
             peak_altitude=1500,
         )
-        assert result["verdict"] == "low"
-        assert result["score"] < 40
+        assert result["verdict"] == "none"
+        assert result["score"] == 0
 
     def test_verdict_medium_existe(self) -> None:
         """Conditions mixtes → verdict medium possible."""
@@ -352,7 +395,7 @@ class TestVerdict:
                 temperature_925hpa=10.0,
                 temperature_850hpa=8.0,
                 pressure=1015.0,
-                cloud_cover_low=40.0,
+                cloud_cover_low=45.0,
                 month=5,
             ),
             peak_altitude=1500,
@@ -426,10 +469,10 @@ class TestStructureRetour:
 
 class TestPresentationHelpers:
     def test_verdict_label_couvre_tous_les_cas(self) -> None:
-        assert _verdict_label("high") == "Lève-toi tôt, ça vaut le coup"
-        assert _verdict_label("medium") == "Ça peut le faire"
-        assert _verdict_label("low") == "Pas ce coup-ci"
-        assert _verdict_label("none") == "Pas de mer de nuage"
+        assert _verdict_label_code("high") == "score.label.high"
+        assert _verdict_label_code("medium") == "score.label.medium"
+        assert _verdict_label_code("low") == "score.label.low"
+        assert _verdict_label_code("none") == "score.label.none"
 
     def test_context_message_ete_score_faible(self) -> None:
         result = calculate_score(
@@ -446,14 +489,11 @@ class TestPresentationHelpers:
             peak_altitude=1500,
         )
         assert result["score"] == 0
-        assert (
-            _context_message(
-                result,
-                weather(cloud_base=1400, cloud_cover_low=10.0, month=7),
-                peak_altitude=1500,
-            )
-            == "Pas de mer de nuage — mais ciel parfaitement dégagé au-dessus de 2400m ☀️"
-        )
+        assert _context_payload(
+            result,
+            weather(cloud_base=1400, cloud_cover_low=10.0, month=7),
+            peak_altitude=1500,
+        ) == ("score.context.none.low_cloud_cover", {})
 
     def test_context_message_detecte_le_facteur_dominant(self) -> None:
         result = calculate_score(
@@ -469,23 +509,113 @@ class TestPresentationHelpers:
             ),
             peak_altitude=1500,
         )
-        assert (
-            _context_message(
-                result,
-                weather(
-                    cloud_base=500,
-                    humidity=92.0,
-                    wind_speed=34.0,
-                    temperature_925hpa=2.0,
-                    temperature_850hpa=9.0,
-                    pressure=1028.0,
-                    cloud_cover_low=55.0,
-                    month=10,
-                ),
-                1500,
-            )
-            == "Pas de mer de nuage aujourd'hui : le vent disperse la couche."
+        assert _context_payload(
+            result,
+            weather(
+                cloud_base=500,
+                humidity=92.0,
+                wind_speed=34.0,
+                temperature_925hpa=2.0,
+                temperature_850hpa=9.0,
+                pressure=1028.0,
+                cloud_cover_low=55.0,
+                month=10,
+            ),
+            1500,
+        ) == ("score.context.low.wind_dispersion", {})
+
+    def test_context_payload_reste_coherent_avec_absence_inversion(self) -> None:
+        result = calculate_score(
+            weather(
+                cloud_base=900,
+                humidity=95.0,
+                wind_speed=5.0,
+                temperature_925hpa=8.0,
+                temperature_850hpa=7.0,
+                pressure=1028.0,
+                cloud_cover_low=70.0,
+                month=10,
+            ),
+            peak_altitude=1500,
         )
+
+        assert result["score"] <= 39
+        assert result["verdict"] == "low"
+        context_code = _context_payload(
+            result,
+            weather(temperature_925hpa=8.0, temperature_850hpa=7.0),
+            1500,
+        )[0]
+        assert context_code == "score.context.low.no_inversion"
+
+    def test_calculate_score_ne_peut_pas_etre_high_sans_inversion(self) -> None:
+        result = calculate_score(
+            weather(
+                cloud_base=650,
+                humidity=95.0,
+                wind_speed=4.0,
+                temperature_925hpa=9.0,
+                temperature_850hpa=6.0,
+                pressure=1030.0,
+                cloud_cover_low=80.0,
+                month=10,
+            ),
+            peak_altitude=1500,
+        )
+
+        assert result["score"] <= 39
+        assert result["verdict"] != "high"
+
+    def test_apply_score_caps_empeche_un_high_sans_inversion(self) -> None:
+        capped = _apply_score_caps(
+            78,
+            weather(
+                cloud_base=800,
+                humidity=90.0,
+                wind_speed=6.0,
+                temperature_925hpa=8.0,
+                temperature_850hpa=7.0,
+                pressure=1028.0,
+                cloud_cover_low=70.0,
+            ),
+            peak_altitude=1500,
+        )
+
+        assert capped == 39
+
+    def test_calculate_score_ne_peut_pas_etre_high_si_couverture_basse_trop_faible(self) -> None:
+        result = calculate_score(
+            weather(
+                cloud_base=650,
+                humidity=95.0,
+                wind_speed=4.0,
+                temperature_925hpa=2.0,
+                temperature_850hpa=8.0,
+                pressure=1030.0,
+                cloud_cover_low=54.0,
+                month=10,
+            ),
+            peak_altitude=1500,
+        )
+
+        assert result["verdict"] != "high"
+
+    def test_calculate_score_peut_etre_high_avec_couverture_basse_solide(self) -> None:
+        result = calculate_score(
+            weather(
+                cloud_base=650,
+                humidity=95.0,
+                wind_speed=4.0,
+                temperature_925hpa=2.0,
+                temperature_850hpa=8.0,
+                pressure=1030.0,
+                cloud_cover_low=55.0,
+                month=10,
+            ),
+            peak_altitude=1500,
+        )
+
+        assert result["verdict"] == "high"
 
     def test_estimate_stability_hours_cas_bloquants(self) -> None:
         none_result = cast(
@@ -498,7 +628,8 @@ class TestPresentationHelpers:
             },
         )
         assert _estimate_stability_hours(none_result, weather(cloud_cover_low=10.0)) == 6
-        assert _estimate_stability_hours(none_result, weather(cloud_cover_low=20.0)) == 8
+        assert _estimate_stability_hours(none_result, weather(cloud_cover_low=20.0)) == 6
+        assert _estimate_stability_hours(none_result, weather(cloud_cover_low=55.0)) == 8
 
     def test_estimate_stability_hours_paliers(self) -> None:
         base_conditions = cast(
@@ -656,10 +787,11 @@ class TestPresentationHelpers:
             lng=6.86,
             peak_altitude=1500,
         )
-        assert presentation["label"] == "Lève-toi tôt, ça vaut le coup"
+        assert presentation["label_code"] == "score.label.high"
+        assert presentation["context_code"] == "score.context.high.stable_window"
+        assert presentation["context_params"] == {"cloud_base_gap_m": 800}
         assert presentation["stability_hours"] == 48
         assert presentation["sunrise"] is not None
-        assert presentation["context_message"]
         assert presentation["optimal_window_start"] is not None
         assert presentation["optimal_window_end"] is not None
         assert presentation["cloud_layer_viz"]["summit_altitude"] == 1500

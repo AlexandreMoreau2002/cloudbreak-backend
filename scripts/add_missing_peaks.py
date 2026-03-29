@@ -31,6 +31,7 @@ MISSING: list[dict] = [
 
 
 def slugify(name: str) -> str:
+    name = name.replace("œ", "oe").replace("Œ", "Oe").replace("æ", "ae").replace("Æ", "Ae")
     nfkd = unicodedata.normalize("NFKD", name)
     ascii_str = nfkd.encode("ascii", "ignore").decode("ascii")
     slug = re.sub(r"[^\w\s-]", "", ascii_str.lower())

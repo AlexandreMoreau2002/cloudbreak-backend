@@ -11,3 +11,5 @@ __pycache__/
 .pytest_cache/
 htmlcov/
 .coverage
+.tmp/
+app/db/peaks_data_new.json

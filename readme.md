@@ -37,6 +37,7 @@ make logs     # suivre les logs en temps réel
 ```
 
 Containers lancés :
+
 - `cloudbreak-backend` → API FastAPI sur http://localhost:8000
 - `cloudbreak-db` → PostgreSQL sur port 5432
 - `cloudbreak-redis` → Redis sur port 6379
@@ -52,6 +53,30 @@ make migrate      # appliquer les migrations
 make migration    # créer une nouvelle migration (demande une description)
 ```
 
+## Donnees peaks
+
+Workflow safe pour enrichir ou regenerer les donnees sommets :
+
+```bash
+source .venv/bin/activate
+
+# 1. Backup local du JSON source + enrichissement region
+python scripts/enrich_region.py
+
+# 2. Verifier le dataset enrichi
+pytest tests/test_peaks_data.py
+
+# 3. Mettre a jour la base via upsert sur slug
+make seed
+```
+
+Notes :
+
+- `scripts/enrich_region.py` n'appelle pas `generate_peaks.py`
+- un backup local temporaire est ecrit dans `.tmp/peaks_data_backup.json` avant modification
+- `make seed` fait maintenant un upsert sur `slug` pour remettre la DB en phase avec `peaks_data.json`
+- le backend lit ensuite `region` depuis `app/db/peaks_data.json` et le propage dans les endpoints peaks / favoris / score (`peak_region`)
+
 ## Qualité & Tests
 
 Ces commandes se lancent **en local** (pas dans Docker) avec le virtualenv activé :
@@ -63,12 +88,14 @@ make validate     # ✅ tout valider d'un coup — à lancer avant chaque commit
 ```
 
 Cette commande enchaîne dans l'ordre :
+
 1. `ruff check .` — 0 erreur lint
 2. `ruff format --check .` — code bien formaté
 3. `mypy app/` — 0 erreur typage
 4. `pytest --cov=app --cov-report=term-missing` — tous les tests passent, coverage 100%
 
 Commandes individuelles :
+
 ```bash
 make lint         # ruff check uniquement
 make format       # ruff format (applique le formatage)
@@ -89,7 +116,7 @@ app/
 ├── services/           # Intégrations I/O (cache Redis, providers HTTP)
 └── main.py             # Point d'entrée FastAPI
 alembic/                # Migrations DB
-scripts/                # Outils dev (generate_peaks.py — régénération sommets via OSM)
+scripts/                # Outils dev (generate_peaks.py, enrich_region.py)
 tests/                  # Tests unitaires
 tests/features/         # Tests de feature (flux HTTP complets)
 docs/                   # Documentation par feature
@@ -103,15 +130,15 @@ Copie `.env.example` en `.env` et remplis les valeurs :
 cp .env.example .env
 ```
 
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | URL PostgreSQL async (`postgresql+asyncpg://...`) |
-| `REDIS_URL` | URL Redis (`redis://localhost:6379`) |
-| `WEATHER_API_KEY` | Non requis — Open-Meteo est gratuit sans clé |
-| `SUPABASE_URL` | URL du projet Supabase |
-| `SUPABASE_KEY` | Clé publique Supabase (validation JWT locale) |
-| `POSTHOG_API_KEY` | Clé PostHog analytics |
-| `EXPO_ACCESS_TOKEN` | Token Expo Push Notifications |
+| Variable            | Description                                       |
+| ------------------- | ------------------------------------------------- |
+| `DATABASE_URL`      | URL PostgreSQL async (`postgresql+asyncpg://...`) |
+| `REDIS_URL`         | URL Redis (`redis://localhost:6379`)              |
+| `WEATHER_API_KEY`   | Non requis — Open-Meteo est gratuit sans clé      |
+| `SUPABASE_URL`      | URL du projet Supabase                            |
+| `SUPABASE_KEY`      | Clé publique Supabase (validation JWT locale)     |
+| `POSTHOG_API_KEY`   | Clé PostHog analytics                             |
+| `EXPO_ACCESS_TOKEN` | Token Expo Push Notifications                     |
 
 ## Documentation features
 
@@ -123,3 +150,5 @@ Chaque feature implementée a sa documentation dans `docs/` :
 - [Seed base de données des sommets](docs/story-3-2-seed-sommets.md)
 - [Gestion des données sommets — guide opérationnel](docs/peaks-data-management.md)
 - [Refactoring domain/ layer](docs/story-refactor-domain-layer.md)
+- [Contrat score de présentation — story 3.5](docs/story-3-5-contrat-score-presentation.md)
+- [Refactorisation i18n score — traduction déplacée côté mobile](docs/story-refacto-i18n-score.md)

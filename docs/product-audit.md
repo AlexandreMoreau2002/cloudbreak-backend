@@ -1,6 +1,6 @@
 # Cloudbreak — Audit produit
 
-_Dernière mise à jour : 2026-03-24_
+_Dernière mise à jour : 2026-03-28_
 
 ---
 
@@ -9,7 +9,7 @@ _Dernière mise à jour : 2026-03-24_
 Une app iOS qui répond à une seule question :
 **"Est-ce que je vais voir une mer de nuage depuis ce sommet, à cette heure ?"**
 
-L'utilisateur cherche un sommet, choisit une date et une heure, et reçoit une probabilité (0-100%) avec un verdict (`high` / `medium` / `low`).
+L'utilisateur cherche un sommet, choisit une date et une heure, et reçoit une probabilité (0-100%) avec un verdict (`high` / `medium` / `low` / `none`).
 
 L'algorithme tourne côté serveur — il peut être amélioré sans mise à jour de l'app.
 
@@ -25,13 +25,16 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 | Données météo Open-Meteo | ✅ Appel réel (gratuit, sans clé) |
 | Cache Redis 10 min | ✅ Actif |
 | Auth JWT Supabase | ✅ Validé localement |
-| 22 397 entrées en base (sommets, cols, viewpoints) | ✅ Seedés — toute la France |
+| Dataset sommets seedé depuis `app/db/peaks_data.json` (23 782 entrées source) | ✅ |
 | Index idx_peaks_name | ✅ Migration Alembic |
 | Script génération Overpass API + Open-Meteo elevation | ✅ scripts/generate_peaks.py |
+| Script enrichissement `region` sans régénération complète | ✅ scripts/enrich_region.py |
 | Migrations DB | ✅ Alembic |
-| Tests — 92 tests, 100% coverage | ✅ |
+| Tests automatisés backend | ✅ `make validate` |
 | CI pipeline | ✅ GitHub Actions |
 | Domain layer (`app/domain/`) — logique métier pure (zero I/O) | ✅ Refactorisé |
+| Contrat score présentation — `label_code`, `context_code`, `context_params`, fenêtre, stabilité | ✅ Story 3.5 |
+| i18n score côté mobile — backend renvoie codes stables, traduction dans le front uniquement | ✅ Refacto i18n |
 
 | Recherche sommets (`GET /api/v1/peaks/search` + `GET /api/v1/peaks/{slug}`) | ✅ ILIKE, limit 20 |
 | Favoris (`POST/DELETE/GET /api/v1/user/favorites`) | ✅ Avec peak info jointe |
@@ -63,11 +66,23 @@ Toutes les données viennent de **Open-Meteo** — une API météo gratuite, san
 
 Pour chaque sommet, on récupère les données à **4 altitudes différentes** (925 hPa ≈ 800m, 850 hPa ≈ 1500m, 800 hPa ≈ 1950m, 700 hPa ≈ 3000m) pour reconstruire ce qui se passe dans la colonne d'air.
 
-### Règle absolue (hard gate)
+### Règles absolues (hard gates)
 
-Si la base des nuages est **au-dessus** du sommet → **0%, sans calcul**.
+- Si la base des nuages est **au-dessus** du sommet → **0%, sans calcul**.
+- Si `cloud_cover_low < 45%` → **0%, sans calcul**.
 
-Exemple : sommet à 1720m, nuages qui commencent à 2500m → l'observateur est sous les nuages → mer de nuage impossible → 0%.
+Exemples :
+- sommet à 1720m, nuages qui commencent à 2500m → l'observateur est sous les nuages → mer de nuage impossible → 0%
+- nuages bas à 20% seulement → couche trop fragmentée → pas de scénario crédible → 0%
+
+Le verdict `none` est donc un état produit distinct de `low`.
+
+### Seuil complémentaire sur `high`
+
+Même quand le calcul est autorisé, le verdict `high` demande une couche basse plus franche :
+
+- sous `55%` de `cloud_cover_low`, un `high` n'est pas retourné
+- entre `45%` et `54%`, le backend peut encore retourner `low` ou `medium`
 
 ### Les 5 indicateurs
 
@@ -106,7 +121,7 @@ Recalibrer les poids en fonction des cas vrais vs faux.
 
 ---
 
-## Les 22 397 entrées disponibles
+## Les données sommets disponibles
 
 Données issues d'OpenStreetMap (Overpass API) + enrichissement altitude Open-Meteo + entrées manuelles.
 
@@ -121,6 +136,8 @@ Données issues d'OpenStreetMap (Overpass API) + enrichissement altitude Open-Me
 | Autres (saddles, manuels…) | reste | — |
 
 Pour régénérer depuis OpenStreetMap : `python scripts/generate_peaks.py`
+
+Pour enrichir le champ `region` sans relancer Overpass : `python scripts/enrich_region.py`
 
 ---
 

@@ -4,28 +4,28 @@
 
 **22 397 entrées** couvrant toute la France : sommets, cols, viewpoints urbains iconiques, issus d'OpenStreetMap + entrées manuelles.
 
-| Source | Entrées | Altitude min |
-|--------|---------|-------------|
-| `natural=peak` — Pyrénées | ~6 566 | 500m |
-| `natural=peak` — Alpes Sud | ~4 185 | 500m |
-| `natural=peak` — Alpes Nord | ~2 479 | 500m |
-| `natural=peak` — Massif Central | ~765 | 500m |
-| `natural=peak` — Vosges | ~409 | 500m |
-| `natural=peak` — Jura | ~181 | 500m |
-| `natural=saddle` — France | ~quelques centaines | 500m |
-| `tourism=viewpoint` — France | ~quelques centaines | 100m |
-| Manuels (cols + viewpoints urbains) | 6 | — |
+| Source                              | Entrées             | Altitude min |
+| ----------------------------------- | ------------------- | ------------ |
+| `natural=peak` — Pyrénées           | ~6 566              | 500m         |
+| `natural=peak` — Alpes Sud          | ~4 185              | 500m         |
+| `natural=peak` — Alpes Nord         | ~2 479              | 500m         |
+| `natural=peak` — Massif Central     | ~765                | 500m         |
+| `natural=peak` — Vosges             | ~409                | 500m         |
+| `natural=peak` — Jura               | ~181                | 500m         |
+| `natural=saddle` — France           | ~quelques centaines | 500m         |
+| `tourism=viewpoint` — France        | ~quelques centaines | 100m         |
+| Manuels (cols + viewpoints urbains) | 6                   | —            |
 
 **Viewpoints urbains manuels** (tagués différemment ou sous seuil dans OSM) :
 
-| Spot | Altitude | Ville | Raison d'ajout manuel |
-|------|---------|-------|----------------------|
-| La Bastille | 476m | Grenoble | tagué `attraction` dans OSM, pas `viewpoint` |
-| Colline de Fourvière | 295m | Lyon | `natural=peak` mais sous seuil 500m |
-| Mont Saint-Clair | 176m | Sète | `natural=peak` mais sous seuil 500m |
-| Sacré-Cœur | 130m | Paris | aucun tag `ele` dans OSM |
-| Colline du Château | 92m | Nice | aucun tag `ele` dans OSM |
-| Col de la Croix-Fry | 1477m | Haute-Savoie | `mountain_pass` pas `natural=peak` |
+| Spot                 | Altitude | Ville        | Raison d'ajout manuel                        |
+| -------------------- | -------- | ------------ | -------------------------------------------- |
+| La Bastille          | 476m     | Grenoble     | tagué `attraction` dans OSM, pas `viewpoint` |
+| Colline de Fourvière | 295m     | Lyon         | `natural=peak` mais sous seuil 500m          |
+| Mont Saint-Clair     | 176m     | Sète         | `natural=peak` mais sous seuil 500m          |
+| Sacré-Cœur           | 130m     | Paris        | aucun tag `ele` dans OSM                     |
+| Colline du Château   | 92m      | Nice         | aucun tag `ele` dans OSM                     |
+| Col de la Croix-Fry  | 1477m    | Haute-Savoie | `mountain_pass` pas `natural=peak`           |
 
 **Stratégie viewpoints automatique** : `generate_peaks.py` requête tous les `tourism=viewpoint["name"]` sans filtre `[ele]`, puis enrichit leur altitude via l'**API Open-Meteo Elevation** (gratuite, batch 100 coords). Filtre final : altitude ≥ 80m. Les spots manuels ci-dessus sont la garantie filet de sécurité si Overpass/Open-Meteo ne les capturent pas.
 
@@ -34,11 +34,13 @@
 ## Architecture des données
 
 ```
-scripts/generate_peaks.py    ← outil de régénération (appelle Overpass API)
-         ↓ génère
-app/db/peaks_data.json       ← source de vérité commitée dans le repo (2MB)
+scripts/generate_peaks.py    ← régénération complète (Overpass + Open-Meteo)
+scripts/enrich_region.py     ← enrichissement local du champ region
+         ↓ met à jour
+app/db/peaks_data.json       ← source de vérité commitée dans le repo
+.tmp/peaks_data_backup.json   ← backup local temporaire avant écrasement
          ↓ lu par
-app/db/seed.py               ← insère en DB au déploiement (idempotent)
+app/db/seed.py               ← upsert en DB sur slug
          ↓ insère dans
 PostgreSQL → table peaks     ← ce que l'app interroge à runtime
 ```
@@ -57,14 +59,14 @@ Format Overpass : `(sud, ouest, nord, est)` — attention, **longitude en deuxi�
 
 Exemples pour futures extensions :
 
-| Zone | Sud | Ouest | Nord | Est | Alt min |
-|------|-----|-------|------|-----|---------|
-| Alpes suisses | 45.8 | 6.0 | 47.8 | 10.5 | 1000m |
-| Alpes autrichiennes | 46.4 | 9.5 | 48.0 | 17.2 | 1000m |
-| Dolomites (Italie) | 45.8 | 10.5 | 47.0 | 13.0 | 1000m |
-| Cantabrie (Espagne) | 42.8 | -5.5 | 43.6 | -1.5 | 800m |
-| Écosse (Highlands) | 56.0 | -6.5 | 58.5 | -2.0 | 600m |
-| Atlas (Maroc) | 30.0 | -9.5 | 33.5 | -4.0 | 1500m |
+| Zone                | Sud  | Ouest | Nord | Est  | Alt min |
+| ------------------- | ---- | ----- | ---- | ---- | ------- |
+| Alpes suisses       | 45.8 | 6.0   | 47.8 | 10.5 | 1000m   |
+| Alpes autrichiennes | 46.4 | 9.5   | 48.0 | 17.2 | 1000m   |
+| Dolomites (Italie)  | 45.8 | 10.5  | 47.0 | 13.0 | 1000m   |
+| Cantabrie (Espagne) | 42.8 | -5.5  | 43.6 | -1.5 | 800m    |
+| Écosse (Highlands)  | 56.0 | -6.5  | 58.5 | -2.0 | 600m    |
+| Atlas (Maroc)       | 30.0 | -9.5  | 33.5 | -4.0 | 1500m   |
 
 ### Étape 2 — Ajouter la région dans generate_peaks.py
 
@@ -83,19 +85,67 @@ Exemples pour futures extensions :
 cd backend
 source .venv/bin/activate
 python scripts/generate_peaks.py
-# → écrit directement app/db/peaks_data.json
+# → écrit dans app/db/peaks_data_new.json
+# → enrichit aussi region automatiquement via les mêmes règles que enrich_region.py
 # ⚠️  Si le count final < count précédent (run partiel), voir retro-seed-sommets-et-spots.md
 ```
 
-### Étape 4 — Re-seeder en dev
+Par défaut, `generate_peaks.py` applique aussi l'enrichissement `region` local.
+Si tu veux tenter un fallback réseau sur les entrées restantes, utilise :
 
 ```bash
-docker exec cloudbreak-db psql -U postgres -d cloudbreak -c "DELETE FROM peaks;"
+python scripts/generate_peaks.py --use-nominatim
+```
+
+### Étape 4 — Réenrichir region sans relancer generate_peaks.py
+
+```bash
+cd backend
+source .venv/bin/activate
+python scripts/enrich_region.py --dry-run
+python scripts/enrich_region.py
+pytest tests/test_peaks_data.py
+```
+
+Le script :
+
+- crée un backup local temporaire dans `.tmp/peaks_data_backup.json`
+- enrichit d'abord via overrides et bounding boxes
+- peut utiliser `--use-nominatim` en dernier recours, avec rate-limit 1 req/sec
+
+### Note de rerun / recovery
+
+Si le run est interrompu ou rate-limité, repartir de `.tmp/peaks_data_backup.json` puis relancer l'enrichissement.
+
+```bash
+cd backend
+source .venv/bin/activate
+
+# Vérifier sans écrire
+python scripts/enrich_region.py --dry-run
+
+# Run complet avec backup automatique
+python scripts/enrich_region.py
+
+# Contrôle qualité
+pytest tests/test_peaks_data.py
+
+# Reseed en base
+make seed
+```
+
+Si Nominatim ou une autre API renvoie un rate-limit, attendre avant de relancer et, si besoin, repasser avec `--dry-run` pour valider la couverture avant d'écrire à nouveau `app/db/peaks_data.json`. Le backup local `.tmp/peaks_data_backup.json` permet de restaurer le JSON source sans repasser par `generate_peaks.py`.
+
+### Étape 5 — Re-seeder en dev
+
+```bash
 make seed
 docker exec cloudbreak-db psql -U postgres -d cloudbreak -c "SELECT COUNT(*) FROM peaks;"
 ```
 
-### Étape 5 — Commiter
+`make seed` fait un upsert sur `slug` : inutile de vider `peaks` si on ne souhaite que synchroniser les nouvelles données.
+
+### Étape 6 — Commiter
 
 ```bash
 git add app/db/peaks_data.json
@@ -153,16 +203,17 @@ Ces entrées sont fusionnées avec les données OSM — un slug déjà présent 
 
 ### Ce que le filtre `natural=peak` exclut
 
-| Exclusion | Raison | Contournement |
-|-----------|--------|---------------|
-| Cols (`mountain_pass`) | Tag OSM différent | Ajout manuel |
-| Sommets < 500m | Filtre altitude | Baisser `min_alt` |
-| Points de vue (`viewpoint`) | Tag OSM différent | Requête séparée |
-| Refuges / cabanes | Pas un sommet | Non pertinent |
+| Exclusion                   | Raison            | Contournement     |
+| --------------------------- | ----------------- | ----------------- |
+| Cols (`mountain_pass`)      | Tag OSM différent | Ajout manuel      |
+| Sommets < 500m              | Filtre altitude   | Baisser `min_alt` |
+| Points de vue (`viewpoint`) | Tag OSM différent | Requête séparée   |
+| Refuges / cabanes           | Pas un sommet     | Non pertinent     |
 
 ### Rate-limit Overpass API
 
 Overpass API est un service public gratuit — il impose un rate-limit.
+
 - **1 requête à la fois** — ne pas paralléliser
 - **12 secondes minimum entre chaque requête** — respecté dans `generate_peaks.py`
 - **Timeout 60s par requête** — les bounding boxes trop grandes échouent (ex : France entière = timeout)
@@ -174,13 +225,12 @@ Si une requête échoue avec 429 ou timeout : attendre 60 secondes et relancer u
 
 ## Roadmap données peaks
 
-| Priorité | Action | Impact |
-|----------|--------|--------|
-| MVP | France entière ✅ | 22 397 entrées |
-| Post-MVP | Score popularité (nb vues, altitude) | Meilleur tri dans la recherche |
-| Post-MVP | Contribution utilisateur (spots manquants via app) | Base communautaire |
-| V2 | Alpes suisses + italiennes | +8 000 sommets |
-| V2 | Pyrénées espagnoles | +3 000 sommets |
-| V2 | Inclusion cols `mountain_pass` | Spots iconiques manquants |
-| V3 | Synchronisation OSM automatique (cron) | Données toujours à jour |
-
+| Priorité | Action                                             | Impact                         |
+| -------- | -------------------------------------------------- | ------------------------------ |
+| MVP      | France entière ✅                                  | 22 397 entrées                 |
+| Post-MVP | Score popularité (nb vues, altitude)               | Meilleur tri dans la recherche |
+| Post-MVP | Contribution utilisateur (spots manquants via app) | Base communautaire             |
+| V2       | Alpes suisses + italiennes                         | +8 000 sommets                 |
+| V2       | Pyrénées espagnoles                                | +3 000 sommets                 |
+| V2       | Inclusion cols `mountain_pass`                     | Spots iconiques manquants      |
+| V3       | Synchronisation OSM automatique (cron)             | Données toujours à jour        |

@@ -6,10 +6,9 @@ On mocke :
 - La DB (execute)
 """
 
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
 from httpx import ASGITransport, AsyncClient
+from unittest.mock import AsyncMock, MagicMock
 
 from app.main import app
 
@@ -23,6 +22,7 @@ MOCK_PEAK.slug = "mont-blanc"
 MOCK_PEAK.lat = 45.83
 MOCK_PEAK.lng = 6.86
 MOCK_PEAK.altitude = 4808
+MOCK_PEAK.region = "Massif du Mont-Blanc"
 
 
 @pytest.fixture
@@ -116,6 +116,7 @@ async def test_search_retourne_200_avec_resultats(
     assert len(data) == 1
     assert data[0]["name"] == "Mont Blanc"
     assert data[0]["altitude"] == 4808
+    assert data[0]["region"] == "Massif du Mont-Blanc"
     assert "id" in data[0]
     assert "slug" in data[0]
 
@@ -160,6 +161,7 @@ async def test_peak_detail_retourne_200(auth_override: None, db_override_peak_de
     assert data["name"] == "Mont Blanc"
     assert data["slug"] == "mont-blanc"
     assert data["altitude"] == 4808
+    assert data["region"] == "Massif du Mont-Blanc"
     assert "lat" in data
     assert "lng" in data
 

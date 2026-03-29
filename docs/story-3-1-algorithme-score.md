@@ -7,12 +7,14 @@
 | `app/services/weather_providers/base.py` | Structures de données météo (`WeatherData`, `PressureLevelData`) |
 | `app/services/weather_providers/open_meteo.py` | Appel API Open-Meteo + calcul de la base des nuages (Skew-T) |
 | `app/services/weather.py` | Cache Redis des données météo (TTL 10min) |
-| `app/services/score.py` | Algorithme de score mer de nuage |
+| `app/domain/score.py` | Orchestrateur du score mer de nuage et du contrat de réponse |
+| `app/domain/score_components.py` | Calcul des composantes métier et seuils produit (`45%`, `55%`) |
+| `app/domain/score_context.py` | Choix du message contextuel et des paramètres i18n |
 | `app/api/v1/endpoints/score.py` | Endpoint `GET /api/v1/score` |
 | `app/schemas/score.py` | Format de la réponse JSON |
 | `app/models/peak.py` | Modèle SQLAlchemy table `peaks` |
-| `app/db/seed.py` | Insertion des 10 sommets initiaux |
-| `alembic/versions/b90b920dc145_init_peaks.py` | Migration SQL création table `peaks` |
+| `app/db/seed.py` | Upsert des sommets seedés depuis `app/db/peaks_data.json` |
+| `alembic/versions/` | Migrations SQL liées au modèle `peaks` |
 | `tests/test_score.py` | Tests unitaires de l'algorithme |
 | `tests/test_weather.py` | Tests du cache Redis |
 | `tests/test_open_meteo.py` | Tests du provider Open-Meteo |
@@ -86,7 +88,7 @@ La version initiale de l'algorithme avait deux problèmes identifiés :
 
 1. **Poids arbitraires non calibrés** — les poids (0.35/0.20/0.15/0.20/0.10) n'ont jamais été validés sur des données terrain. Ils donnaient une fausse impression de précision. Ils sont conservés mais présentés honnêtement comme des indicateurs de qualité, pas un score de précision calibré.
 
-2. **Coefficient saisonnier supprimé** — le ×0.75 en été était une mauvaise heuristique. C'est la présence ou absence de nuages bas qui détermine si une mer de nuage est possible, pas le mois de l'année. Si en juillet le ciel est dégagé (`cloud_cover_low < 20%`), la condition bloquante l'attrape correctement. Si en juillet il y a des nuages bas sous le sommet, pourquoi pénaliser ?
+2. **Coefficient saisonnier supprimé** — le ×0.75 en été était une mauvaise heuristique. C'est la présence ou absence de nuages bas qui détermine si une mer de nuage est possible, pas le mois de l'année. Si en juillet le ciel est trop dégagé (`cloud_cover_low < 45%`), la condition bloquante l'attrape correctement. Si en juillet il y a une vraie couche basse sous le sommet, on laisse les autres composantes décider.
 
 ### Conditions bloquantes (éliminatoires)
 
@@ -102,15 +104,47 @@ cloud_base = 1700m, sommet = 1700m → "none" (nuages exactement au niveau)
 cloud_base = 1699m, sommet = 1700m → calcul normal (nuages 1m sous le sommet)
 ```
 
-**Condition 2 : cloud_cover_low < 20%**
+**Condition 2 : cloud_cover_low < 45%**
 
-Si la couverture nuageuse basse est inférieure à 20%, le ciel est trop dégagé pour former une mer de nuage. Pas assez de nuages bas présents.
+Si la couverture nuageuse basse est inférieure à 45%, la couche est jugée trop fragmentée pour former une mer de nuage crédible. Pas assez de nuages bas présents.
 
 ```
 cloud_cover_low = 5%  → "none" (ciel dégagé)
-cloud_cover_low = 19% → "none" (insuffisant)
-cloud_cover_low = 20% → calcul normal (seuil atteint)
+cloud_cover_low = 34% → "none" (trop fragmenté)
+cloud_cover_low = 45% → calcul normal (seuil atteint)
 ```
+
+#### Règle produit
+
+Le seuil de `45%` n'est pas un bonus ou un malus dans le score. C'est un **pré-requis de présence de couche** :
+
+- en dessous de `45%`, le backend ne calcule pas de score probabiliste de mer de nuage
+- il retourne immédiatement `score = 0` et `verdict = "none"`
+- les composantes météo détaillées sont toutes ramenées à `0.0` parce que le scénario physique n'est pas jugé viable
+
+Cette règle évite de produire un faux `low` ou `medium` alors qu'il n'y a tout simplement pas assez de matière nuageuse pour parler de mer de nuage.
+
+#### Rationale produit
+
+- **Honnêteté du signal** : un ciel presque vide ne doit pas être présenté comme une "petite chance". Le bon message est "pas de mer de nuage possible aujourd'hui".
+- **Lisibilité pour l'utilisateur** : on sépare clairement deux cas :
+  - `none` = condition bloquante, pas de scénario exploitable
+  - `low` = scénario possible mais fragile ou dégradé
+- **Cohérence saisonnière** : on n'utilise plus de pénalité d'été. C'est la présence minimale de nuages bas qui décide si le calcul a du sens.
+
+#### Impact utilisateur
+
+- un utilisateur peut voir `Pas de mer de nuage` même si d'autres paramètres semblent favorables, simplement parce que la couche basse est trop faible
+- dans ce cas, l'app doit orienter la lecture vers un message contextuel utile, pas vers une interprétation fine des composantes
+- le seuil à retenir côté produit est donc : **pas de score mer de nuage tant que `cloud_cover_low < 45%`**
+
+#### Contrat complémentaire sur `high`
+
+Une fois le calcul autorisé, le verdict `high` reste réservé aux cas où la couche basse est franchement présente :
+
+- si `cloud_cover_low < 55%`, un verdict `high` est refusé
+- entre `45%` et `54%`, le backend peut encore retourner `low` ou `medium`
+- à partir de `55%`, un `high` redevient possible si les autres composantes suivent
 
 ### Score conditionnel (si conditions non bloquantes)
 
@@ -201,7 +235,16 @@ make dev
 Exemples de réponses attendues :
 - Sommet 1500m, cloud_base 5000m (ciel clair) → `verdict: "none"` (condition bloquante 1)
 - Sommet 1500m, cloud_base 800m, cloud_cover_low 5% → `verdict: "none"` (condition bloquante 2)
+- Sommet 1500m, cloud_base 800m, cloud_cover_low 40%, bonnes conditions → `verdict: "medium"` max (jamais `high`)
 - Sommet 1500m, cloud_base 800m, cloud_cover_low 80%, bonnes conditions → `verdict: "high"`
+
+## Acceptance Criteria vérifiés
+
+- [x] score court-circuité en `none` si `cloud_base >= peak_altitude`
+- [x] score court-circuité en `none` si `cloud_cover_low < 45%`
+- [x] verdict `high` impossible si `cloud_cover_low < 55%`
+- [x] calcul pondéré conservé quand les prérequis physiques sont réunis
+- [x] endpoint score expose le résultat conforme au contrat backend actuel
 
 ---
 

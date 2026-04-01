@@ -18,27 +18,25 @@ Erreurs :
   503 WEATHER_UNAVAILABLE  — provider météo indisponible
 """
 
-import logging
-from typing import Annotated, Any
-
-import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.core.config import settings
-from app.core.dependencies import check_quota
-from app.core.errors import ErrorCode
-from app.db.session import get_db
-from app.domain.score import build_score_presentation, calculate_score
-from app.models.peak import Peak
 from app.schemas.score import (
     ScoreConditionsSchema,
     ScoreCloudLayerVizSchema,
     PressureLevelSchema,
     ScoreResponse,
 )
+import logging
+from sqlalchemy import select
+import redis.asyncio as aioredis
+from app.models.peak import Peak
+from typing import Annotated, Any
+from app.db.session import get_db
+from app.core.config import settings
+from app.core.errors import ErrorCode
+from app.core.dependencies import check_quota
 from app.services.weather import WeatherService
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from app.domain.score import build_score_presentation, calculate_score
 from app.services.weather_providers.open_meteo import OpenMeteoProvider
 
 logger = logging.getLogger(__name__)

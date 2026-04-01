@@ -1,8 +1,8 @@
 """Subscription — Modèle utilisateur Premium/Pro."""
 
-from sqlalchemy import Column, DateTime, String
-from sqlalchemy.orm import declarative_base
 from datetime import datetime
+from sqlalchemy.orm import declarative_base
+from sqlalchemy import Column, DateTime, String
 
 Base = declarative_base()
 

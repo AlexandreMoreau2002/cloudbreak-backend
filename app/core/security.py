@@ -1,9 +1,7 @@
 import json
 from typing import Any
-
 from jose import JWTError, jwt
 from jose.backends import ECKey
-
 from app.core.errors import ErrorCode
 
 

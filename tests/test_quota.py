@@ -13,7 +13,6 @@ Cas testés:
 import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock, patch
-
 from app.services.quota import QuotaService, QuotaExceededException
 
 

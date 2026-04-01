@@ -12,8 +12,8 @@ Format erreur :
 """
 
 import logging
-from datetime import datetime, timedelta
 from redis.asyncio import Redis
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 

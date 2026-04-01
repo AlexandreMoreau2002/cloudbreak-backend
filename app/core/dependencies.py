@@ -1,6 +1,6 @@
 import logging
-from datetime import datetime
 from typing import Any
+from datetime import datetime
 
 import redis.asyncio as aioredis
 from fastapi import Depends, HTTPException, status

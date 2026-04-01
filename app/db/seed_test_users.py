@@ -19,8 +19,8 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 
 from app.core.config import settings
 from app.models.subscription import Subscription
@@ -93,6 +93,7 @@ async def unseed_test_users() -> None:
     async with async_session() as session:
         for user_type, user_data in TEST_USERS.items():
             from sqlalchemy import delete
+
             stmt = delete(Subscription).where(Subscription.user_id == user_data["user_id"])
             await session.execute(stmt)
             logger.info("unseed_test_user", extra={"user_id": user_data["user_id"]})

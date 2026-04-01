@@ -12,9 +12,11 @@ Cas testés:
 
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
+
+from httpx import AsyncClient, ASGITransport
+
 from app.main import app
 from app.core.dependencies import get_redis, get_user_subscription
-from httpx import AsyncClient, ASGITransport
 from app.domain.weather_types import PressureLevelData, WeatherData
 
 

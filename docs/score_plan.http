@@ -1,0 +1,210 @@
+###
+# Cloudbreak Score API — Plan de test quota freemium
+#
+# Comptes de test prédéfinis (créés via `make seed-test`):
+#   - user-freemium-001 (freemium@cloudbreak.fr) — 1 check/jour
+#   - user-pro-001 (pro@cloudbreak.fr) — illimité
+#   - user-admin-001 (admin@cloudbreak.fr) — admin, illimité
+#
+# Avant de tester:
+#   1. make dev           # Lancer API + DB + Redis
+#   2. make migrate       # Appliquer migrations
+#   3. make seed          # Insérer les sommets
+#   4. make seed-test     # Insérer les users de test
+#
+# Pour reset complet:
+#   make reset-db         # Drop + recreate tables + seed
+#
+# Pour arrêter:
+#   make unseed-test      # Supprimer les users
+#   make down             # Arrêter les containers
+###
+
+@baseUrl = http://localhost:8000/api/v1
+@contentType = application/json
+
+# Test user IDs (réels, en base de données)
+@userFreemium = user-freemium-001
+@userPro = user-pro-001
+@userAdmin = user-admin-001
+
+# Peak ID pour les tests
+@peakId = mont-blanc
+@testDate = 2026-04-01
+
+---
+
+## 🎯 QUOTA FREEMIUM — Acceptance Criteria Tests
+
+### ✅ AC1: Freemium user — 1er check du jour OK (200)
+# Utilisateur gratuit, 1er appel → 200 OK + score
+# Redis quota:user-freemium-001:2026-04-01 passe de absent à 1
+GET {{baseUrl}}/score?peak_id={{peakId}}&date={{testDate}}&hour=6
+Authorization: Bearer dummy-token-for-freemium
+
+> {%
+  client.test("AC1: Status 200", function() {
+    client.assert(response.status === 200, "Expected 200, got " + response.status);
+  });
+  client.test("AC1: Score retourné", function() {
+    const body = response.body;
+    client.assert(body.score !== undefined, "Score missing");
+    client.assert(["high", "medium", "low", "none"].includes(body.verdict), "Invalid verdict");
+  });
+  client.test("AC1: Contient les champs attendus", function() {
+    const body = response.body;
+    client.assert(body.peak_id === "{{peakId}}", "peak_id mismatch");
+    client.assert(body.altitude !== undefined, "altitude missing");
+  });
+%}
+
+---
+
+### ❌ AC2: Freemium user — 2e check du jour BLOQUÉ (429)
+# Même utilisateur, 2e appel du même jour → 429 QUOTA_EXCEEDED
+# Redis quota:user-freemium-001:2026-04-01 = 1 → quota dépassé
+GET {{baseUrl}}/score?peak_id={{peakId}}&date={{testDate}}&hour=7
+Authorization: Bearer dummy-token-for-freemium
+
+> {%
+  client.test("AC2: Status 429", function() {
+    client.assert(response.status === 429, "Expected 429, got " + response.status);
+  });
+  client.test("AC2: Code QUOTA_EXCEEDED", function() {
+    const detail = response.body.detail;
+    client.assert(detail && detail.code === "QUOTA_EXCEEDED", "Expected QUOTA_EXCEEDED");
+  });
+  client.test("AC2: Message français", function() {
+    const detail = response.body.detail;
+    client.assert(detail && detail.detail.includes("Quota journalier"), "Expected French message");
+  });
+%}
+
+---
+
+### ✅ AC3: Premium user — appels illimités (200 x N)
+# Utilisateur Pro Plan, appels illimités (pas de quota)
+# Redis ne consulté, quota bypassed
+GET {{baseUrl}}/score?peak_id={{peakId}}&date={{testDate}}&hour=8
+Authorization: Bearer dummy-token-for-pro
+
+> {%
+  client.test("AC3a: Status 200 (1er appel)", function() {
+    client.assert(response.status === 200, "Expected 200");
+  });
+%}
+
+---
+
+### ✅ AC3 (continued): Premium user — 2e appel même jour
+# Même user Pro, 2e appel → toujours 200 (pas de 429)
+GET {{baseUrl}}/score?peak_id={{peakId}}&date={{testDate}}&hour=9
+Authorization: Bearer dummy-token-for-pro
+
+> {%
+  client.test("AC3b: Status 200 (2e appel — no quota)", function() {
+    client.assert(response.status === 200, "Expected 200, got " + response.status);
+  });
+%}
+
+---
+
+### ✅ AC4: Freemium reset jour suivant
+# Jour suivant, même utilisateur freemium → nouveau check autorisé
+# Redis quota:user-freemium-001:2026-04-02 absent (TTL expiré)
+GET {{baseUrl}}/score?peak_id={{peakId}}&date=2026-04-02&hour=6
+Authorization: Bearer dummy-token-for-freemium
+
+> {%
+  client.test("AC4: Status 200 (quota reset)", function() {
+    client.assert(response.status === 200, "Expected 200 (quota reset next day)");
+  });
+%}
+
+---
+
+## 🔧 DEBUG & INSPECTION
+
+### 🔍 Redis — Vérifier les clés quota
+# Via shell :
+# docker exec cloudbreak-redis redis-cli KEYS "quota:*"
+# docker exec cloudbreak-redis redis-cli GET quota:user-freemium-001:2026-04-01
+# docker exec cloudbreak-redis redis-cli TTL quota:user-freemium-001:2026-04-01
+
+### 🔍 Database — Vérifier les subscriptions
+# Via Docker :
+# docker exec cloudbreak-postgres psql -U postgres -d cloudbreak -c "SELECT * FROM subscriptions;"
+
+### 🔍 Logs de l'API
+# docker logs -f cloudbreak-backend | grep quota
+
+---
+
+## 📝 NOTES IMPORTANTES
+
+### Comment les tokens sont générés?
+Les comptes de test utilisent des **user_ids fictifs** (user-freemium-001, etc.).
+Pour tester avec l'API REST, il faut:
+1. Créer les comptes avec `make seed-test`
+2. Utiliser un `Authorization: Bearer <token>` valide
+3. Le backend valide le JWT via Supabase JWKS
+4. En dev, tu peux utiliser des tokens Supabase réels ou mock le JWT validation
+
+### JWT fake vs réel
+- **Fake (dev)**: Signature invalide mais structure valide — seulement pour unit tests
+- **Réel**: Généré par Supabase, validé localement via JWKS — pour les tests HTTP
+
+### Comment tester en dev local?
+```bash
+# Option 1 : Utiliser les fixtures pytest + mocks
+pytest tests/features/test_quota_flow.py -v
+
+# Option 2 : Utiliser REST Client + vrais JWTs Supabase
+# (Besoin d'un compte Supabase réel ou token Supabase test)
+
+# Option 3 : Patcher le JWT validation en dev
+# (Voir TESTING.md pour les détails)
+```
+
+### Reset des données de test
+```bash
+# Supprimer juste les users de test
+make unseed-test
+
+# Reset complète (drop + recreate tout)
+make reset-db
+```
+
+### Pour le futur (story 4.3)
+En story 4.3, on créera une vraie table `subscriptions` avec migrations Alembic.
+Le code `get_user_subscription()` sera implémenté réellement.
+Ces tests resteront valides sans changement.
+
+---
+
+## 🧪 Workflow local complet
+
+```bash
+# Terminal 1: Lancer les services
+cd backend
+make dev           # API + DB + Redis en Docker
+make migrate       # Appliquer migrations
+make seed          # Insérer les sommets
+make seed-test     # Insérer les users de test
+
+# Terminal 2: Voir les logs
+make logs
+
+# Terminal 3: Lancer les tests
+make test          # Tous les tests
+pytest tests/features/test_quota_flow.py -v  # Juste quota
+
+# Ou tester manuellement avec REST Client
+# Ouvrir ce fichier (score_plan.http) et cliquer "Send Request"
+```
+
+Pour arrêter:
+```bash
+make unseed-test   # Optionnel : supprimer les users
+make down          # Arrêter Docker
+```

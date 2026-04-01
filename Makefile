@@ -3,7 +3,7 @@
 #  Usage : make <commande>
 # ────────────────────────────────────────────────
 
-.PHONY: help validate lint format typecheck test dev down logs migrate migration install seed
+.PHONY: help validate lint format typecheck test dev down logs migrate migration install seed seed-test unseed-test reset-db
 
 help:
 	@echo ""
@@ -25,6 +25,9 @@ help:
 	@echo "    make migrate     applique les migrations"
 	@echo "    make migration   génère une nouvelle migration (autogenerate)"
 	@echo "    make seed        insère les sommets initiaux"
+	@echo "    make seed-test   insère les users de test (freemium, pro, admin)"
+	@echo "    make unseed-test supprime les users de test"
+	@echo "    make reset-db    reset complet (drop tables + recreate)"
 	@echo ""
 	@echo "  Dépendances"
 	@echo "    make install     pip install requirements"
@@ -71,6 +74,26 @@ migration:
 # Seed données initiales (sommets)
 seed:
 	python -m app.db.seed
+
+# Seed users de test (freemium, pro, admin)
+seed-test:
+	python -m app.db.seed_test_users seed
+
+unseed-test:
+	python -m app.db.seed_test_users unseed
+
+# Reset complète BD (danger : drop tables)
+reset-db:
+	@echo "⚠️  Attention : ceci va DROP toutes les tables et les recréer"
+	@read -p "Confirmer (y/n) : " confirm; \
+	if [ "$$confirm" = "y" ]; then \
+		PYTHONPATH=. alembic downgrade base; \
+		PYTHONPATH=. alembic upgrade head; \
+		python -m app.db.seed; \
+		echo "✅ BD reset complète et seed inséré"; \
+	else \
+		echo "❌ Annulé"; \
+	fi
 
 # Dépendances
 install:

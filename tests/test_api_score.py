@@ -15,6 +15,7 @@ import pytest
 from app.main import app
 from httpx import AsyncClient, ASGITransport
 from unittest.mock import AsyncMock, patch, MagicMock
+from app.core.dependencies import get_redis, get_user_subscription
 from app.domain.weather_types import PressureLevelData, WeatherData
 
 
@@ -62,7 +63,20 @@ MOCK_WEATHER = WeatherData(
 def auth_override():
     from app.core.dependencies import get_current_user
 
+    # Mock Redis (quota check)
+    mock_redis = AsyncMock()
+    mock_redis.get.return_value = None  # No quota exceeded
+    mock_redis.incr.return_value = 1
+
+    async def mock_get_redis_impl():
+        return mock_redis
+
+    async def mock_get_subscription_impl(user_id: str, db):
+        return None  # Freemium user
+
     app.dependency_overrides[get_current_user] = lambda: MOCK_USER
+    app.dependency_overrides[get_redis] = mock_get_redis_impl
+    app.dependency_overrides[get_user_subscription] = mock_get_subscription_impl
     yield
     app.dependency_overrides.clear()
 

@@ -19,25 +19,27 @@ Erreurs :
 """
 
 import logging
-from sqlalchemy import select
-import redis.asyncio as aioredis
-from app.models.peak import Peak
 from typing import Annotated, Any
-from app.db.session import get_db
-from app.core.config import settings
-from app.core.errors import ErrorCode
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.services.weather import WeatherService
-from app.core.dependencies import get_current_user
+
+import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import settings
+from app.core.dependencies import check_quota
+from app.core.errors import ErrorCode
+from app.db.session import get_db
 from app.domain.score import build_score_presentation, calculate_score
-from app.services.weather_providers.open_meteo import OpenMeteoProvider
+from app.models.peak import Peak
 from app.schemas.score import (
-    ScoreResponse,
-    PressureLevelSchema,
     ScoreConditionsSchema,
     ScoreCloudLayerVizSchema,
+    PressureLevelSchema,
+    ScoreResponse,
 )
+from app.services.weather import WeatherService
+from app.services.weather_providers.open_meteo import OpenMeteoProvider
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +67,7 @@ async def get_score(
     peak_id: Annotated[str, Query(description="Identifiant du sommet")],
     date: Annotated[str, Query(pattern=r"^\d{4}-\d{2}-\d{2}$", description="Date ISO 8601")],
     hour: Annotated[int, Query(ge=0, le=23, description="Heure souhaitée (défaut: 6h)")] = 6,
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(check_quota),
     db: AsyncSession = Depends(get_db),
 ) -> ScoreResponse:
     peak = await get_peak_by_id(peak_id, db)

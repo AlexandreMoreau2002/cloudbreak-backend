@@ -11,13 +11,25 @@ Cas testés:
 """
 
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-
-from httpx import AsyncClient, ASGITransport
-
 from app.main import app
-from app.core.dependencies import get_redis, get_user_subscription
+from contextlib import asynccontextmanager
+from app.core.dependencies import get_redis
+from httpx import AsyncClient, ASGITransport
+from unittest.mock import AsyncMock, patch, MagicMock
 from app.domain.weather_types import PressureLevelData, WeatherData
+
+
+def _make_mock_redis() -> AsyncMock:
+    """Mock Redis avec pipeline() correctement configuré comme async context manager."""
+    mock_redis = AsyncMock()
+    mock_pipe = AsyncMock()
+
+    @asynccontextmanager
+    async def mock_pipeline() -> object:
+        yield mock_pipe
+
+    mock_redis.pipeline = mock_pipeline
+    return mock_redis
 
 
 MOCK_USER = {"id": "user-123", "email": "alex@test.com"}
@@ -117,25 +129,25 @@ async def test_quota_score_endpoint_first_call_returns_200(auth_freemium: object
         new_callable=AsyncMock,
         return_value=MOCK_WEATHER,
     )
+    patch_subscription = patch(
+        "app.core.dependencies.get_user_subscription",
+        new_callable=AsyncMock,
+        return_value=None,
+    )
 
-    # Mock Redis avec quota absent (1er check)
-    mock_redis = AsyncMock()
-    mock_redis.get.return_value = None
-    mock_redis.incr.return_value = 1
+    # Mock Redis avec quota absent (1er check — sommet pas encore déverrouillé)
+    mock_redis = _make_mock_redis()
+    mock_redis.sismember.return_value = False
+    mock_redis.scard.return_value = 0
 
     async def mock_get_redis_impl() -> AsyncMock:
         return mock_redis
 
-    # Mock subscription
-    async def mock_get_subscription_impl(user_id: str, db: object) -> None:
-        return None
-
     # Override dependencies
     app.dependency_overrides[get_redis] = mock_get_redis_impl
-    app.dependency_overrides[get_user_subscription] = mock_get_subscription_impl
 
     try:
-        with patch_peak, patch_weather:
+        with patch_peak, patch_weather, patch_subscription:
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://test"
             ) as client:
@@ -146,8 +158,6 @@ async def test_quota_score_endpoint_first_call_returns_200(auth_freemium: object
     finally:
         if get_redis in app.dependency_overrides:
             del app.dependency_overrides[get_redis]
-        if get_user_subscription in app.dependency_overrides:
-            del app.dependency_overrides[get_user_subscription]
 
     assert response.status_code == 200
     data = response.json()
@@ -168,22 +178,24 @@ async def test_quota_score_endpoint_second_call_returns_429(auth_freemium: objec
         new_callable=AsyncMock,
         return_value=MOCK_WEATHER,
     )
+    patch_subscription = patch(
+        "app.core.dependencies.get_user_subscription",
+        new_callable=AsyncMock,
+        return_value=None,
+    )
 
-    # Mock Redis avec quota déjà atteint
-    mock_redis = AsyncMock()
-    mock_redis.get.return_value = b"1"  # 1 check déjà effectué
+    # Mock Redis avec quota déjà atteint (sommet différent, scard=1 = limite)
+    mock_redis = _make_mock_redis()
+    mock_redis.sismember.return_value = False
+    mock_redis.scard.return_value = 1  # 1 sommet déjà déverrouillé = limite atteinte
 
     async def mock_get_redis_impl() -> AsyncMock:
         return mock_redis
 
-    async def mock_get_subscription_impl(user_id: str, db: object) -> None:
-        return None
-
     app.dependency_overrides[get_redis] = mock_get_redis_impl
-    app.dependency_overrides[get_user_subscription] = mock_get_subscription_impl
 
     try:
-        with patch_peak, patch_weather:
+        with patch_peak, patch_weather, patch_subscription:
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://test"
             ) as client:
@@ -194,8 +206,6 @@ async def test_quota_score_endpoint_second_call_returns_429(auth_freemium: objec
     finally:
         if get_redis in app.dependency_overrides:
             del app.dependency_overrides[get_redis]
-        if get_user_subscription in app.dependency_overrides:
-            del app.dependency_overrides[get_user_subscription]
 
     assert response.status_code == 429
     data = response.json()
@@ -344,21 +354,23 @@ async def test_quota_expired_subscription_falls_back_to_freemium(
     mock_subscription.plan = "premium"
     mock_subscription.expires_at = datetime(2026, 1, 1)  # Déjà expiré
 
-    async def mock_get_subscription_impl(user_id: str, db: object) -> MagicMock:
-        return mock_subscription
+    patch_subscription = patch(
+        "app.core.dependencies.get_user_subscription",
+        new_callable=AsyncMock,
+        return_value=mock_subscription,
+    )
 
-    mock_redis = AsyncMock()
-    mock_redis.get.return_value = None
-    mock_redis.incr.return_value = 1
+    mock_redis = _make_mock_redis()
+    mock_redis.sismember.return_value = False
+    mock_redis.scard.return_value = 0
 
     async def mock_get_redis_impl() -> AsyncMock:
         return mock_redis
 
     app.dependency_overrides[get_redis] = mock_get_redis_impl
-    app.dependency_overrides[get_user_subscription] = mock_get_subscription_impl
 
     try:
-        with patch_peak, patch_weather:
+        with patch_peak, patch_weather, patch_subscription:
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://test"
             ) as client:
@@ -369,8 +381,6 @@ async def test_quota_expired_subscription_falls_back_to_freemium(
     finally:
         if get_redis in app.dependency_overrides:
             del app.dependency_overrides[get_redis]
-        if get_user_subscription in app.dependency_overrides:
-            del app.dependency_overrides[get_user_subscription]
 
     # Avec abonnement expiré → freemium quota s'applique
     assert response.status_code == 200
@@ -389,22 +399,23 @@ async def test_quota_no_subscription_record_is_freemium(auth_freemium: object) -
         new_callable=AsyncMock,
         return_value=MOCK_WEATHER,
     )
+    patch_subscription = patch(
+        "app.core.dependencies.get_user_subscription",
+        new_callable=AsyncMock,
+        return_value=None,
+    )
 
-    async def mock_get_subscription_impl(user_id: str, db: object) -> None:
-        return None  # Pas de subscription
-
-    mock_redis = AsyncMock()
-    mock_redis.get.return_value = None
-    mock_redis.incr.return_value = 1
+    mock_redis = _make_mock_redis()
+    mock_redis.sismember.return_value = False
+    mock_redis.scard.return_value = 0
 
     async def mock_get_redis_impl() -> AsyncMock:
         return mock_redis
 
     app.dependency_overrides[get_redis] = mock_get_redis_impl
-    app.dependency_overrides[get_user_subscription] = mock_get_subscription_impl
 
     try:
-        with patch_peak, patch_weather:
+        with patch_peak, patch_weather, patch_subscription:
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://test"
             ) as client:
@@ -415,7 +426,5 @@ async def test_quota_no_subscription_record_is_freemium(auth_freemium: object) -
     finally:
         if get_redis in app.dependency_overrides:
             del app.dependency_overrides[get_redis]
-        if get_user_subscription in app.dependency_overrides:
-            del app.dependency_overrides[get_user_subscription]
 
     assert response.status_code == 200

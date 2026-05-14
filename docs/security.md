@@ -106,9 +106,10 @@ pip-audit  # à installer : pip install pip-audit
 - `DELETE /api/v1/user/favorites/{peak_id}` — auth JWT requise, isolation par user_id JWT
 - `GET /api/v1/user/favorites` — auth JWT requise, isolation par user_id JWT
 
+- `GET /api/v1/score` — auth JWT requise + quota Redis (check_quota dependency), `peak_id`/`date`/`hour` validés par Pydantic/Query
+
 ### Ce qui n'existe pas encore
-- Pas de rate limiting (à implémenter epic 3 ou avant prod)
-- Pas de quota enforcement (epic 4)
+- Pas de rate limiting (à implémenter avant prod)
 - Pas de limite sur le nombre de favoris par utilisateur (à prévoir avant prod)
 
 ---
@@ -147,6 +148,35 @@ pip-audit  # à installer : pip install pip-audit
 - **[index.tsx:59-62]** Messages d'erreur filtres via cle i18n avant affichage (`home.serviceUnavailable` / `home.errorGeneric`) — le message brut de l'API n'est jamais rendu dans l'UI sur cet ecran.
 - **[ScoreCard.tsx]** Composant purement presentationnel — affiche uniquement `peak_name`, `peak_altitude`, `score`, `verdict` (donnees non-sensibles). Aucune logique auth, aucun acces token.
 - **[api/score.ts:23]** `peak_id` passe comme query param valide par le backend via SQLAlchemy ORM — pas d'injection possible.
+
+---
+
+---
+
+## 2026-05-14 Story 4-1 — Quota freemium backend (Redis QuotaService)
+
+### CRITIQUE
+
+- **[dependencies.py:107]** Comparaison timezone-aware vs timezone-naive possible sur `expires_at` : `datetime.now(subscription.expires_at.tzinfo)` crashe avec `AttributeError` si `expires_at` est `None` (colonne nullable). Un utilisateur freemium sans ligne `subscriptions` ne passe jamais dans ce bloc (car `subscription` est `None`), mais un utilisateur avec une ligne `subscriptions` dont `expires_at` est `None` (plan `free` en DB) déclencherait un 500 non géré. Correction : `if subscription and subscription.plan in ("premium", "pro") and subscription.expires_at is not None and subscription.expires_at > datetime.now(subscription.expires_at.tzinfo)`.
+- **[dependencies.py:122]** `peak_id` lu depuis `request.query_params.get("peak_id", "")` sans aucune validation. Un client malveillant peut envoyer un `peak_id` vide (`""`) ou arbitrairement long : la clé Redis devient `quota:{user_id}:{date}` avec un membre vide dans le SET, ce qui déverrouille un slot de quota sans sommet réel — contournement partiel du quota. Un second appel avec le vrai `peak_id` consomme un deuxième slot et déclenche QUOTA_EXCEEDED alors que l'utilisateur n'a pas réellement consulté deux sommets. Correction : valider `peak_id` non vide et de format UUID avant d'appeler `check_and_increment` ; retourner 422 si invalide.
+
+### WARNING
+
+- **[main.py:35]** L'exception handler `OperationalError` logue `str(exc)` dans le champ `error` : `logger.error(..., extra={"error": str(exc)})`. En prod, les messages SQLAlchemy peuvent contenir le `DATABASE_URL` complet (avec mot de passe) si la connexion échoue. Le log est structuré (JSON) et ne remonte pas au client (réponse 503 sans détail technique), mais le secret peut être persisté dans les logs du VPS. Recommandation : logguer `type(exc).__name__` uniquement, ou masquer le `DATABASE_URL` dans les settings avant logging.
+- **[quota.py:82-85]** Race condition mineure entre `sadd` et `expire` : si le process est tué entre les deux instructions, la clé Redis n'a pas de TTL et ne sera jamais purgée (fuite mémoire Redis). Recommandation : utiliser un pipeline Redis atomique `pipe.sadd(...); pipe.expire(...); await pipe.execute()`.
+- **[dependencies.py:118]** `datetime.utcnow()` déprécié en Python 3.12 (warning `DeprecationWarning`). Remplacer par `datetime.now(timezone.utc).strftime("%Y-%m-%d")` pour cohérence et compatibilité future.
+- **[health.py]** L'endpoint `GET /health` est public (pas d'auth). Il expose l'état de Redis et PostgreSQL (`"ok"` / `"unavailable"`). En prod derrière Caddy, cet endpoint est accessible depuis Internet — un attaquant peut déduire si la DB ou Redis est en panne pour choisir le bon moment d'attaque. Recommandation : soit protéger par IP (Caddy allow only internal), soit retourner uniquement `{"status": "ok"|"degraded"}` sans détailler quel service est indisponible.
+
+### INFO
+
+- **[quota.py]** Clés Redis correctement préfixées `quota:{user_id}:{date}` — aucune collision possible avec `weather:*` ou `cache:*`. Schéma conforme aux conventions Cloudbreak.
+- **[quota.py]** TTL calculé jusqu'à minuit UTC et appliqué via `expire()` — reset automatique correct sans fuite mémoire (sous réserve de la race condition ci-dessus).
+- **[dependencies.py]** `user_id` extrait exclusivement du JWT validé (`payload.get("sub")`) — jamais passé en paramètre client sur l'endpoint score. Isolation correcte.
+- **[dependencies.py]** `get_user_subscription` utilise `select(Subscription).where(Subscription.user_id == user_id)` — requête SQLAlchemy paramétrée, aucun SQL brut, pas d'injection possible.
+- **[main.py]** Exception handler `OperationalError` retourne `{"detail": "Base de données indisponible", "code": "DATABASE_UNAVAILABLE"}` — aucune stack trace, aucun message interne exposé au client.
+- **[security.py:26-44]** `encode_test_jwt` avec `dev-secret-key` hardcodé présent dans le code de production (`app/core/security.py`). La fonction est marquée `DEV/TEST ONLY` et n'est importée que dans les tests — aucun endpoint ne l'expose. Risque résiduel : si un développeur l'importe par erreur dans une route, le token serait signé avec HS256 et une clé connue. Recommandation : déplacer cette fonction dans `tests/conftest.py` ou un module `tests/helpers.py` pour l'isoler du code de production.
+- **[quota.py:78]** Message de `QuotaExceededException` contient `user_id` et `date` : `f"Daily quota exceeded for {user_id} on {date}"`. Ce message ne remonte pas au client (catch dans `dependencies.py`), mais il est potentiellement loggué si une exception non catchée remontait. Actuellement sans risque — surveiller si le catch est retiré.
+- **[score.py]** Deux instances Redis créées indépendamment : une dans `dependencies.py` (`get_redis` singleton) et une dans `score.py` (`_redis` module-level). Pas de risque de sécurité mais doublon de connexions Redis en prod — à consolider via la dependency `get_redis`.
 
 ---
 

@@ -36,6 +36,17 @@ make down     # arrêter
 make logs     # suivre les logs en temps réel
 ```
 
+Pour tester le quota freemium en local, créer des users de test Supabase :
+
+```bash
+source .venv/bin/activate
+make seed-test        # crée freemium@cloudbreak.app + pro@cloudbreak.app dans Supabase
+make unseed-test      # supprime les users de test
+
+make clean-subscriptions   # vide la table subscriptions (reset plan → freemium)
+make reset-db              # reset complet BD (drop + recreate + seed) — ⚠ destructif
+```
+
 Containers lancés :
 
 - `cloudbreak-backend` → API FastAPI sur http://localhost:8000

@@ -26,10 +26,10 @@ check_quota() dependency
   ├─ 3. Si Premium/Pro + non expiré → BYPASS quota, retourne user
   └─ 4. Si freemium ou expiré :
       ├─ Crée QuotaService(redis)
-      ├─ Appelle quota_service.check_and_increment(user_id, date)
-      │   ├─ Récupère compteur Redis : quota:{user_id}:{date_iso}
-      │   ├─ Si compteur >= 1 → QuotaExceededException
-      │   └─ Sinon → INCR + expire(TTL=minuit UTC)
+      ├─ Appelle quota_service.check_and_increment(user_id, date, peak_id)
+      │   ├─ SISMEMBER quota:{user_id}:{date_iso} → peak déjà déverrouillé ? → allow
+      │   ├─ SCARD quota:{user_id}:{date_iso} → nb sommets uniques >= limit ? → QuotaExceededException
+      │   └─ Sinon → SADD peak_id + EXPIRE(TTL=minuit UTC)
       ├─ Si exception → HTTPException(429)
       └─ Sinon → retourne user
   ↓
@@ -38,33 +38,39 @@ Score endpoint continue (peak lookup, météo, algo)
 
 ### Flux utilisateur freemium
 
-**1er appel (2026-04-01 10:00 UTC)**
+**1er appel (2026-04-01 10:00 UTC) — sommet A**
 ```bash
-GET /api/v1/score?peak_id=mont-blanc&date=2026-04-01
+GET /api/v1/score?peak_id={peakA}&date=2026-04-01
 Authorization: Bearer {jwt_freemium}
 ```
 - `check_quota()` appelé
-- Redis `quota:user-123:2026-04-01` absent → None
-- INCR → 1
-- TTL expire() = 50400 secondes (jusqu'à 2026-04-02 00:00 UTC)
+- SISMEMBER `quota:user-123:2026-04-01` peakA → absent
+- SCARD `quota:user-123:2026-04-01` → 0 < 1 (limit)
+- SADD peakA → SET = {peakA}
+- EXPIRE TTL = secondes jusqu'à 2026-04-02 00:00 UTC
 - **Résultat : 200 OK + score**
 
-**2e appel (2026-04-01 15:00 UTC)**
+**2e appel (2026-04-01 12:00 UTC) — même sommet A, heure différente**
 ```bash
-GET /api/v1/score?peak_id=mont-blanc&date=2026-04-01
+GET /api/v1/score?peak_id={peakA}&date=2026-04-01&hour=12
 Authorization: Bearer {jwt_freemium}
 ```
-- `check_quota()` appelé
-- Redis `quota:user-123:2026-04-01` = 1 (b"1" depuis Redis)
-- 1 >= 1 → QuotaExceededException
+- SISMEMBER `quota:user-123:2026-04-01` peakA → **présent** → allow immédiat (pas de SCARD)
+- **Résultat : 200 OK + score** (toutes les heures d'un sommet déverrouillé passent librement)
+
+**3e appel (2026-04-01 15:00 UTC) — sommet B différent**
+```bash
+GET /api/v1/score?peak_id={peakB}&date=2026-04-01
+Authorization: Bearer {jwt_freemium}
+```
+- SISMEMBER peakB → absent
+- SCARD → 1 >= 1 (limit) → QuotaExceededException
 - HTTPException(status=429, detail={"detail": "Quota journalier atteint", "code": "QUOTA_EXCEEDED"})
 - **Résultat : 429 Too Many Requests**
 
-**3e appel (2026-04-02 08:00 UTC — jour suivant)**
+**4e appel (2026-04-02 08:00 UTC — jour suivant)**
 - Redis `quota:user-123:2026-04-01` expiré automatiquement (TTL atteint)
-- Nouvelle clé `quota:user-123:2026-04-02` absent
-- INCR → 1
-- TTL expire()
+- Nouvelle clé `quota:user-123:2026-04-02` absente → SADD peakA → SET = {peakA}
 - **Résultat : 200 OK + score** (reset fonctionnel)
 
 ### Flux utilisateur Premium/Pro
@@ -97,20 +103,25 @@ User avec subscription.plan="premium" mais expires_at < now :
 
 ## Code clé
 
-### Service quota
+### Service quota (Redis SET — 1 sommet unique/jour)
 
 ```python
 class QuotaService:
-    async def check_and_increment(self, user_id: str, date: str) -> None:
+    async def check_and_increment(self, user_id: str, date: str, peak_id: str) -> None:
         quota_key = f"quota:{user_id}:{date}"
-        checks = await self._redis.get(quota_key)
-        checks_int = int(checks) if checks else 0
 
-        if checks_int >= self._daily_limit:  # 1 pour freemium
+        # Sommet déjà déverrouillé → toutes ses heures passent librement
+        already_unlocked = await self._redis.sismember(quota_key, peak_id)
+        if already_unlocked:
+            return
+
+        # Quota de sommets uniques atteint ?
+        unlocked_count = await self._redis.scard(quota_key)
+        if unlocked_count >= self._daily_limit:  # 1 pour freemium
             raise QuotaExceededException(...)
 
-        # Incrémenter
-        await self._redis.incr(quota_key)
+        # Déverrouiller ce sommet pour aujourd'hui
+        await self._redis.sadd(quota_key, peak_id)
 
         # TTL minuit UTC
         tomorrow = datetime.utcnow().replace(
@@ -124,16 +135,17 @@ class QuotaService:
 
 ```python
 async def check_quota(
+    request: Request,
     user: dict[str, Any] = Depends(get_current_user),
-    redis: aioredis.Redis = Depends(get_redis),
+    redis: Redis = Depends(get_redis),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     user_id = user["id"]
 
-    # Vérifier si Premium/Pro
+    # Vérifier si Premium/Pro (non expiré)
     subscription = await get_user_subscription(user_id, db)
     if subscription and subscription.plan in ("premium", "pro"):
-        if subscription.expires_at > datetime.utcnow():
+        if subscription.expires_at > datetime.now(subscription.expires_at.tzinfo):
             return user  # Bypass quota
 
     # Freemium : vérifier le quota
@@ -141,7 +153,8 @@ async def check_quota(
     quota_service = QuotaService(redis)
 
     try:
-        await quota_service.check_and_increment(user_id, today)
+        peak_id = request.query_params.get("peak_id", "")
+        await quota_service.check_and_increment(user_id, today, peak_id)
     except QuotaExceededException:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -159,13 +172,13 @@ async def check_quota(
 ```python
 @router.get("/score", response_model=ScoreResponse)
 async def get_score(
-    peak_id: str = Query(...),
-    date: str = Query(...),
-    hour: int = Query(default=6),
+    peak_id: Annotated[str, Query(description="Identifiant du sommet")],
+    date: Annotated[str, Query(pattern=r"^\d{4}-\d{2}-\d{2}$")],
+    hour: Annotated[int, Query(ge=0, le=23)] = 6,
     current_user: dict[str, Any] = Depends(check_quota),  # ← remplace get_current_user
     db: AsyncSession = Depends(get_db),
 ) -> ScoreResponse:
-    # ... resto du code inchangé
+    # ... reste du code inchangé
 ```
 
 ## Comment tester
@@ -239,11 +252,11 @@ docker logs -f cloudbreak-backend
 
 ## Acceptance Criteria vérifiés
 
-- [x] **AC1** : Freemium user 1er check → score retourné + quota incrémenté Redis
+- [x] **AC1** : Freemium user 1er sommet → score retourné + sommet déverrouillé dans Redis SET
   - Test : `test_quota_score_endpoint_first_call_returns_200`
-  - Vérification : mock_redis.incr() appelé
+  - Vérification : mock_redis.sadd() appelé + response.status_code == 200
 
-- [x] **AC2** : Freemium user 2e check → 429 QUOTA_EXCEEDED
+- [x] **AC2** : Freemium user 2e sommet → 429 QUOTA_EXCEEDED (même sommet → toujours 200)
   - Test : `test_quota_score_endpoint_second_call_returns_429`
   - Vérification : response.status_code == 429 + detail.code == "QUOTA_EXCEEDED"
 
@@ -268,11 +281,19 @@ Le code `check_quota()` restera **100% compatible** — pas de changement endpoi
 
 ## Redis clés et TTL
 
-| Clé | Format | Exemple | TTL |
-|-----|--------|---------|-----|
-| quota | `quota:{user_id}:{date_iso}` | `quota:user-123:2026-04-01` | Minuit UTC suivant |
+| Clé | Type Redis | Format | Exemple | TTL |
+|-----|-----------|--------|---------|-----|
+| quota | SET de peak_ids | `quota:{user_id}:{date_iso}` | `quota:user-123:2026-04-01` | Minuit UTC suivant |
 
 Préfixe `quota:*` permet isolation simple par pattern.
+
+Commandes debug utiles :
+```bash
+docker exec cloudbreak-redis redis-cli SMEMBERS "quota:user-123:2026-05-14"   # sommets déverrouillés
+docker exec cloudbreak-redis redis-cli SCARD "quota:user-123:2026-05-14"      # nb sommets déverrouillés
+docker exec cloudbreak-redis redis-cli TTL "quota:user-123:2026-05-14"        # secondes avant reset
+docker exec cloudbreak-redis redis-cli FLUSHDB                                # reset complet (dev)
+```
 
 ## Notes
 

@@ -1,6 +1,6 @@
 # Testing Guide — Cloudbreak Backend
 
-⚠️ **Approche correcte** : **Vrais comptes en DB** + **vrais JWTs Supabase**, pas de tokens fake.
+✅ **Approche** : **Vrais UUIDs Supabase en DB** + **vrais JWTs Supabase** pour les tests.
 
 ---
 
@@ -23,51 +23,48 @@ make seed-test        # Insérer les users de test ← c'est là!
 
 Créés automatiquement par `make seed-test` :
 
-| User ID | Email | Plan | Accès | User_ID en DB |
-|---------|-------|------|-------|---------------|
-| **Freemium** | freemium@cloudbreak.fr | free | 1 check/jour | user-freemium-001 |
-| **Pro** | pro@cloudbreak.fr | pro | illimité | user-pro-001 |
-| **Admin** | admin@cloudbreak.fr | pro | illimité | user-admin-001 |
+| Email | Plan | Accès | UUID Supabase |
+|-------|------|-------|-----------------|
+| **freemium@cloudbreak.app** | free | 1 check/jour | `ddce4acf-4588-4916-bb8e-8e47de082e7b` |
+| **pro@cloudbreak.app** | pro | illimité | `d19f15c6-ab8c-4eee-89a2-cc3c2342a3a5` |
+| **test@cloudbreak.app** | pro | illimité | `6f12c6e6-5478-4301-8494-83ab039c53aa` |
 
 ---
 
-## 🔐 Obtenir les JWTs Supabase
+## 🔐 Authentification — JWT Supabase réel
 
-### Option 1 : Via interface Supabase (recommandé)
+**Tous les appels API exigent un JWT Supabase valide** (en dev et en prod).
 
-```bash
-# 1. Aller à https://supabase.com → ton projet Cloudbreak
-# 2. Auth → Users
-# 3. Créer un user test ou en utiliser un existant
-# 4. Copy JWT token du user
-# 5. Coller dans REST Client
-```
-
-### Option 2 : Via Supabase CLI (pour dev local)
+### Récupérer les JWTs (REST Client)
 
 ```bash
-# Installer Supabase CLI
-brew install supabase/tap/supabase
+# Ouvrir le fichier de test d'auth
+code docs/user_plan.http
 
-# Se connecter
-supabase login
-
-# Générer un token pour un user
-supabase gen:token --email freemium@cloudbreak.fr --expires-in 3600
+# Exécuter les 3 requests pour récupérer les JWTs depuis Supabase
+# Les JWTs sont stockés dans les variables REST Client
 ```
 
-### Option 3 : Mock en dev (pour tests pytest)
+Les 3 requests font un POST à Supabase auth API avec les credentials (email + password).
 
-Dans les tests, utiliser les fixtures + mocks :
-```python
-@pytest.fixture
-def mock_jwt_validation(mocker):
-    """Mock la validation JWT pour ignorer les signatures."""
-    def fake_decode(token, jwks):
-        # Retourner un payload fake avec le user_id
-        return {"sub": "user-freemium-001", "email": "freemium@cloudbreak.fr"}
+### Utiliser les JWTs dans REST Client
 
-    mocker.patch("app.core.security.decode_supabase_jwt", side_effect=fake_decode)
+Les JWTs générés par `user_plan.http` sont disponibles dans les variables :
+- `jwtFreemium`
+- `jwtPro`
+- `jwtTest`
+
+Utiliser dans `docs/score_plan.http` :
+```http
+Authorization: Bearer {{jwtFreemium}}
+```
+
+### Tests pytest
+
+Les tests utilisent `app.dependency_overrides[get_current_user]` pour mocker l'authentification. Pas besoin de JWT réel.
+
+```bash
+pytest tests/features/test_quota_flow.py -v
 ```
 
 ---
@@ -86,17 +83,21 @@ VS Code → Extensions → "REST Client" by Huachao Mao
 code docs/score_plan.http
 ```
 
-### Modifier les JWTs
+### Utiliser le header de dev
 
-Dans le fichier, remplacer les `Authorization: Bearer dummy-token-*` par les **vrais JWTs Supabase** :
+Dans le fichier, utiliser le header `X-Dev-User-ID` avec l'UUID réel du user Supabase :
 
 ```http
-# Avant (fake)
-Authorization: Bearer dummy-token-for-freemium
+# ✅ Correct (en dev, avec SKIP_JWT_VALIDATION=true)
+X-Dev-User-ID: ddce4acf-4588-4916-bb8e-8e47de082e7b
 
-# Après (réel)
-Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImFiYzEyMyJ9.eyJzdWIiOiJ1c2VyLWZyZWVtaXVtLTAwMSIsImVtYWlsIjoiZnJlZW1pdW1AY2xvdWRicmVhay5mciIsImV4cCI6MTcxMzY0ODAwMH0.signature...
+# ❌ Pas besoin de Authorization header en dev
 ```
+
+**Les 3 UUIDs à utiliser :**
+- Freemium : `ddce4acf-4588-4916-bb8e-8e47de082e7b`
+- Pro : `d19f15c6-ab8c-4eee-89a2-cc3c2342a3a5`
+- Test : `6f12c6e6-5478-4301-8494-83ab039c53aa`
 
 ### Cliquer "Send Request"
 

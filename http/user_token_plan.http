@@ -1,0 +1,47 @@
+###
+# Cloudbreak User Auth — Récupérer les JWTs Supabase
+# Exécute les 3 requests et copie les access_token vers settings.json
+
+@supabaseUrl = https://yggehvcwxiqrkhsoxrxe.supabase.co
+@supabaseKey = sb_publishable_kvTa5gayV_CeR2V9W08_CQ_oU0yPhak
+@contentType = application/json
+@freemiumEmail = freemium@cloudbreak.app
+@proEmail = pro@cloudbreak.app
+@testEmail = test@cloudbreak.app
+@password = motdepasse123
+
+###
+# 1️⃣ Freemium user
+
+POST {{supabaseUrl}}/auth/v1/token?grant_type=password
+Content-Type: {{contentType}}
+apikey: {{supabaseKey}}
+
+{
+  "email": "{{freemiumEmail}}",
+  "password": "{{password}}"
+}
+
+###
+# 2️⃣ Pro user
+
+POST {{supabaseUrl}}/auth/v1/token?grant_type=password
+Content-Type: {{contentType}}
+apikey: {{supabaseKey}}
+
+{
+  "email": "{{proEmail}}",
+  "password": "{{password}}"
+}
+
+###
+# 3️⃣ Test user
+
+POST {{supabaseUrl}}/auth/v1/token?grant_type=password
+Content-Type: {{contentType}}
+apikey: {{supabaseKey}}
+
+{
+  "email": "{{testEmail}}",
+  "password": "{{password}}"
+}

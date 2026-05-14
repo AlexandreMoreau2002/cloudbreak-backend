@@ -1,0 +1,184 @@
+###
+# Cloudbreak — Plan de test HTTP
+# Score : quota freemium (1 check/jour)
+#
+# Prérequis :
+#   1. `cd backend && make dev`  (API + DB + Redis dans Docker)
+#   2. Tokens JWT dans .vscode/settings.json (rest-client.environmentVariables > local)
+#      freemiumEmail-jwt : token d'un compte free (pas de ligne dans subscriptions)
+#      premiumEmail-jwt  : token d'un compte premium (plan = "premium", expires_at > now)
+#      proEmail-jwt      : token d'un compte pro
+#   3. Sélectionner l'environnement "local" dans VS Code Rest Client (Ctrl+Alt+E)
+#
+# Reset quota entre les tests :
+#   docker exec cloudbreak-redis redis-cli FLUSHDB
+# ─────────────────────────────────────────────────────────────
+
+@baseUrl     = http://localhost:8000/api/v1
+@testDate    = 2026-04-01
+
+# UUIDs réels en DB (peak_id requis par /score)
+@peakVentoux  = 0728f7c7-a0c9-5fb0-b87d-d9edc8696840
+@peakPuyDome  = 42cd96c1-c2c0-5cd0-8534-3931e696790b
+@peakBlanc    = 95b3d052-884a-59f4-8509-5e4869f0b468
+@peakBastille = 90c1a7f5-5d75-5785-80c3-3230aa1cbfe0
+
+
+# ═══════════════════════════════════════════════════════════
+# BLOC 0 — Sanity checks (sans quota)
+# ═══════════════════════════════════════════════════════════
+
+### 0.1 — Health check (pas d'auth)
+# Attendu : 200 OK + {"status": "ok", "services": {"database": "ok", "redis": "ok"}}
+GET http://localhost:8000/health
+
+
+### 0.2 — Sans JWT → 403
+# Attendu : 403 Forbidden
+GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date={{testDate}}&hour=9
+
+
+### 0.3 — Token invalide → 401 ou 403
+# Attendu : 401 ou 403
+GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date={{testDate}}&hour=9
+Authorization: Bearer token.invalide.xxx
+
+
+### 0.4 — Peak inexistant → 404
+# Attendu : 404 + {"detail": "...", "code": "PEAK_NOT_FOUND"}
+GET {{baseUrl}}/score?peak_id=00000000-0000-0000-0000-000000000000&date={{testDate}}&hour=9
+Authorization: Bearer {{freemiumEmail-jwt}}
+
+
+### 0.5 — Date invalide → 422
+# Attendu : 422 Unprocessable Entity
+GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date=pas-une-date&hour=9
+Authorization: Bearer {{freemiumEmail-jwt}}
+
+
+# ═══════════════════════════════════════════════════════════
+# BLOC 1 — AC1 : Freemium, 1er appel → 200 OK
+# ⚠ Faire FLUSHDB avant ce bloc si tests relancés
+# ═══════════════════════════════════════════════════════════
+
+### 1.1 — Freemium, 1er appel → 200 OK + score
+# Attendu :
+#   - status 200
+#   - body : { "score": <0-100>, "verdict": "none"|"low"|"medium"|"high", ... }
+#   - Redis : clé quota:{user_id}:{date} = 1
+GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date={{testDate}}&hour=9
+Authorization: Bearer {{freemiumEmail-jwt}}
+
+
+# ═══════════════════════════════════════════════════════════
+# BLOC 1b — AC1 bis : même sommet, heure différente → toujours 200 (sommet déjà déverrouillé)
+# ⚠ Exécuter APRÈS 1.1 (même user, même peak, même jour)
+# ═══════════════════════════════════════════════════════════
+
+### 1.2 — Freemium, même sommet heure différente → 200 (pas de quota consommé)
+# Attendu :
+#   - status 200 (le sommet est déjà dans le SET — toutes ses heures passent librement)
+#   - pas de 429
+GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date={{testDate}}&hour=12
+Authorization: Bearer {{freemiumEmail-jwt}}
+
+
+# ═══════════════════════════════════════════════════════════
+# BLOC 2 — AC2 : Freemium, sommet différent → 429 QUOTA_EXCEEDED
+# ⚠ Exécuter APRÈS 1.1 (même user, même jour, sommet DIFFÉRENT)
+# ═══════════════════════════════════════════════════════════
+
+### 2.1 — Freemium, sommet différent → 429
+# Attendu :
+#   - status 429
+#   - body : {"detail": "Quota journalier atteint", "code": "QUOTA_EXCEEDED"}
+#   (peakPuyDome ≠ peakVentoux → nouveau sommet, quota SET plein)
+GET {{baseUrl}}/score?peak_id={{peakPuyDome}}&date={{testDate}}&hour=9
+Authorization: Bearer {{freemiumEmail-jwt}}
+
+
+### 2.2 — Freemium, encore un autre sommet → toujours 429
+# Attendu : status 429 (SET toujours plein)
+GET {{baseUrl}}/score?peak_id={{peakBlanc}}&date={{testDate}}&hour=15
+Authorization: Bearer {{freemiumEmail-jwt}}
+
+
+# ═══════════════════════════════════════════════════════════
+# BLOC 3 — AC3 : Pro bypass quota (appels illimités)
+# ═══════════════════════════════════════════════════════════
+
+### 3.1 — Pro, 1er appel → 200 OK
+GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date={{testDate}}&hour=9
+Authorization: Bearer {{proEmail-jwt}}
+
+
+### 3.2 — Pro, 2e appel → 200 OK (pas de 429)
+GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date={{testDate}}&hour=12
+Authorization: Bearer {{proEmail-jwt}}
+
+
+### 3.3 — Pro, 3e appel (sommet différent) → 200 OK
+GET {{baseUrl}}/score?peak_id={{peakBlanc}}&date={{testDate}}&hour=15
+Authorization: Bearer {{proEmail-jwt}}
+
+
+# ═══════════════════════════════════════════════════════════
+# BLOC 4 — AC4 : Reset quota le lendemain (TTL Redis)
+# ⚠ Nécessite d'avoir déclenché AC2 (quota épuisé)
+# ═══════════════════════════════════════════════════════════
+
+### 4.1 — Freemium, appel le lendemain → 200 OK (quota reset)
+GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date=2026-04-02&hour=9
+Authorization: Bearer {{freemiumEmail-jwt}}
+
+
+# ═══════════════════════════════════════════════════════════
+# BLOC 5 — Vérification Redis (debug)
+# Commandes à lancer dans le container Redis :
+#
+# Le quota est stocké dans un SET Redis (pas un compteur entier).
+# Chaque membre du SET est un peak_id déverrouillé pour la journée.
+#
+#   docker exec cloudbreak-redis redis-cli KEYS "quota:*"
+#   docker exec cloudbreak-redis redis-cli SMEMBERS "quota:{user_id}:2026-04-01"
+#   docker exec cloudbreak-redis redis-cli SCARD "quota:{user_id}:2026-04-01"
+#   docker exec cloudbreak-redis redis-cli TTL "quota:{user_id}:2026-04-01"
+#   docker exec cloudbreak-redis redis-cli FLUSHDB   # reset complet
+# ═══════════════════════════════════════════════════════════
+
+
+# ═══════════════════════════════════════════════════════════
+# BLOC 6 — Endpoints annexes (smoke tests)
+# ═══════════════════════════════════════════════════════════
+
+### 6.1 — Recherche de sommets (par slug — pas UUID)
+# Attendu : 200 + liste de peaks
+GET {{baseUrl}}/peaks/search?q=mont
+Authorization: Bearer {{freemiumEmail-jwt}}
+
+
+### 6.2 — Détail d'un sommet (par slug)
+# Attendu : 200 + peak object
+GET {{baseUrl}}/peaks/mont-ventoux
+Authorization: Bearer {{freemiumEmail-jwt}}
+
+
+### 6.3 — Favoris : liste
+# Attendu : 200 + []  (ou liste si déjà des favoris)
+GET {{baseUrl}}/user/favorites
+Authorization: Bearer {{freemiumEmail-jwt}}
+
+
+### 6.4 — Favoris : ajout (par slug)
+# Attendu : 201 ou 200
+POST {{baseUrl}}/user/favorites
+Authorization: Bearer {{freemiumEmail-jwt}}
+Content-Type: application/json
+
+{"peak_id": "mont-ventoux"}
+
+
+### 6.5 — Favoris : suppression (par slug)
+# Attendu : 204 No Content
+DELETE {{baseUrl}}/user/favorites/mont-ventoux
+Authorization: Bearer {{freemiumEmail-jwt}}

@@ -13,6 +13,7 @@ Pour tester uniquement la logique de l'endpoint lui-même.
 
 import pytest
 from app.main import app
+from app.core.dependencies import get_redis
 from httpx import AsyncClient, ASGITransport
 from unittest.mock import AsyncMock, patch, MagicMock
 from app.domain.weather_types import PressureLevelData, WeatherData
@@ -62,8 +63,25 @@ MOCK_WEATHER = WeatherData(
 def auth_override():
     from app.core.dependencies import get_current_user
 
+    # Mock Redis (quota check)
+    mock_redis = AsyncMock()
+    mock_redis.get.return_value = None  # No quota exceeded
+    mock_redis.incr.return_value = 1
+
+    async def mock_get_redis_impl():
+        return mock_redis
+
     app.dependency_overrides[get_current_user] = lambda: MOCK_USER
-    yield
+    app.dependency_overrides[get_redis] = mock_get_redis_impl
+
+    # Patch get_user_subscription au niveau module (appel direct, pas Depends)
+    with patch(
+        "app.core.dependencies.get_user_subscription",
+        new_callable=AsyncMock,
+        return_value=None,
+    ):
+        yield
+
     app.dependency_overrides.clear()
 
 

@@ -1,4 +1,9 @@
 # Auth - signup + token
+#
+#
+# testEmail
+# freemiumEmail
+# proEmail
 
 ###
 # Creer un compte
@@ -7,8 +12,8 @@ Content-Type: application/json
 apikey: {{supabaseKey}}
 
 {
-  "email": "test@cloudbreak.app",
-  "password": "motdepasse123"
+  "email": "{{testEmail}}",
+  "password": "{{password}}"
 }
 
 ###
@@ -18,6 +23,6 @@ Content-Type: application/json
 apikey: {{supabaseKey}}
 
 {
-  "email": "test@cloudbreak.app",
-  "password": "motdepasse123"
+  "email": "{{testEmail}}",
+  "password": "{{password}}"
 }

@@ -106,9 +106,10 @@ pip-audit  # à installer : pip install pip-audit
 - `DELETE /api/v1/user/favorites/{peak_id}` — auth JWT requise, isolation par user_id JWT
 - `GET /api/v1/user/favorites` — auth JWT requise, isolation par user_id JWT
 
+- `GET /api/v1/score` — auth JWT requise + quota Redis (check_quota dependency), `peak_id`/`date`/`hour` validés par Pydantic/Query
+
 ### Ce qui n'existe pas encore
-- Pas de rate limiting (à implémenter epic 3 ou avant prod)
-- Pas de quota enforcement (epic 4)
+- Pas de rate limiting (à implémenter avant prod)
 - Pas de limite sur le nombre de favoris par utilisateur (à prévoir avant prod)
 
 ---
@@ -147,6 +148,33 @@ pip-audit  # à installer : pip install pip-audit
 - **[index.tsx:59-62]** Messages d'erreur filtres via cle i18n avant affichage (`home.serviceUnavailable` / `home.errorGeneric`) — le message brut de l'API n'est jamais rendu dans l'UI sur cet ecran.
 - **[ScoreCard.tsx]** Composant purement presentationnel — affiche uniquement `peak_name`, `peak_altitude`, `score`, `verdict` (donnees non-sensibles). Aucune logique auth, aucun acces token.
 - **[api/score.ts:23]** `peak_id` passe comme query param valide par le backend via SQLAlchemy ORM — pas d'injection possible.
+
+---
+
+---
+
+## 2026-05-15 Story 4-1 — Quota freemium backend (Redis QuotaService)
+
+### WARNING
+
+- **[dependencies.py:122]** `peak_id` lu depuis `request.query_params.get("peak_id", "")` sans validation de longueur ni de format. La chaîne vide est rejetée par le `if not peak_id` immédiatement après, mais une valeur arbitrairement longue (ex: 10 000 caractères) ou contenant des caractères spéciaux (`\n`, `:`, espaces) passe et est insérée comme membre dans le SET Redis, polluant la clé `quota:{user_id}:{date}`. Le `peak_id` vient ensuite de la DB via le routeur FastAPI sur l'endpoint score (validé ORM), mais `check_quota` est une dependency générique qui n'a pas ce contexte. Recommandation : ajouter `max_length=255` et optionnellement un pattern `^[a-zA-Z0-9_-]+$` sur `peak_id` dans la dependency avant l'appel `check_and_increment`.
+- **[health.py]** L'endpoint `GET /health` est public (pas d'auth). Il expose l'état de Redis et PostgreSQL (`"ok"` / `"unavailable"`). En prod derrière Caddy, cet endpoint est accessible depuis Internet — un attaquant peut déduire si la DB ou Redis est en panne pour optimiser une tentative d'attaque. Recommandation : soit restreindre par IP dans Caddy (allow interne uniquement), soit ne retourner que `{"status": "ok"|"degraded"}` sans détailler quel service est indisponible.
+- **[seed_test_users.py]** Trois UUIDs Supabase réels sont hardcodés dans `app/db/seed_test_users.py` (lignes 31, 37, 43) avec leurs emails associés (`freemium@cloudbreak.app`, `pro@cloudbreak.app`, `test@cloudbreak.app`). Ces UUIDs correspondent à des comptes Supabase existants sur l'environnement de dev. Ils sont commités dans le repo. Si le repo devient public ou si un tiers accède au code, ces comptes sont identifiés. Recommandation : déplacer ces valeurs dans une variable d'environnement `TEST_USER_IDS` ou un fichier `.env.test` non commité ; utiliser des UUIDs fictifs dans le code.
+
+### INFO
+
+- **[dependencies.py:106-109]** Vérification expiry subscription correcte : la condition `subscription.expires_at is not None` précède `subscription.expires_at > datetime.now(...)` dans une chaîne `and` — Python court-circuite, pas de risque d'`AttributeError` sur `None.tzinfo`. Logique correcte.
+- **[quota.py:82-87]** `sadd` et `expire` exécutés via `async with self._redis.pipeline() as pipe` suivi de `await pipe.execute()` — atomicité garantie par le pipeline Redis. Pas de race condition TTL.
+- **[main.py:35]** L'exception handler `OperationalError` logue `type(exc).__name__` (non `str(exc)`) — le `DATABASE_URL` ne peut pas fuiter dans les logs via cette voie. Correct.
+- **[dependencies.py:121]** Date calculée via `datetime.now(UTC).strftime(...)` — `UTC` importé de `datetime` Python 3.11+, pas de `datetime.utcnow()` déprécié. Correct.
+- **[quota.py]** Clés Redis correctement préfixées `quota:{user_id}:{date}` — aucune collision possible avec `weather:*` ou `cache:*`. Schéma conforme aux conventions Cloudbreak.
+- **[quota.py]** TTL calculé jusqu'à minuit UTC via pipeline Redis — reset automatique correct, pas de fuite mémoire.
+- **[dependencies.py]** `user_id` extrait exclusivement du JWT validé (`payload.get("sub")`) — jamais passé en paramètre client sur l'endpoint score. Isolation correcte.
+- **[dependencies.py]** `get_user_subscription` utilise `select(Subscription).where(Subscription.user_id == user_id)` — requête SQLAlchemy paramétrée, aucun SQL brut, pas d'injection possible.
+- **[main.py]** Exception handler `OperationalError` retourne `{"detail": "Base de données indisponible", "code": "DATABASE_UNAVAILABLE"}` — aucune stack trace, aucun message interne exposé au client.
+- **[tests/helpers.py]** `encode_test_jwt` avec `dev-secret-key` hardcodé est isolé dans `tests/helpers.py` — absent de `app/core/security.py`. Aucun endpoint de production ne peut l'importer. Pattern correct.
+- **[quota.py:78]** Message de `QuotaExceededException` contient `user_id` et `date`. Ce message est catchéd dans `dependencies.py` et ne remonte pas au client. Sans risque dans l'état actuel — surveiller si le catch est retiré.
+- **[score.py]** Deux instances Redis indépendantes : `get_redis` singleton dans `dependencies.py` et `_redis` module-level dans `score.py`. Pas de risque de sécurité mais doublon de connexions Redis en prod — à consolider via `get_redis` dans une prochaine story.
 
 ---
 

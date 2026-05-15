@@ -1,8 +1,6 @@
 import json
-
 from jose import JWTError, jwt
 from jose.backends import ECKey
-
 from app.core.errors import ErrorCode
 
 

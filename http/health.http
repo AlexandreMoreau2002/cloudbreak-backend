@@ -1,3 +1,26 @@
-# Health check
+###
+# Health check — vérifie que l'API, la DB et Redis répondent
+#
+# Attendu (tous services OK) :
+#   HTTP/1.1 200 OK
+#   {
+#     "status": "ok",
+#     "services": {
+#       "database": "ok",
+#       "redis": "ok"
+#     }
+#   }
+#
+# Attendu (un service KO) :
+#   HTTP/1.1 200 OK
+#   {
+#     "status": "degraded",
+#     "services": {
+#       "database": "ok",
+#       "redis": "unavailable"
+#     }
+#   }
+#
+# Pas d'auth requise.
 
-GET {{baseUrl}}/health
+GET http://localhost:8000/health

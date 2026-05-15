@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     posthog_api_key: str = ""
     expo_access_token: str = ""
     environment: str = "development"
+    app_version: str = "1.0.0"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

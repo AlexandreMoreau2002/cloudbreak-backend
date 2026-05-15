@@ -1,10 +1,9 @@
 import json
 import time
-
 import pytest
 from jose import jwt
 from jose.backends import ECKey
-
+from tests.helpers import encode_test_jwt
 from app.core.security import decode_supabase_jwt
 
 # Paire de clés ECC P-256 éphémère — tests uniquement
@@ -51,3 +50,17 @@ def test_decode_expired_token() -> None:
     token = _make_token(payload)
     with pytest.raises(ValueError):
         decode_supabase_jwt(token, json.dumps(TEST_PUBLIC_JWK))
+
+
+def test_encode_test_jwt_signs_payload_with_dev_secret() -> None:
+    payload = {"sub": "user-123", "email": "test@cloudbreak.app", "exp": int(time.time()) + 3600}
+
+    token = encode_test_jwt(payload)
+    decoded = jwt.decode(
+        token,
+        "dev-secret-key-very-insecure-do-not-use-in-prod",
+        algorithms=["HS256"],
+    )
+
+    assert decoded["sub"] == "user-123"
+    assert decoded["email"] == "test@cloudbreak.app"

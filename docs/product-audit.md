@@ -1,6 +1,6 @@
 # Cloudbreak — Audit produit
 
-_Dernière mise à jour : 2026-03-28_
+_Dernière mise à jour : 2026-05-14_
 
 ---
 
@@ -38,10 +38,13 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 
 | Recherche sommets (`GET /api/v1/peaks/search` + `GET /api/v1/peaks/{slug}`) | ✅ ILIKE, limit 20 |
 | Favoris (`POST/DELETE/GET /api/v1/user/favorites`) | ✅ Avec peak info jointe |
+| Quota freemium Redis — 1 sommet unique/jour, bypass Premium/Pro, reset minuit UTC | ✅ Story 4.1 |
+| `make seed-test` / `make unseed-test` — users de test Supabase (freemium, pro) | ✅ Story 4.1 |
+| `make clean-subscriptions` / `make reset-db` — maintenance DB dev | ✅ Story 4.1 |
 
 ### Ce qui n'existe pas encore
 
-- Gestion des abonnements / freemium / quota Redis
+- Gestion des abonnements StoreKit 2 (vérification reçus, table `subscriptions`) — story 4.3
 - Endpoint validations terrain (`POST /api/v1/validations`)
 - Notifications push
 - Déploiement VPS (infra prod)

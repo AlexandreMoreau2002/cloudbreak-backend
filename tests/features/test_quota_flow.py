@@ -12,6 +12,7 @@ Cas testés:
 
 import pytest
 from app.main import app
+from datetime import UTC
 from contextlib import asynccontextmanager
 from app.core.dependencies import get_redis
 from httpx import AsyncClient, ASGITransport
@@ -232,7 +233,7 @@ async def test_quota_premium_user_unlimited_calls(auth_premium: object) -> None:
     # Mock subscription avec plan "premium" et expiry future
     mock_subscription = MagicMock()
     mock_subscription.plan = "premium"
-    mock_subscription.expires_at = datetime(2099, 1, 1)  # Loin dans le futur
+    mock_subscription.expires_at = datetime(2099, 1, 1, tzinfo=UTC)  # Loin dans le futur
 
     # Patch get_user_subscription au niveau du module dependencies
     patch_subscription = patch(
@@ -297,7 +298,7 @@ async def test_quota_pro_user_unlimited_calls(auth_pro: object) -> None:
     # Mock subscription avec plan "pro" et expiry future
     mock_subscription = MagicMock()
     mock_subscription.plan = "pro"
-    mock_subscription.expires_at = datetime(2099, 1, 1)  # Loin dans le futur
+    mock_subscription.expires_at = datetime(2099, 1, 1, tzinfo=UTC)  # Loin dans le futur
 
     # Patch get_user_subscription au niveau du module dependencies
     patch_subscription = patch(
@@ -352,7 +353,7 @@ async def test_quota_expired_subscription_falls_back_to_freemium(
     # Mock subscription expiré
     mock_subscription = MagicMock()
     mock_subscription.plan = "premium"
-    mock_subscription.expires_at = datetime(2026, 1, 1)  # Déjà expiré
+    mock_subscription.expires_at = datetime(2026, 1, 1, tzinfo=UTC)  # Déjà expiré
 
     patch_subscription = patch(
         "app.core.dependencies.get_user_subscription",
@@ -360,30 +361,48 @@ async def test_quota_expired_subscription_falls_back_to_freemium(
         return_value=mock_subscription,
     )
 
-    mock_redis = _make_mock_redis()
-    mock_redis.sismember.return_value = False
-    mock_redis.scard.return_value = 0
+    # 1er appel : quota libre (scard=0)
+    mock_redis_first = _make_mock_redis()
+    mock_redis_first.sismember.return_value = False
+    mock_redis_first.scard.return_value = 0
 
-    async def mock_get_redis_impl() -> AsyncMock:
-        return mock_redis
+    # 2ème appel : quota atteint (scard=1 = limite)
+    mock_redis_second = _make_mock_redis()
+    mock_redis_second.sismember.return_value = False
+    mock_redis_second.scard.return_value = 1
 
-    app.dependency_overrides[get_redis] = mock_get_redis_impl
+    call_count = 0
+
+    async def mock_get_redis_stateful() -> AsyncMock:
+        nonlocal call_count
+        call_count += 1
+        return mock_redis_first if call_count == 1 else mock_redis_second
+
+    app.dependency_overrides[get_redis] = mock_get_redis_stateful
 
     try:
         with patch_peak, patch_weather, patch_subscription:
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://test"
             ) as client:
-                response = await client.get(
+                # 1er appel → 200 OK (quota pas encore atteint)
+                response_first = await client.get(
                     "/api/v1/score",
                     params={"peak_id": "peak-1", "date": "2026-04-01", "hour": 7},
+                )
+                # 2ème appel → 429 (quota freemium épuisé)
+                response_second = await client.get(
+                    "/api/v1/score",
+                    params={"peak_id": "peak-1", "date": "2026-04-01", "hour": 8},
                 )
     finally:
         if get_redis in app.dependency_overrides:
             del app.dependency_overrides[get_redis]
 
     # Avec abonnement expiré → freemium quota s'applique
-    assert response.status_code == 200
+    assert response_first.status_code == 200
+    assert response_second.status_code == 429
+    assert response_second.json()["detail"]["code"] == "QUOTA_EXCEEDED"
 
 
 @pytest.mark.asyncio

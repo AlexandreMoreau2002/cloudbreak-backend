@@ -106,7 +106,7 @@ async def check_quota(
         subscription
         and subscription.plan in ("premium", "pro")
         and subscription.expires_at is not None
-        and subscription.expires_at > datetime.now(subscription.expires_at.tzinfo)
+        and subscription.expires_at > datetime.now(UTC)
     ):
         logger.debug(
             "quota_bypassed",
@@ -131,13 +131,6 @@ async def check_quota(
     try:
         await quota_service.check_and_increment(user_id, today, peak_id)
     except QuotaExceededException:
-        logger.warning(
-            "quota_exceeded",
-            extra={
-                "user_id": user_id,
-                "date": today,
-            },
-        )
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail={

@@ -43,6 +43,28 @@ def test_delete_user_sans_auth_retourne_403() -> None:
         response = client.delete("/api/v1/user/")
 
     assert response.status_code == 403
+    assert response.json() == {"detail": "Not authenticated"}
+
+
+@patch("app.api.v1.endpoints.user.delete_supabase_user", new_callable=AsyncMock)
+@patch("app.api.v1.endpoints.user.delete_user_data", new_callable=AsyncMock)
+def test_delete_user_supabase_erreur_retourne_500(
+    mock_delete_data: AsyncMock, mock_delete_supabase: AsyncMock
+) -> None:
+    from fastapi import HTTPException
+
+    mock_delete_supabase.side_effect = HTTPException(
+        status_code=500,
+        detail={"detail": "Erreur suppression compte", "code": "INTERNAL_ERROR"},
+    )
+    app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+    try:
+        with TestClient(app) as client:
+            response = client.delete("/api/v1/user/")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 500
 
 
 @patch("app.api.v1.endpoints.user.delete_supabase_user", new_callable=AsyncMock)

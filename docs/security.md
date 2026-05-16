@@ -178,6 +178,52 @@ pip-audit  # à installer : pip install pip-audit
 
 ---
 
+## 2026-05-16 Story 2-4 — Suppression compte et données personnelles (RGPD)
+
+### INFO
+
+- **[security.py]** `delete_supabase_user()` utilise la clé `service_role_key` uniquement côté backend — jamais exposée dans les réponses API ni dans les logs
+- **[security.py]** Appel Supabase Admin API via `httpx.AsyncClient` — connexion HTTPS, pas de persistance du client (nouvelle connexion par appel). Acceptable en MVP.
+- **[user.py]** Suppression DB ordonnée : `user_favorites` puis `subscriptions` avant suppression du compte Supabase — évite un état où le compte Supabase est supprimé mais les données locales persistent
+- **[endpoints/user.py]** `user_id` extrait exclusivement du JWT validé (`current_user["id"]`) — jamais passé en paramètre client. Isolation correcte.
+- **[endpoints/user.py]** Route protégée par `get_current_user` (HTTPBearer) — retourne 403 sans header `Authorization`
+
+### WARNING
+
+- **[security.py]** `delete_supabase_user()` ne logue pas le statut Supabase en cas de succès (200 ou 204) — si Supabase renvoie 200 avec un body d'erreur non standard, l'erreur est silencieuse. Recommandation : logger le status code en DEBUG même en cas de succès.
+- **[config.py]** `supabase_service_role_key: str = ""` — valeur par défaut vide string. En dev sans cette variable, l'appel Supabase échouera avec 401 mais retournera une `HTTPException(500)` opaque. Recommandation : valider que la clé est non-vide au démarrage (validator Pydantic) en environment `production`.
+- **[endpoints/user.py]** Pas de vérification que l'utilisateur a bien un abonnement ou des données avant suppression — un utilisateur peut appeler l'endpoint plusieurs fois sans effet de bord (idempotent), ce qui est correct, mais chaque appel déclenche une tentative de suppression Supabase potentiellement inutile après la première.
+
+### Secrets ajoutés
+
+| Secret | Fichier | Exposé client | Rotation |
+|--------|---------|---------------|---------|
+| `SUPABASE_SERVICE_ROLE_KEY` | `.env` backend + `docker-compose.dev.yml` | Jamais | Si leak détecté |
+
+---
+
+## 2026-05-16 Story 2-4 — Suppression compte et données personnelles RGPD
+
+### WARNING
+
+- **[security.py:45-46]** `httpx.AsyncClient().delete()` appelé sans timeout explicite. Si l'API Admin Supabase est lente ou bloque, la coroutine FastAPI peut rester suspendue indéfiniment, épuisant le pool de workers Gunicorn. Recommandation : `httpx.AsyncClient(timeout=10.0)` — 10s est largement suffisant pour un appel Admin Supabase, et la gestion du `TimeoutException` doit lever une `HTTPException(503)` ou `500` avec le code `INTERNAL_ERROR` existant.
+- **[security.py:47]** En cas d'échec Supabase (`response.status_code not in (200, 204)`), les données DB ont déjà été supprimées (`delete_user_data` est appelé en premier dans `user.py:31`). L'utilisateur se retrouve dans un état incohérent : données locales effacées, compte Supabase toujours actif. Le JWT reste valide jusqu'à expiration, permettant des appels API sans données associées. Recommandation : soit inverser l'ordre (supprimer Supabase en premier, puis DB sur succès), soit implémenter un soft-delete DB avec nettoyage asynchrone en cas d'échec Supabase.
+- **[config.py:15]** `supabase_service_role_key: str = ""` — valeur par défaut vide sans validation au démarrage. Si la variable est absente du `.env`, la clé sera une chaîne vide ; `delete_supabase_user` appellera l'API Admin avec `Authorization: Bearer ` vide, recevra un 401 Supabase, et retournera une `HTTPException(500)`. L'app démarre sans avertissement malgré une clé critique manquante. Recommandation : valider au startup (`lifespan`) que `settings.supabase_service_role_key` est non-vide, sinon logger un `CRITICAL` et refuser les requêtes de suppression.
+- **[.env.example]** `SUPABASE_SERVICE_ROLE_KEY` absent du fichier `.env.example`. Un développeur qui clone le repo ne saura pas que cette variable est requise pour `DELETE /api/v1/user`. Recommandation : ajouter `SUPABASE_SERVICE_ROLE_KEY=` au `.env.example` avec un commentaire `# Service role — jamais exposé côté client`.
+
+### INFO
+
+- **[user.py:30]** `user_id = str(current_user["id"])` — `current_user` est le retour direct de `get_current_user` qui extrait `sub` du JWT validé localement. Aucune possibilité d'IDOR : un utilisateur authentifié ne peut supprimer que son propre compte. Isolation correcte.
+- **[security.py:40]** URL Admin Supabase construite avec `f"{supabase_url}/auth/v1/admin/users/{user_id}"` — `user_id` est le `sub` extrait du JWT validé, pas un paramètre client. Pas de path traversal possible.
+- **[security.py:41-44]** `service_role_key` utilisé uniquement dans les headers HTTP côté serveur — jamais sérialisé dans les logs, jamais retourné dans une réponse. Aucune fuite côté client.
+- **[user.py:33]** `logger.info("user_deleted", extra={"user_id": user_id})` — seul l'UUID (non sensible en soi) est loggé. Pas d'email, pas de token, pas de données personnelles dans ce log.
+- **[AuthContext.tsx:79-80]** Après suppression backend réussie, `supabase.auth.signOut()` est appelé côté mobile pour invalider la session locale, puis `AsyncStorage.clear()` efface l'intégralité du stockage AsyncStorage. Scope correct : AsyncStorage est isolé par app sur iOS, donc l'effacement est complet pour Cloudbreak. Aucune donnée résiduelle dans le cache local.
+- **[DeleteAccountModal.tsx:19]** Vérification email côté client uniquement (`emailInput.trim() === userEmail`) — cette vérification est une UX de protection contre la suppression accidentelle, pas un contrôle de sécurité. L'autorisation réelle est assurée par le JWT côté backend. C'est l'architecture correcte : le client peut contourner ce check (jailbreak), mais cela n'aboutit qu'à supprimer son propre compte, ce qui est l'opération demandée.
+- **[user.py:23-24]** Suppressions via `delete(Favorite).where(...)` et `delete(Subscription).where(...)` — SQLAlchemy paramétré, aucun SQL brut, pas d'injection. `user_id` provient du JWT, pas d'un paramètre de requête.
+- **[user.py:16-18]** Le commentaire documente explicitement que `predictions`, `terrain_validations` et `events` sont ignorées silencieusement car les tables n'existent pas encore. À revoir avant release 1.0.0 pour garantir la complétude RGPD lorsque ces tables seront créées.
+
+---
+
 ## Checklist avant mise en prod
 
 - [ ] Variables `.env` renseignées sur le VPS (jamais en clair dans le code)

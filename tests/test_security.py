@@ -1,10 +1,16 @@
 import json
 import time
+from typing import Any
+from unittest.mock import AsyncMock
+
+import httpx
 import pytest
 from jose import jwt
 from jose.backends import ECKey
+from fastapi import HTTPException
+from app.core.errors import ErrorCode
 from tests.helpers import encode_test_jwt
-from app.core.security import decode_supabase_jwt
+from app.core.security import decode_supabase_jwt, delete_supabase_user
 
 # Paire de clés ECC P-256 éphémère — tests uniquement
 TEST_PRIVATE_JWK = {
@@ -64,3 +70,88 @@ def test_encode_test_jwt_signs_payload_with_dev_secret() -> None:
 
     assert decoded["sub"] == "user-123"
     assert decoded["email"] == "test@cloudbreak.app"
+
+
+class _FakeResponse:
+    def __init__(self, status_code: int) -> None:
+        self.status_code = status_code
+
+
+def _install_async_client(monkeypatch: pytest.MonkeyPatch, delete_mock: AsyncMock) -> None:
+    class _FakeAsyncClient:
+        def __init__(self, timeout: float) -> None:
+            self.timeout = timeout
+
+        async def __aenter__(self) -> "_FakeAsyncClient":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def delete(self, *args: Any, **kwargs: Any) -> _FakeResponse:
+            return await delete_mock(*args, **kwargs)
+
+    monkeypatch.setattr("app.core.security.httpx.AsyncClient", _FakeAsyncClient)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status_code", [200, 204])
+async def test_delete_supabase_user_accepts_success_statuses(
+    monkeypatch: pytest.MonkeyPatch, status_code: int
+) -> None:
+    delete_mock = AsyncMock(return_value=_FakeResponse(status_code))
+    _install_async_client(monkeypatch, delete_mock)
+
+    await delete_supabase_user(
+        user_id="user-123",
+        supabase_url="https://supabase.test",
+        service_role_key="service-role",
+    )
+
+    delete_mock.assert_awaited_once_with(
+        "https://supabase.test/auth/v1/admin/users/user-123",
+        headers={
+            "apikey": "service-role",
+            "Authorization": "Bearer service-role",
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_delete_supabase_user_timeout_returns_503(monkeypatch: pytest.MonkeyPatch) -> None:
+    delete_mock = AsyncMock(side_effect=httpx.TimeoutException("slow"))
+    _install_async_client(monkeypatch, delete_mock)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await delete_supabase_user(
+            user_id="user-123",
+            supabase_url="https://supabase.test",
+            service_role_key="service-role",
+        )
+
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail == {
+        "detail": "Timeout suppression compte Supabase",
+        "code": ErrorCode.SERVICE_UNAVAILABLE,
+    }
+
+
+@pytest.mark.asyncio
+async def test_delete_supabase_user_error_status_returns_500(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    delete_mock = AsyncMock(return_value=_FakeResponse(500))
+    _install_async_client(monkeypatch, delete_mock)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await delete_supabase_user(
+            user_id="user-123",
+            supabase_url="https://supabase.test",
+            service_role_key="service-role",
+        )
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == {
+        "detail": "Erreur suppression compte",
+        "code": ErrorCode.INTERNAL_ERROR,
+    }

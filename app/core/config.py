@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     supabase_db_password: str = ""
     posthog_api_key: str = ""
     expo_access_token: str = ""
+    supabase_service_role_key: str = ""
     environment: str = "development"
     app_version: str = "1.0.0"
 

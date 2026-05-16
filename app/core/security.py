@@ -1,6 +1,8 @@
 import json
+import httpx
 from jose import JWTError, jwt
 from jose.backends import ECKey
+from fastapi import HTTPException
 from app.core.errors import ErrorCode
 
 
@@ -20,3 +22,37 @@ def decode_supabase_jwt(token: str, jwks_json: str) -> dict[str, object]:
         return payload
     except JWTError as e:
         raise ValueError(f"{ErrorCode.INVALID_TOKEN}: {e}") from e
+
+
+async def delete_supabase_user(user_id: str, supabase_url: str, service_role_key: str) -> None:
+    """Supprime un utilisateur via l'API Admin Supabase.
+
+    Args:
+        user_id: UUID utilisateur Supabase
+        supabase_url: URL du projet Supabase
+        service_role_key: Clé service role (jamais exposée côté client)
+
+    Raises:
+        HTTPException(500) si la suppression échoue côté Supabase
+    """
+    url = f"{supabase_url}/auth/v1/admin/users/{user_id}"
+    headers = {
+        "apikey": service_role_key,
+        "Authorization": f"Bearer {service_role_key}",
+    }
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.delete(url, headers=headers)
+        except httpx.TimeoutException as exc:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "detail": "Timeout suppression compte Supabase",
+                    "code": ErrorCode.SERVICE_UNAVAILABLE,
+                },
+            ) from exc
+    if response.status_code not in (200, 204):
+        raise HTTPException(
+            status_code=500,
+            detail={"detail": "Erreur suppression compte", "code": ErrorCode.INTERNAL_ERROR},
+        )

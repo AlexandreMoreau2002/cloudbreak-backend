@@ -41,6 +41,7 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 | Quota freemium Redis — 1 sommet unique/jour, bypass Premium/Pro, reset minuit UTC | ✅ Story 4.1 |
 | `make seed-test` / `make unseed-test` — users de test Supabase (freemium, pro) | ✅ Story 4.1 |
 | `make clean-subscriptions` / `make reset-db` — maintenance DB dev | ✅ Story 4.1 |
+| Suppression compte RGPD (`DELETE /api/v1/user/`) — suppression DB + Supabase Auth → 204 | ✅ Story 2.4 |
 
 ### Ce qui n'existe pas encore
 

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Politique de confidentialité — Cloudbreak</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 32px 20px 64px;
+    color: #1A1A1A;
+    background: #F7F5F1;
+    line-height: 1.6;
+  }
+  h1 {
+    font-size: 26px;
+    margin-bottom: 4px;
+  }
+  .updated {
+    color: #5E5E5E;
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+  h2 {
+    font-size: 19px;
+    margin-top: 32px;
+    border-bottom: 1px solid #E9E4DA;
+    padding-bottom: 6px;
+  }
+  p, li {
+    color: #1A1A1A;
+    font-size: 15px;
+  }
+  ul {
+    padding-left: 20px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    font-size: 14px;
+  }
+  th, td {
+    text-align: left;
+    padding: 8px 10px;
+    border: 1px solid #E9E4DA;
+  }
+  th {
+    background: #EFE8DC;
+  }
+  a {
+    color: #B28C6E;
+  }
+  .contact {
+    margin-top: 40px;
+    padding: 16px;
+    background: #EFE8DC;
+    border-radius: 8px;
+  }
+</style>
+</head>
+<body>
+  <h1>Politique de confidentialité</h1>
+  <p class="updated">Application Cloudbreak — dernière mise à jour : 12 juillet 2026</p>
+
+  <p>
+    Cloudbreak ("l'Application", "nous") accorde une grande importance à la protection de vos données
+    personnelles. Cette politique de confidentialité décrit quelles données nous collectons, pourquoi,
+    et comment vous pouvez exercer vos droits.
+  </p>
+
+  <h2>1. Données collectées</h2>
+  <table>
+    <tr><th>Donnée</th><th>Finalité</th><th>Obligatoire</th></tr>
+    <tr><td>Adresse email</td><td>Création de compte et authentification</td><td>Oui</td></tr>
+    <tr><td>Identifiant utilisateur</td><td>Fonctionnement de l'application (favoris, historique)</td><td>Oui</td></tr>
+    <tr><td>Localisation (GPS)</td><td>Suggestion de sommets à proximité</td><td>Non — activation optionnelle</td></tr>
+    <tr><td>Données d'usage (logs d'utilisation)</td><td>Analytics et amélioration du produit (PostHog)</td><td>Non</td></tr>
+  </table>
+
+  <h2>2. Prestataires et SDK tiers</h2>
+  <p>Nous faisons appel aux prestataires suivants pour faire fonctionner l'application :</p>
+  <ul>
+    <li><strong>Supabase</strong> — authentification et base de données (email, identifiant utilisateur)</li>
+    <li><strong>PostHog</strong> — analytics d'usage anonymisées, pas de ciblage publicitaire</li>
+    <li><strong>Expo</strong> — infrastructure technique de l'application mobile (notifications push, mise à jour)</li>
+  </ul>
+  <p>Cloudbreak n'intègre aucun SDK publicitaire ni de tracking tiers à des fins commerciales.</p>
+
+  <h2>3. Hébergement des données</h2>
+  <p>
+    Vos données sont hébergées exclusivement dans l'Union Européenne :
+  </p>
+  <ul>
+    <li>Base de données et authentification : Supabase, région Francfort (Allemagne)</li>
+    <li>Backend applicatif : OVH, région Paris (France)</li>
+  </ul>
+
+  <h2>4. Vos droits</h2>
+  <p>
+    Conformément au RGPD, vous disposez d'un droit d'accès, de rectification et d'effacement de vos
+    données personnelles. Vous pouvez supprimer votre compte et toutes les données associées directement
+    depuis l'application, ou via l'endpoint <code>DELETE /api/v1/user</code>, qui entraîne la suppression
+    définitive de votre compte, de vos favoris, de votre historique de prédictions et de vos données
+    d'abonnement.
+  </p>
+
+  <h2>5. Durée de conservation</h2>
+  <p>
+    Vos données sont conservées tant que votre compte est actif. En cas de suppression de compte, les
+    données sont effacées immédiatement, à l'exception des données de facturation dont la conservation
+    est requise par la loi (jusqu'à 10 ans pour les obligations comptables, gérées directement par Apple
+    via StoreKit).
+  </p>
+
+  <h2>6. Sécurité</h2>
+  <p>
+    Les communications entre l'application et nos serveurs sont chiffrées en HTTPS. L'authentification
+    repose sur des tokens JWT à durée de vie limitée. Nous ne stockons jamais de mot de passe en clair —
+    cette gestion est entièrement déléguée à Supabase.
+  </p>
+
+  <div class="contact">
+    <h2 style="margin-top:0; border:none;">Contact</h2>
+    <p>
+      Pour toute question relative à cette politique de confidentialité ou pour exercer vos droits,
+      contactez-nous à <a href="mailto:support@cloudbreak.app">support@cloudbreak.app</a>.
+    </p>
+  </div>
+</body>
+</html>

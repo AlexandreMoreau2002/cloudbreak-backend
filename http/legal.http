@@ -1,0 +1,16 @@
+###
+# Pages légales — Privacy Policy et CGU (story 4.4 AC1)
+# Servies en statique via StaticFiles monté sur /legal (voir app/main.py)
+#
+# Attendu :
+#   HTTP/1.1 200 OK
+#   Content-Type: text/html; charset=utf-8
+#   <corps HTML de la page>
+#
+# Pas d'auth requise.
+
+GET http://localhost:8000/legal/privacy
+
+###
+
+GET http://localhost:8000/legal/cgu

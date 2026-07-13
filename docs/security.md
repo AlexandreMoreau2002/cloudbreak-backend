@@ -237,3 +237,28 @@ pip-audit  # à installer : pip install pip-audit
 - [ ] `pip-audit` passé sans vulnérabilité critique
 - [ ] Accès SSH VPS par clé uniquement (password auth désactivé)
 - [ ] Firewall VPS : seuls ports 22, 80, 443 ouverts
+
+---
+
+## App Privacy Apple — données déclarées (App Store Connect)
+
+Story 4.4 (AC6) — checklist à reporter dans **App Store Connect → App Privacy** avant soumission. Chaque SDK intégré dans l'app doit être déclaré avec les données exactes qu'il collecte.
+
+### Checklist App Privacy — données déclarées
+
+| Donnée | SDK | Usage | Lié à l'identité ? |
+|--------|-----|-------|-------------------|
+| Email | Supabase | Auth | Oui |
+| Identifiant utilisateur | Supabase | Fonctionnalité app | Oui |
+| Données d'utilisation | PostHog | Analytics | Non (anonymisé) |
+| Localisation précise | expo-location | Fonctionnalité opt-in | Non |
+| Crashs | Expo | Debugging | Non |
+
+### Points de vigilance spécifiques Cloudbreak
+
+1. **PostHog** — déclarer "données d'utilisation" pour "analytics", pas pour ciblage publicitaire
+2. **Supabase** — déclarer "email" et "identifiant utilisateur" liés à l'identité
+3. **expo-location** — déclarer "localisation précise" avec usage "fonctionnalité app" et opt-in explicite
+4. **Pas de pub, pas de tracking tiers** → section "Tracking" App Store Connect = vide
+
+> ⚠️ **Déclarer honnêtement** — une fausse déclaration App Privacy est une cause de bannissement Apple.

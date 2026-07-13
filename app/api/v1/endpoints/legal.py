@@ -3,10 +3,6 @@
 Sert les pages HTML statiques stockées dans app/legal/ sur des routes
 sans extension, exigées par Apple pour les liens légaux (paywall, App
 Store Connect).
-
-Router explicite plutôt que StaticFiles(html=True) car celui-ci ne
-résout que /legal/privacy.html, pas /legal/privacy (URL sans extension
-exigée par l'AC1).
 """
 
 import os

@@ -1,6 +1,6 @@
 ###
 # Pages légales — Privacy Policy et CGU (story 4.4 AC1)
-# Servies par un router FastAPI dédié (voir app/api/v1/endpoints/legal.py)
+# Servies en statique via StaticFiles monté sur /legal (voir app/main.py)
 #
 # Attendu :
 #   HTTP/1.1 200 OK

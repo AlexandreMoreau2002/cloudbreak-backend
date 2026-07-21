@@ -11,7 +11,7 @@ import uuid
 import pytest
 from datetime import UTC, datetime
 from httpx import ASGITransport, AsyncClient
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.main import app
 
@@ -232,3 +232,64 @@ async def test_list_favorites_sans_jwt_retourne_403() -> None:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/api/v1/user/favorites")
     assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Analytics — track()
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_add_favorite_appelle_track_favorite_added(auth_override: None) -> None:
+    """Ajout favori réussi → track('favorite_added', ...) appelé."""
+    from app.db.session import get_db
+
+    mock_db = _make_db_mock()
+
+    peak_result = MagicMock()
+    peak_result.scalar_one_or_none.return_value = MOCK_PEAK
+    dup_result = MagicMock()
+    dup_result.scalar_one_or_none.return_value = None
+    mock_db.execute = AsyncMock(side_effect=[peak_result, dup_result])
+    mock_db.refresh = AsyncMock(
+        side_effect=lambda fav: (
+            setattr(fav, "created_at", MOCK_CREATED_AT) or setattr(fav, "id", MOCK_FAV_ID)
+        )
+    )
+
+    app.dependency_overrides[get_db] = lambda: mock_db
+    try:
+        with patch("app.api.v1.endpoints.favorites.track") as mock_track:
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as client:
+                response = await client.post("/api/v1/user/favorites", json={"peak_id": "peak-1"})
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 201
+    mock_track.assert_called_once_with("favorite_added", MOCK_USER["id"], {"peak_id": "peak-1"})
+
+
+@pytest.mark.asyncio
+async def test_remove_favorite_appelle_track_favorite_removed(auth_override: None) -> None:
+    """Suppression favori réussie → track('favorite_removed', ...) appelé."""
+    from app.db.session import get_db
+
+    mock_db = _make_db_mock()
+    fav_result = MagicMock()
+    fav_result.scalar_one_or_none.return_value = MOCK_FAV
+    mock_db.execute = AsyncMock(return_value=fav_result)
+
+    app.dependency_overrides[get_db] = lambda: mock_db
+    try:
+        with patch("app.api.v1.endpoints.favorites.track") as mock_track:
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as client:
+                response = await client.delete("/api/v1/user/favorites/peak-1")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 204
+    mock_track.assert_called_once_with("favorite_removed", MOCK_USER["id"], {"peak_id": "peak-1"})

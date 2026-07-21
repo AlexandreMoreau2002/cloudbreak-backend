@@ -16,6 +16,7 @@ from app.models.peak import Peak
 from app.db.session import get_db
 from app.core.errors import ErrorCode
 from app.models.favorite import Favorite
+from app.services.analytics import track
 from app.schemas.peak import PeakSearchResult
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_current_user
@@ -70,6 +71,7 @@ async def add_favorite(
     await db.refresh(fav)
 
     logger.info("favorite_added", extra={"user_id": user_id, "peak_id": body.peak_id})
+    track("favorite_added", user_id, {"peak_id": body.peak_id})
     return FavoriteResponse(
         id=str(fav.id),
         peak_id=str(fav.peak_id),
@@ -109,6 +111,7 @@ async def remove_favorite(
     await db.delete(fav)
     await db.commit()
     logger.info("favorite_removed", extra={"user_id": user_id, "peak_id": peak_id})
+    track("favorite_removed", user_id, {"peak_id": peak_id})
 
 
 @router.get("/user/favorites", response_model=list[FavoriteResponse])

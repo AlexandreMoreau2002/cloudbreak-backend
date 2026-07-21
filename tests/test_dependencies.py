@@ -157,3 +157,59 @@ async def test_get_user_subscription_returns_db_record() -> None:
 
     assert result is subscription
     db.execute.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_check_quota_bypass_appelle_track_quota_bypassed() -> None:
+    from app.core.dependencies import check_quota
+    from datetime import UTC, datetime, timedelta
+
+    subscription = MagicMock(plan="premium", expires_at=datetime.now(UTC) + timedelta(days=10))
+    db = AsyncMock()
+    request = MagicMock()
+    request.query_params = {"peak_id": "peak-1"}
+
+    with (
+        patch(
+            "app.core.dependencies.get_user_subscription",
+            new_callable=AsyncMock,
+            return_value=subscription,
+        ),
+        patch("app.core.dependencies.track") as mock_track,
+    ):
+        result = await check_quota(
+            request=request, user={"id": "user-123"}, redis=AsyncMock(), db=db
+        )
+
+    assert result == {"id": "user-123"}
+    mock_track.assert_called_once_with("quota_bypassed", "user-123", {"plan": "premium"})
+
+
+@pytest.mark.asyncio
+async def test_check_quota_exceeded_appelle_track_quota_exceeded() -> None:
+    from app.core.dependencies import check_quota
+    from app.services.quota import QuotaExceededException
+
+    db = AsyncMock()
+    request = MagicMock()
+    request.query_params = {"peak_id": "peak-1"}
+
+    with (
+        patch(
+            "app.core.dependencies.get_user_subscription",
+            new_callable=AsyncMock,
+            return_value=None,
+        ),
+        patch(
+            "app.core.dependencies.QuotaService.check_and_increment",
+            new_callable=AsyncMock,
+            side_effect=QuotaExceededException("quota atteint"),
+        ),
+        patch("app.core.dependencies.track") as mock_track,
+    ):
+        with pytest.raises(Exception):
+            await check_quota(request=request, user={"id": "user-123"}, redis=AsyncMock(), db=db)
+
+    mock_track.assert_called_once_with(
+        "quota_exceeded", "user-123", {"peak_id": "peak-1", "plan": "free"}
+    )

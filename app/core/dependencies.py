@@ -6,6 +6,7 @@ from app.db.session import get_db
 from datetime import UTC, datetime
 from app.core.config import settings
 from app.core.errors import ErrorCode
+from app.services.analytics import track
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.subscription import Subscription
 from app.core.security import decode_supabase_jwt
@@ -115,6 +116,7 @@ async def check_quota(
                 "plan": subscription.plan,
             },
         )
+        track("quota_bypassed", user_id, {"plan": subscription.plan})
         return user
 
     # Freemium : vérifier le quota
@@ -131,6 +133,7 @@ async def check_quota(
     try:
         await quota_service.check_and_increment(user_id, today, peak_id)
     except QuotaExceededException:
+        track("quota_exceeded", user_id, {"peak_id": peak_id, "plan": "free"})
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail={

@@ -2,10 +2,11 @@ import logging
 from app.db.session import get_db
 from app.core.config import settings
 from fastapi import APIRouter, Depends
+from app.services.analytics import track
 from app.services.user import delete_user_data
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.security import delete_supabase_user
 from app.core.dependencies import get_current_user
+from app.core.security import delete_supabase_user
 
 logger = logging.getLogger(__name__)
 
@@ -31,3 +32,4 @@ async def delete_user(
     await delete_user_data(user_id, db)
     await delete_supabase_user(user_id, settings.supabase_url, settings.supabase_service_role_key)
     logger.info("user_deleted", extra={"user_id": user_id})
+    track("account_deleted", user_id)

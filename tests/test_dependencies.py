@@ -181,7 +181,7 @@ async def test_check_quota_bypass_appelle_track_quota_bypassed() -> None:
             request=request, user={"id": "user-123"}, redis=AsyncMock(), db=db
         )
 
-    assert result == {"id": "user-123"}
+    assert result == {"id": "user-123", "plan": "premium"}
     mock_track.assert_called_once_with("quota_bypassed", "user-123", {"plan": "premium"})
 
 

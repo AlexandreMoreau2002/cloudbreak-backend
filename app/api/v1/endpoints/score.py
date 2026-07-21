@@ -111,7 +111,12 @@ async def get_score(
     track(
         "score_calculated",
         str(current_user["id"]),
-        {"peak_id": peak_id, "verdict": result["verdict"], "score": result["score"]},
+        {
+            "peak_id": peak_id,
+            "verdict": result["verdict"],
+            "score": result["score"],
+            "plan": current_user.get("plan", "free"),
+        },
     )
 
     cond = result["conditions"]

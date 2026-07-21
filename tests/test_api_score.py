@@ -264,3 +264,4 @@ async def test_get_score_appelle_track_score_calculated(auth_override: None) -> 
     assert properties["peak_id"] == "peak-1"
     assert "verdict" in properties
     assert "score" in properties
+    assert properties["plan"] == "free"

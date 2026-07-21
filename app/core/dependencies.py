@@ -117,6 +117,7 @@ async def check_quota(
             },
         )
         track("quota_bypassed", user_id, {"plan": subscription.plan})
+        user["plan"] = subscription.plan
         return user
 
     # Freemium : vérifier le quota
@@ -142,4 +143,5 @@ async def check_quota(
             },
         ) from None
 
+    user["plan"] = "free"
     return user

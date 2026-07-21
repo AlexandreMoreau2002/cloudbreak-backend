@@ -35,8 +35,9 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 | Domain layer (`app/domain/`) — logique métier pure (zero I/O) | ✅ Refactorisé |
 | Contrat score présentation — `label_code`, `context_code`, `context_params`, fenêtre, stabilité | ✅ Story 3.5 |
 | i18n score côté mobile — backend renvoie codes stables, traduction dans le front uniquement | ✅ Refacto i18n |
+| Onboarding mobile narratif (story 7.1) : splash + transition mer de nuages + 3 écrans, gate AsyncStorage, permission push, sommet par défaut via API publique | ✅ |
 
-| Recherche sommets (`GET /api/v1/peaks/search` + `GET /api/v1/peaks/{slug}`) | ✅ ILIKE, limit 20 |
+| Recherche sommets (`GET /api/v1/peaks/search` + `GET /api/v1/peaks/{slug}`) | ✅ ILIKE, limit 20 — **publics depuis story 7.1** (onboarding pré-login, aucun JWT requis) |
 | Favoris (`POST/DELETE/GET /api/v1/user/favorites`) | ✅ Avec peak info jointe |
 | Quota freemium Redis — 1 sommet unique/jour, bypass Premium/Pro, reset minuit UTC | ✅ Story 4.1 |
 | `make seed-test` / `make unseed-test` — users de test Supabase (freemium, pro) | ✅ Story 4.1 |

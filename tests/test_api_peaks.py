@@ -1,8 +1,10 @@
 """
 Tests de l'endpoint GET /api/v1/peaks/search et GET /api/v1/peaks/{slug}
 
+Ces endpoints sont publics depuis la story 7.1 (onboarding mobile pré-login) :
+aucune authentification requise.
+
 On mocke :
-- L'authentification JWT (get_current_user)
 - La DB (execute)
 """
 
@@ -13,8 +15,6 @@ from unittest.mock import AsyncMock, MagicMock
 from app.main import app
 
 
-MOCK_USER = {"id": "user-123", "email": "alex@test.com"}
-
 MOCK_PEAK = MagicMock()
 MOCK_PEAK.id = "peak-1"
 MOCK_PEAK.name = "Mont Blanc"
@@ -23,15 +23,6 @@ MOCK_PEAK.lat = 45.83
 MOCK_PEAK.lng = 6.86
 MOCK_PEAK.altitude = 4808
 MOCK_PEAK.region = "Massif du Mont-Blanc"
-
-
-@pytest.fixture
-def auth_override():
-    from app.core.dependencies import get_current_user
-
-    app.dependency_overrides[get_current_user] = lambda: MOCK_USER
-    yield
-    app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -104,10 +95,12 @@ def db_override_peak_not_found():
 
 
 @pytest.mark.asyncio
-async def test_search_retourne_200_avec_resultats(
-    auth_override: None, db_override_search: None
-) -> None:
-    """Recherche valide → 200 avec liste de peaks."""
+async def test_search_retourne_200_avec_resultats(db_override_search: None) -> None:
+    """Recherche valide → 200 avec liste de peaks.
+
+    Endpoint public depuis story 7.1 (onboarding pré-login) — aucune auth requise :
+    la requête est envoyée sans header Authorization.
+    """
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/api/v1/peaks/search", params={"q": "mont"})
     assert response.status_code == 200
@@ -122,7 +115,7 @@ async def test_search_retourne_200_avec_resultats(
 
 
 @pytest.mark.asyncio
-async def test_search_retourne_liste_vide(auth_override: None, db_override_empty: None) -> None:
+async def test_search_retourne_liste_vide(db_override_empty: None) -> None:
     """Aucun résultat → 200 avec liste vide."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/api/v1/peaks/search", params={"q": "zzz"})
@@ -131,19 +124,11 @@ async def test_search_retourne_liste_vide(auth_override: None, db_override_empty
 
 
 @pytest.mark.asyncio
-async def test_search_q_trop_court_retourne_422(auth_override: None) -> None:
+async def test_search_q_trop_court_retourne_422() -> None:
     """q < 2 chars → 422 Unprocessable Entity."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/api/v1/peaks/search", params={"q": "m"})
     assert response.status_code == 422
-
-
-@pytest.mark.asyncio
-async def test_search_sans_jwt_retourne_403() -> None:
-    """Sans Authorization → 403 (HTTPBearer retourne 403 si absent)."""
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.get("/api/v1/peaks/search", params={"q": "mont"})
-    assert response.status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -152,8 +137,12 @@ async def test_search_sans_jwt_retourne_403() -> None:
 
 
 @pytest.mark.asyncio
-async def test_peak_detail_retourne_200(auth_override: None, db_override_peak_detail: None) -> None:
-    """Slug existant → 200 avec tous les champs."""
+async def test_peak_detail_retourne_200(db_override_peak_detail: None) -> None:
+    """Slug existant → 200 avec tous les champs.
+
+    Endpoint public depuis story 7.1 (onboarding pré-login) — aucune auth requise :
+    la requête est envoyée sans header Authorization.
+    """
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/api/v1/peaks/mont-blanc")
     assert response.status_code == 200
@@ -168,7 +157,7 @@ async def test_peak_detail_retourne_200(auth_override: None, db_override_peak_de
 
 @pytest.mark.asyncio
 async def test_peak_detail_slug_inexistant_retourne_404(
-    auth_override: None, db_override_peak_not_found: None
+    db_override_peak_not_found: None,
 ) -> None:
     """Slug inconnu → 404 PEAK_NOT_FOUND."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

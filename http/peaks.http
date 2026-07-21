@@ -1,48 +1,66 @@
-# Peaks
+# ============================================================================
+# Peaks — GET /api/v1/peaks/search + GET /api/v1/peaks/{slug}
+#
+# ⚠️ Endpoints PUBLICS depuis la story 7.1 (onboarding mobile pré-login) :
+#    aucune variable jwt, aucun header Authorization nécessaire.
 #
 # Prerequis dans .vscode/settings.json > rest-client.environmentVariables > local :
 #   "baseUrl": "http://localhost:8000"
-#   "jwt": "<token Supabase - copie depuis les logs mobile>"
+#
+# Serveur : make dev (Docker) + make seed si la DB est vide.
+# ============================================================================
+
+
+# ----------------------------------------------------------------------------
+# GET /api/v1/peaks/search — recherche autocomplete
+# ----------------------------------------------------------------------------
 
 ###
-# Recherche "mont"
+# Search nominal — q=mont
+# Attendu : 200 + liste JSON de max 20 sommets (id, name, slug, altitude, region)
 GET {{baseUrl}}/api/v1/peaks/search?q=mont
-Authorization: Bearer {{jwt}}
 
 ###
-# Recherche "puy"
-GET {{baseUrl}}/api/v1/peaks/search?q=puy
-Authorization: Bearer {{jwt}}
-
-###
-# Recherche qui retourne liste vide
-GET {{baseUrl}}/api/v1/peaks/search?q=zzzinexistant
-Authorization: Bearer {{jwt}}
-
-###
-# q trop court -> 422
+# Search q d'1 seul caractère (min_length=2)
+# Attendu : 422 Unprocessable Entity (validation Pydantic/FastAPI)
 GET {{baseUrl}}/api/v1/peaks/search?q=m
-Authorization: Bearer {{jwt}}
 
 ###
-# Sans JWT -> 403
-GET {{baseUrl}}/api/v1/peaks/search?q=mont
+# Search sans paramètre q
+# Attendu : 422 Unprocessable Entity (paramètre requis manquant)
+GET {{baseUrl}}/api/v1/peaks/search
 
 ###
-# Detail Mont Ventoux
+# Search sans résultat
+# Attendu : 200 + liste vide []
+GET {{baseUrl}}/api/v1/peaks/search?q=zzzzzz
+
+###
+# Search avec accents — q=dôme (doit matcher "Puy de Dôme")
+# Attendu : 200 + liste contenant les sommets dont le nom contient "dôme"
+GET {{baseUrl}}/api/v1/peaks/search?q=dôme
+
+###
+# Search "puy" — vérifie l'ordre alphabétique et la limite 20
+# Attendu : 200 + liste triée par nom, max 20 entrées
+GET {{baseUrl}}/api/v1/peaks/search?q=puy
+
+
+# ----------------------------------------------------------------------------
+# GET /api/v1/peaks/{slug} — détail d'un sommet
+# ----------------------------------------------------------------------------
+
+###
+# Detail slug existant — mont-ventoux
+# Attendu : 200 + objet complet {id, name, slug, lat, lng, altitude, region}
 GET {{baseUrl}}/api/v1/peaks/mont-ventoux
-Authorization: Bearer {{jwt}}
 
 ###
-# Detail Grand Ballon
-GET {{baseUrl}}/api/v1/peaks/grand-ballon
-Authorization: Bearer {{jwt}}
-
-###
-# Slug inexistant -> 404 PEAK_NOT_FOUND
-GET {{baseUrl}}/api/v1/peaks/slug-qui-nexiste-pas
-Authorization: Bearer {{jwt}}
-
-###
-# Sans JWT -> 403
+# Detail slug existant — puy-de-dome (slug ASCII, nom accentué en DB)
+# Attendu : 200 + objet complet
 GET {{baseUrl}}/api/v1/peaks/puy-de-dome
+
+###
+# Detail slug inexistant
+# Attendu : 404 + {"detail": {"detail": "Sommet introuvable", "code": "PEAK_NOT_FOUND"}}
+GET {{baseUrl}}/api/v1/peaks/slug-qui-nexiste-pas

@@ -241,6 +241,24 @@ L'onboarding mobile (story 7.1) doit permettre à un utilisateur de chercher et 
 
 ---
 
+## 2026-07-21 Story 1-7 — Taxonomie & instrumentation events (backend)
+
+### Contexte
+Nouveau module `app/services/analytics.py` (`track()`) : stub `logger.debug` uniquement, aucun appel réseau (PostHog sera branché derrière cette interface plus tard). Appelé depuis `score.py` (`score_calculated`), `core/dependencies.py` (`quota_bypassed`/`quota_exceeded`), `favorites.py` (`favorite_added`/`removed`), `user.py` (`account_deleted`).
+
+### INFO
+- **[app/services/analytics.py]** Stub sans réseau confirmé — aucune fuite possible tant que PostHog n'est pas branché ; `user_id` loggé est bien l'UUID Supabase (`sub` du JWT), jamais l'email ni le token
+- **[score.py:111-115]** Properties `peak_id`/`verdict`/`score` — aucune donnée sensible
+- **[core/dependencies.py:119,136]** Properties `plan`/`peak_id` — aucune donnée sensible
+- **[favorites.py:74,114]** Properties `peak_id` uniquement
+- **[user.py:35]** `account_deleted` tracké sans property — cohérent avec RGPD (pas de donnée résiduelle après suppression)
+- Aucune duplication détectée avec les events mobile pour une même action (ex : mobile trace l'intention `delete_account_initiated`, le backend trace l'issue `account_deleted` — un seul propriétaire par étape du flux)
+
+### WARNING
+- **[app/services/analytics.py]** Le stub logue `user_id` en clair au niveau DEBUG — s'assurer que `LOG_LEVEL=DEBUG` ne soit jamais actif en prod (déjà couvert par la checklist "Logs ne contiennent aucun secret ou donnée personnelle" plus bas, mais à re-vérifier explicitement quand PostHog sera branché : ne pas envoyer `user_id` brut à PostHog sans le passer par un identifiant anonymisé/hashé si l'usage prévu est de l'analytics agrégée)
+
+---
+
 ## Checklist avant mise en prod
 
 - [ ] Variables `.env` renseignées sur le VPS (jamais en clair dans le code)

@@ -232,3 +232,36 @@ async def test_get_peak_by_id_retourne_none_si_absent() -> None:
 
     result = await get_peak_by_id("inexistant", mock_db)
     assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_score_appelle_track_score_calculated(auth_override: None) -> None:
+    """L'endpoint appelle track('score_calculated', ...) avec les bonnes propriétés."""
+    patch_peak = patch(
+        "app.api.v1.endpoints.score.get_peak_by_id",
+        new_callable=AsyncMock,
+        return_value=MOCK_PEAK,
+    )
+    patch_weather = patch(
+        "app.api.v1.endpoints.score.weather_service.get_forecast",
+        new_callable=AsyncMock,
+        return_value=MOCK_WEATHER,
+    )
+    patch_track = patch("app.api.v1.endpoints.score.track")
+    with patch_peak, patch_weather, patch_track as mock_track:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(
+                "/api/v1/score",
+                params={"peak_id": "peak-1", "date": "2026-10-15", "hour": 6},
+            )
+
+    assert response.status_code == 200
+    mock_track.assert_called_once()
+    call_args = mock_track.call_args
+    assert call_args[0][0] == "score_calculated"
+    assert call_args[0][1] == MOCK_USER["id"]
+    properties = call_args[0][2]
+    assert properties["peak_id"] == "peak-1"
+    assert "verdict" in properties
+    assert "score" in properties
+    assert properties["plan"] == "free"

@@ -26,6 +26,7 @@ from typing import Annotated, Any
 from app.db.session import get_db
 from app.core.config import settings
 from app.core.errors import ErrorCode
+from app.services.analytics import track
 from app.core.dependencies import check_quota
 from app.services.weather import WeatherService
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -105,6 +106,16 @@ async def get_score(
             "date": date,
             "score": result["score"],
             "verdict": result["verdict"],
+        },
+    )
+    track(
+        "score_calculated",
+        str(current_user["id"]),
+        {
+            "peak_id": peak_id,
+            "verdict": result["verdict"],
+            "score": result["score"],
+            "plan": current_user.get("plan", "free"),
         },
     )
 

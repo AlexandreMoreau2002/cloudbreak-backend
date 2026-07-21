@@ -43,6 +43,7 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 | `make seed-test` / `make unseed-test` — users de test Supabase (freemium, pro) | ✅ Story 4.1 |
 | `make clean-subscriptions` / `make reset-db` — maintenance DB dev | ✅ Story 4.1 |
 | Suppression compte RGPD (`DELETE /api/v1/user/`) — suppression DB + Supabase Auth → 204 | ✅ Story 2.4 |
+| Instrumentation analytics — `track()` stub DEBUG-only sur `score_calculated`, `quota_bypassed`, `quota_exceeded`, `favorite_added/removed`, `account_deleted` (story 1.7) | ✅ Stub, aucun réseau |
 
 ### Ce qui n'existe pas encore
 

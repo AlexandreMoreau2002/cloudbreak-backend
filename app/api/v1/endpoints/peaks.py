@@ -5,17 +5,16 @@ Endpoints :
   GET  /api/v1/peaks/search?q=    — recherche autocomplete (min 2 chars)
   GET  /api/v1/peaks/{slug}        — détail par slug
 
-Auth required sur tous les endpoints.
+Publics depuis la story 7.1 (onboarding mobile pré-login) : aucune auth requise.
 """
 
 import logging
+from typing import Annotated
 from sqlalchemy import select
 from app.models.peak import Peak
-from typing import Annotated, Any
 from app.db.session import get_db
 from app.core.errors import ErrorCode
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.dependencies import get_current_user
 from app.schemas.peak import PeakResponse, PeakSearchResult
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -31,7 +30,6 @@ def _optional_region(value: object) -> str | None:
 @router.get("/peaks/search", response_model=list[PeakSearchResult])
 async def search_peaks(
     q: Annotated[str, Query(min_length=2, description="Texte de recherche (min 2 chars)")],
-    current_user: dict[str, Any] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[PeakSearchResult]:
     """Recherche autocomplete sur le nom des sommets — ILIKE, limite 20 résultats."""
@@ -55,7 +53,6 @@ async def search_peaks(
 @router.get("/peaks/{slug}", response_model=PeakResponse)
 async def get_peak(
     slug: str,
-    current_user: dict[str, Any] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> PeakResponse:
     """Récupère le détail d'un sommet par son slug."""

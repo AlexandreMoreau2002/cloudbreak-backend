@@ -100,8 +100,8 @@ pip-audit  # à installer : pip install pip-audit
 
 ### Ce qui existe
 - `GET /health` — endpoint public, pas de donnée sensible, pas de risque
-- `GET /api/v1/peaks/search` — auth JWT requise, q min_length=2 validé par Pydantic/FastAPI
-- `GET /api/v1/peaks/{slug}` — auth JWT requise, slug passé en path param (ORM only)
+- `GET /api/v1/peaks/search` — **public depuis story 7.1** (onboarding pré-login), q min_length=2 validé par Pydantic/FastAPI
+- `GET /api/v1/peaks/{slug}` — **public depuis story 7.1** (onboarding pré-login), slug passé en path param (ORM only)
 - `POST /api/v1/user/favorites` — auth JWT requise, user_id extrait du JWT uniquement
 - `DELETE /api/v1/user/favorites/{peak_id}` — auth JWT requise, isolation par user_id JWT
 - `GET /api/v1/user/favorites` — auth JWT requise, isolation par user_id JWT
@@ -221,6 +221,23 @@ pip-audit  # à installer : pip install pip-audit
 - **[DeleteAccountModal.tsx:19]** Vérification email côté client uniquement (`emailInput.trim() === userEmail`) — cette vérification est une UX de protection contre la suppression accidentelle, pas un contrôle de sécurité. L'autorisation réelle est assurée par le JWT côté backend. C'est l'architecture correcte : le client peut contourner ce check (jailbreak), mais cela n'aboutit qu'à supprimer son propre compte, ce qui est l'opération demandée.
 - **[user.py:23-24]** Suppressions via `delete(Favorite).where(...)` et `delete(Subscription).where(...)` — SQLAlchemy paramétré, aucun SQL brut, pas d'injection. `user_id` provient du JWT, pas d'un paramètre de requête.
 - **[user.py:16-18]** Le commentaire documente explicitement que `predictions`, `terrain_validations` et `events` sont ignorées silencieusement car les tables n'existent pas encore. À revoir avant release 1.0.0 pour garantir la complétude RGPD lorsque ces tables seront créées.
+
+---
+
+## 2026-07-19 Story 7-1 — Recherche et détail des sommets rendus publics
+
+### Contexte
+L'onboarding mobile (story 7.1) doit permettre à un utilisateur de chercher et choisir un sommet **avant connexion** (pré-login). `GET /api/v1/peaks/search` et `GET /api/v1/peaks/{slug}` ne peuvent donc plus exiger de JWT.
+
+### INFO
+- **[peaks.py]** `Depends(get_current_user)` retiré des deux endpoints — plus aucune dépendance d'auth sur `search_peaks` et `get_peak`
+- **[peaks.py]** Aucune donnée utilisateur exposée par ces endpoints : `Peak` contient uniquement des données OSM publiques (nom, slug, altitude, coordonnées, région) — pas de PII, pas de lien vers `users`/`favorites`/`predictions`
+- **[peaks.py]** Énumération non sensible : parcourir les slugs de sommets ne révèle rien de confidentiel (données déjà publiques sur OpenStreetMap/IGN)
+- **[peaks.py]** `POST/DELETE/GET /api/v1/user/favorites` restent protégés par JWT — seuls les endpoints de lecture pure (recherche + détail) sont ouverts
+- Rate limiting global (à implémenter avant prod, cf. checklist) reste la seule protection anti-abus sur ces routes désormais publiques — pas de dégradation supplémentaire du risque puisqu'aucun rate limiting n'existait déjà pour les routes authentifiées
+
+### WARNING
+- **[peaks.py]** Ces endpoints étant maintenant appelables sans compte, un attaquant peut scripter des appels `GET /peaks/search` en boucle sans coût d'authentification préalable — renforce l'importance du rate limiting global (checklist prod) qui n'est toujours pas implémenté
 
 ---
 

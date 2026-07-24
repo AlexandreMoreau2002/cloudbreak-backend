@@ -265,3 +265,42 @@ async def test_get_score_appelle_track_score_calculated(auth_override: None) -> 
     assert "verdict" in properties
     assert "score" in properties
     assert properties["plan"] == "free"
+
+
+@pytest.mark.asyncio
+async def test_get_score_persiste_une_prediction_et_expose_son_id(auth_override: None) -> None:
+    """GET /api/v1/score écrit une ligne Prediction et renvoie prediction_id."""
+    from app.db.session import get_db
+
+    mock_db = AsyncMock()
+    mock_db.add = MagicMock()
+    mock_db.commit = AsyncMock()
+    mock_db.refresh = AsyncMock(side_effect=lambda pred: setattr(pred, "id", "pred-uuid-1"))
+
+    patch_peak = patch(
+        "app.api.v1.endpoints.score.get_peak_by_id",
+        new_callable=AsyncMock,
+        return_value=MOCK_PEAK,
+    )
+    patch_weather = patch(
+        "app.api.v1.endpoints.score.weather_service.get_forecast",
+        new_callable=AsyncMock,
+        return_value=MOCK_WEATHER,
+    )
+
+    app.dependency_overrides[get_db] = lambda: mock_db
+    try:
+        with patch_peak, patch_weather:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                response = await client.get(
+                    "/api/v1/score", params={"peak_id": "peak-1", "date": "2026-07-24", "hour": 6}
+                )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["prediction_id"] == "pred-uuid-1"
+    assert mock_db.add.called
+    assert mock_db.commit.await_count >= 1

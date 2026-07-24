@@ -46,6 +46,9 @@ class ScoreResponse(BaseModel):
     )
     cloud_base: int = Field(description="Altitude de la base des nuages en mètres")
     peak_slug: str = Field(description="Slug du sommet pour le deep link")
+    prediction_id: str = Field(
+        description="Id de la prédiction persistée, référencée par une validation terrain"
+    )
     optimal_window_start: str | None = Field(
         default=None,
         description="Début de la fenêtre optimale (HH:MM local)",

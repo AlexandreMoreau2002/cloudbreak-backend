@@ -20,11 +20,13 @@ Erreurs :
 
 import uuid
 import logging
-from datetime import UTC, datetime
 from sqlalchemy import select
 import redis.asyncio as aioredis
-from app.models.peak import Peak
 from typing import Annotated, Any
+from datetime import UTC, datetime
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from app.models.peak import Peak
 from app.db.session import get_db
 from app.core.config import settings
 from app.core.errors import ErrorCode
@@ -32,8 +34,6 @@ from app.services.analytics import track
 from app.models.prediction import Prediction
 from app.core.dependencies import check_quota
 from app.services.weather import WeatherService
-from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.domain.score import build_score_presentation, calculate_score
 from app.services.weather_providers.open_meteo import OpenMeteoProvider
 from app.schemas.score import (

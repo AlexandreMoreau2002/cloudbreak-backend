@@ -12,10 +12,10 @@ Pour tester uniquement la logique de l'endpoint lui-même.
 """
 
 import pytest
-from app.main import app
-from app.core.dependencies import get_redis
 from httpx import AsyncClient, ASGITransport
 from unittest.mock import AsyncMock, patch, MagicMock
+from app.main import app
+from app.core.dependencies import get_redis
 from app.domain.weather_types import PressureLevelData, WeatherData
 
 

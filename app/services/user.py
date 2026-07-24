@@ -2,9 +2,9 @@
 
 import logging
 from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.favorite import Favorite
 from app.models.prediction import Prediction
-from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.subscription import Subscription
 from app.models.terrain_validation import TerrainValidation
 

@@ -4,8 +4,8 @@ import pytest
 from sqlalchemy.sql.dml import Delete
 
 from app.models.favorite import Favorite
-from app.models.prediction import Prediction
 from app.services.user import delete_user_data
+from app.models.prediction import Prediction
 from app.models.subscription import Subscription
 from app.models.terrain_validation import TerrainValidation
 

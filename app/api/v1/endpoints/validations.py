@@ -10,14 +10,14 @@ import uuid
 import logging
 from typing import Any
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, HTTPException, status
 from app.db.session import get_db
 from app.core.errors import ErrorCode
 from app.services.analytics import track
 from app.models.prediction import Prediction
-from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_current_user
 from app.models.terrain_validation import TerrainValidation
-from fastapi import APIRouter, Depends, HTTPException, status
 from app.schemas.validation import TerrainValidationCreate, TerrainValidationResponse
 
 logger = logging.getLogger(__name__)

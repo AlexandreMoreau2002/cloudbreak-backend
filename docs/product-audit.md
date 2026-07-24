@@ -44,11 +44,12 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 | `make clean-subscriptions` / `make reset-db` — maintenance DB dev | ✅ Story 4.1 |
 | Suppression compte RGPD (`DELETE /api/v1/user/`) — suppression DB + Supabase Auth → 204 | ✅ Story 2.4 |
 | Instrumentation analytics — `track()` stub DEBUG-only sur `score_calculated`, `quota_bypassed`, `quota_exceeded`, `favorite_added/removed`, `account_deleted` (story 1.7) | ✅ Stub, aucun réseau |
+| Validation terrain (`POST /api/v1/validations`) — confirmation/infirmation d'une prédiction, persistance `Prediction` best-effort à chaque `GET /api/v1/score`, table `terrain_validations` (`result`, `lat`/`lng` optionnels) (story 6.1) | ✅ Sans photo — voir story 6.2 |
 
 ### Ce qui n'existe pas encore
 
 - Gestion des abonnements StoreKit 2 (vérification reçus, table `subscriptions`) — story 4.3
-- Endpoint validations terrain (`POST /api/v1/validations`)
+- Photo optionnelle sur validation terrain + calcul du taux de précision — story 6.2
 - Notifications push
 - Déploiement VPS (infra prod)
 
@@ -151,5 +152,5 @@ Pour enrichir le champ `region` sans relancer Overpass : `python scripts/enrich_
 
 1. **Story 3-5** — détail conditions météo + fenêtre temporelle + stabilité (mobile)
 2. **Freemium** — quota 1 consultation/jour pour les non-abonnés (epic 4)
-3. **Validations terrain** — les utilisateurs confirment ou infirment le score avec une photo
+3. **Validations terrain** — confirmation/infirmation sans photo faite (story 6.1) ; photo optionnelle + taux de précision restent à faire (story 6.2)
 4. **Recalibration de l'algo** — après 50+ validations terrain

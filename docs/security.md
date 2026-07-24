@@ -259,6 +259,26 @@ Nouveau module `app/services/analytics.py` (`track()`) : stub `logger.debug` uni
 
 ---
 
+## 2026-07-24 Story 6-1 — Validation Terrain (Confirmation/Infirmation)
+
+### Contexte
+Nouveau flux : `GET /api/v1/score` persiste désormais une `Prediction` (best-effort) à chaque calcul, et `POST /api/v1/validations` permet à l'utilisateur de confirmer/infirmer une prédiction depuis le terrain, avec `lat`/`lng` optionnels.
+
+### INFO
+- **[terrain_validation.py]** Première fois que le backend persiste une **géolocalisation réelle** de l'utilisateur (`lat`/`lng` en `Float`, nullable). Jusqu'ici le projet ne lisait que le *statut de permission* de géolocalisation côté mobile (`docs/security.md` App Privacy — "Localisation précise... opt-in"), jamais de coordonnées effectives stockées où que ce soit. `lat`/`lng` restent optionnels côté schéma (`TerrainValidationCreate`) : un utilisateur qui refuse la permission peut valider sans coordonnées.
+- **[prediction.py / terrain_validation.py]** `user_id` stocké en `String` (pas de type UUID contraint) — cohérent avec le pattern déjà en place sur `favorites`/`subscriptions` (voir WARNING story 3-3 plus haut sur `Favorite.user_id`), pas une nouvelle divergence introduite par cette story.
+- **[validations.py]** `user_id` extrait exclusivement de `current_user["id"]` (JWT validé) — jamais passé en paramètre client. Isolation correcte, même pattern que les endpoints précédents.
+- **[validations.py]** Requête `select(Prediction).where(Prediction.id == body.prediction_id)` — SQLAlchemy ORM paramétré, pas de SQL brut, pas d'injection possible.
+- **[score.py]** La persistance de `Prediction` est enveloppée dans un `try/except` : un échec DB n'empêche pas l'endpoint score de répondre (best-effort), et ne fuite pas de détail interne au client — seul `logger.error("prediction_persist_failed", ...)` est loggé côté serveur.
+- Aucun nouveau secret ni variable d'environnement introduit par cette story.
+
+### WARNING
+- **[validations.py]** N'importe quel utilisateur authentifié peut confirmer/infirmer **n'importe quel `prediction_id`** existant, y compris une prédiction créée par un autre utilisateur (pas de vérification `Prediction.user_id == current_user_id`). Le risque est limité (pas de données sensibles exposées, `prediction_id` est un UUID non énumérable), mais un attaquant en possession d'un `prediction_id` d'un tiers (ex: partagé par erreur) pourrait polluer ses statistiques de validation terrain. À évaluer avant recalibration de l'algo sur ces données (story future) — la légitimité du couple `(prediction_id, user_id)` n'est pas garantie.
+- **[terrain_validation.py]** `photo_url` existe déjà en colonne (`nullable`) mais est toujours forcé à `null` côté endpoint — non exploitable en l'état, mais **story 6.2** (upload photo) devra faire l'objet d'une revue sécurité dédiée : validation du type de fichier, limite de taille, contrôle d'accès au stockage (éviter qu'un `photo_url` pointe vers une ressource accessible sans auth ou qu'un utilisateur puisse écraser/lire la photo d'un autre), et scan éventuel de contenu.
+- **[user.py]** Le commentaire RGPD signalé en 2026-05-16 (story 2-4) sur `predictions`/`terrain_validations` ignorées silencieusement lors de `DELETE /api/v1/user` reste d'actualité **et devient concret maintenant que ces tables existent réellement** : la suppression de compte ne nettoie toujours pas `predictions` ni `terrain_validations` — à corriger avant release 1.0.0 pour la complétude RGPD.
+
+---
+
 ## Checklist avant mise en prod
 
 - [ ] Variables `.env` renseignées sur le VPS (jamais en clair dans le code)

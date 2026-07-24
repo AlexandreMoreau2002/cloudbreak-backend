@@ -6,10 +6,9 @@ Endpoint validation terrain.
 Auth required. 404 si prediction_id inconnu.
 """
 
-import logging
 import uuid
+import logging
 from typing import Any
-
 from sqlalchemy import select
 from app.db.session import get_db
 from app.core.errors import ErrorCode

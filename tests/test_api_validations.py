@@ -141,6 +141,37 @@ async def test_post_validation_prediction_inconnue_retourne_404(auth_override: N
 
 
 @pytest.mark.asyncio
+async def test_post_validation_prediction_dune_autre_utilisateur_retourne_404(
+    auth_override: None,
+) -> None:
+    """prediction_id existant mais appartenant à un autre utilisateur → 404 (pas 403).
+
+    La query filtre désormais sur Prediction.user_id == current_user["id"], donc une
+    prédiction d'un autre utilisateur ne remonte jamais (scalar_one_or_none() -> None),
+    exactement comme une prédiction inexistante.
+    """
+    from app.db.session import get_db
+
+    mock_db = _make_db_mock()
+    pred_result = MagicMock()
+    pred_result.scalar_one_or_none.return_value = None
+    mock_db.execute = AsyncMock(return_value=pred_result)
+
+    app.dependency_overrides[get_db] = lambda: mock_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(
+                "/api/v1/validations",
+                json={"prediction_id": str(MOCK_PREDICTION_ID), "result": True},
+            )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["code"] == "NOT_FOUND"
+
+
+@pytest.mark.asyncio
 async def test_post_validation_payload_invalide_retourne_422(auth_override: None) -> None:
     """result manquant → 422."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

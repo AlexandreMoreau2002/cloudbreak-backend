@@ -36,9 +36,17 @@ async def create_validation(
     """Enregistre une validation terrain (confirmation/infirmation)."""
     user_id = str(current_user["id"])
 
-    pred_result = await db.execute(select(Prediction).where(Prediction.id == body.prediction_id))
+    pred_result = await db.execute(
+        select(Prediction).where(
+            Prediction.id == body.prediction_id,
+            Prediction.user_id == user_id,
+        )
+    )
     prediction = pred_result.scalar_one_or_none()
     if not prediction:
+        # 404 dans les deux cas (prédiction inexistante ou appartenant à un autre
+        # utilisateur) — ne jamais distinguer les deux pour éviter une fuite
+        # d'information sur l'existence de prédictions d'autrui.
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"detail": "Prédiction introuvable", "code": ErrorCode.NOT_FOUND},

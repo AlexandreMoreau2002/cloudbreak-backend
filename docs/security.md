@@ -273,9 +273,12 @@ Nouveau flux : `GET /api/v1/score` persiste désormais une `Prediction` (best-ef
 - Aucun nouveau secret ni variable d'environnement introduit par cette story.
 
 ### WARNING
-- **[validations.py]** N'importe quel utilisateur authentifié peut confirmer/infirmer **n'importe quel `prediction_id`** existant, y compris une prédiction créée par un autre utilisateur (pas de vérification `Prediction.user_id == current_user_id`). Le risque est limité (pas de données sensibles exposées, `prediction_id` est un UUID non énumérable), mais un attaquant en possession d'un `prediction_id` d'un tiers (ex: partagé par erreur) pourrait polluer ses statistiques de validation terrain. À évaluer avant recalibration de l'algo sur ces données (story future) — la légitimité du couple `(prediction_id, user_id)` n'est pas garantie.
 - **[terrain_validation.py]** `photo_url` existe déjà en colonne (`nullable`) mais est toujours forcé à `null` côté endpoint — non exploitable en l'état, mais **story 6.2** (upload photo) devra faire l'objet d'une revue sécurité dédiée : validation du type de fichier, limite de taille, contrôle d'accès au stockage (éviter qu'un `photo_url` pointe vers une ressource accessible sans auth ou qu'un utilisateur puisse écraser/lire la photo d'un autre), et scan éventuel de contenu.
-- **[user.py]** Le commentaire RGPD signalé en 2026-05-16 (story 2-4) sur `predictions`/`terrain_validations` ignorées silencieusement lors de `DELETE /api/v1/user` reste d'actualité **et devient concret maintenant que ces tables existent réellement** : la suppression de compte ne nettoie toujours pas `predictions` ni `terrain_validations` — à corriger avant release 1.0.0 pour la complétude RGPD.
+
+### Corrections appliquées dans cette branche
+- **[validations.py — commit 4ea86c8]** CORRIGÉ : ownership check ajouté — `select(Prediction).where(Prediction.id == body.prediction_id, Prediction.user_id == user_id)` → 404 si la prédiction appartient à un autre utilisateur (sans distinguer "inexistante" de "appartient à un tiers", évitant une fuite d'information sur l'existence de prédictions d'autrui).
+- **[user.py — commit 603eeb9]** CORRIGÉ : RGPD cascade-delete complété — `delete_user_data` supprime désormais `TerrainValidation` et `Prediction` par `user_id` avant les favoris et subscriptions. La dette signalée en story 2-4 est soldée.
+- **[schemas/validation.py — commit c284e65]** CORRIGÉ : `TerrainValidationCreate.prediction_id` typé `uuid.UUID` (au lieu de `str`) — Pydantic rejette désormais toute valeur malformée en 422 avant toute requête DB.
 
 ---
 

@@ -21,7 +21,7 @@ MOCK_VALIDATED_AT = datetime(2026, 7, 24, 10, 0, 0, tzinfo=UTC)
 
 
 MOCK_USER = {"id": "user-123", "email": "alex@test.com"}
-KNOWN_PREDICTION_ID = "pred-uuid-fixed-1"
+KNOWN_PREDICTION_ID = "11111111-1111-4111-8111-111111111111"
 
 MOCK_PEAK = MagicMock()
 MOCK_PEAK.id = "peak-1"

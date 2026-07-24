@@ -180,3 +180,14 @@ async def test_post_validation_payload_invalide_retourne_422(auth_override: None
             json={"prediction_id": str(MOCK_PREDICTION_ID)},
         )
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_post_validation_prediction_id_malformee_retourne_422(auth_override: None) -> None:
+    """prediction_id qui n'est pas un UUID valide → 422 (jamais de 500 DB)."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/validations",
+            json={"prediction_id": "not-a-uuid", "result": True},
+        )
+    assert response.status_code == 422

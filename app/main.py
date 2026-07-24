@@ -11,6 +11,7 @@ from app.api.v1.endpoints.peaks import router as peaks_router
 from app.api.v1.endpoints.score import router as score_router
 from app.api.v1.endpoints.health import router as health_router
 from app.api.v1.endpoints.favorites import router as favorites_router
+from app.api.v1.endpoints.validations import router as validations_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ app.include_router(user_router)
 app.include_router(score_router)
 app.include_router(health_router)
 app.include_router(favorites_router)
+app.include_router(validations_router)
 
 
 @app.exception_handler(OperationalError)

@@ -3,5 +3,6 @@
 from app.models.peak import Peak
 from app.models.favorite import Favorite
 from app.models.subscription import Subscription
+from app.models.prediction import Prediction
 
-__all__ = ["Favorite", "Peak", "Subscription"]
+__all__ = ["Favorite", "Peak", "Prediction", "Subscription"]

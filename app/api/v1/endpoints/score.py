@@ -18,19 +18,22 @@ Erreurs :
   503 WEATHER_UNAVAILABLE  — provider météo indisponible
 """
 
+import uuid
 import logging
 from sqlalchemy import select
 import redis.asyncio as aioredis
-from app.models.peak import Peak
 from typing import Annotated, Any
+from datetime import UTC, datetime
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from app.models.peak import Peak
 from app.db.session import get_db
 from app.core.config import settings
 from app.core.errors import ErrorCode
 from app.services.analytics import track
+from app.models.prediction import Prediction
 from app.core.dependencies import check_quota
 from app.services.weather import WeatherService
-from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.domain.score import build_score_presentation, calculate_score
 from app.services.weather_providers.open_meteo import OpenMeteoProvider
 from app.schemas.score import (
@@ -119,6 +122,27 @@ async def get_score(
         },
     )
 
+    prediction = Prediction(
+        id=uuid.uuid4(),
+        peak_id=peak_id,
+        user_id=str(current_user["id"]),
+        date=date,
+        hour=hour,
+        score=result["score"],
+        verdict=result["verdict"],
+        cloud_base=result["cloud_base"],
+        created_at=datetime.now(UTC),
+    )
+    try:
+        db.add(prediction)
+        await db.commit()
+        await db.refresh(prediction)
+        prediction_id = str(prediction.id)
+    except Exception as exc:
+        logger.error("prediction_persist_failed", extra={"peak_id": peak_id, "error": str(exc)})
+        # id éphémère — une validation terrain le référençant échouera proprement en 404
+        prediction_id = str(uuid.uuid4())
+
     cond = result["conditions"]
     return ScoreResponse(
         score=result["score"],
@@ -128,6 +152,7 @@ async def get_score(
         context_params=presentation["context_params"],
         cloud_base=result["cloud_base"],
         peak_slug=str(peak.slug),
+        prediction_id=prediction_id,
         optimal_window_start=presentation["optimal_window_start"],
         optimal_window_end=presentation["optimal_window_end"],
         sunrise=presentation["sunrise"],

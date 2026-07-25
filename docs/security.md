@@ -259,6 +259,29 @@ Nouveau module `app/services/analytics.py` (`track()`) : stub `logger.debug` uni
 
 ---
 
+## 2026-07-24 Story 6-1 — Validation Terrain (Confirmation/Infirmation)
+
+### Contexte
+Nouveau flux : `GET /api/v1/score` persiste désormais une `Prediction` (best-effort) à chaque calcul, et `POST /api/v1/validations` permet à l'utilisateur de confirmer/infirmer une prédiction depuis le terrain, avec `lat`/`lng` optionnels.
+
+### INFO
+- **[terrain_validation.py]** Première fois que le backend persiste une **géolocalisation réelle** de l'utilisateur (`lat`/`lng` en `Float`, nullable). Jusqu'ici le projet ne lisait que le *statut de permission* de géolocalisation côté mobile (`docs/security.md` App Privacy — "Localisation précise... opt-in"), jamais de coordonnées effectives stockées où que ce soit. `lat`/`lng` restent optionnels côté schéma (`TerrainValidationCreate`) : un utilisateur qui refuse la permission peut valider sans coordonnées.
+- **[prediction.py / terrain_validation.py]** `user_id` stocké en `String` (pas de type UUID contraint) — cohérent avec le pattern déjà en place sur `favorites`/`subscriptions` (voir WARNING story 3-3 plus haut sur `Favorite.user_id`), pas une nouvelle divergence introduite par cette story.
+- **[validations.py]** `user_id` extrait exclusivement de `current_user["id"]` (JWT validé) — jamais passé en paramètre client. Isolation correcte, même pattern que les endpoints précédents.
+- **[validations.py]** Requête `select(Prediction).where(Prediction.id == body.prediction_id)` — SQLAlchemy ORM paramétré, pas de SQL brut, pas d'injection possible.
+- **[score.py]** La persistance de `Prediction` est enveloppée dans un `try/except` : un échec DB n'empêche pas l'endpoint score de répondre (best-effort), et ne fuite pas de détail interne au client — seul `logger.error("prediction_persist_failed", ...)` est loggé côté serveur.
+- Aucun nouveau secret ni variable d'environnement introduit par cette story.
+
+### WARNING
+- **[terrain_validation.py]** `photo_url` existe déjà en colonne (`nullable`) mais est toujours forcé à `null` côté endpoint — non exploitable en l'état, mais **story 6.2** (upload photo) devra faire l'objet d'une revue sécurité dédiée : validation du type de fichier, limite de taille, contrôle d'accès au stockage (éviter qu'un `photo_url` pointe vers une ressource accessible sans auth ou qu'un utilisateur puisse écraser/lire la photo d'un autre), et scan éventuel de contenu.
+
+### Corrections appliquées dans cette branche
+- **[validations.py — commit 4ea86c8]** CORRIGÉ : ownership check ajouté — `select(Prediction).where(Prediction.id == body.prediction_id, Prediction.user_id == user_id)` → 404 si la prédiction appartient à un autre utilisateur (sans distinguer "inexistante" de "appartient à un tiers", évitant une fuite d'information sur l'existence de prédictions d'autrui).
+- **[user.py — commit 603eeb9]** CORRIGÉ : RGPD cascade-delete complété — `delete_user_data` supprime désormais `TerrainValidation` et `Prediction` par `user_id` avant les favoris et subscriptions. La dette signalée en story 2-4 est soldée.
+- **[schemas/validation.py — commit c284e65]** CORRIGÉ : `TerrainValidationCreate.prediction_id` typé `uuid.UUID` (au lieu de `str`) — Pydantic rejette désormais toute valeur malformée en 422 avant toute requête DB.
+
+---
+
 ## Checklist avant mise en prod
 
 - [ ] Variables `.env` renseignées sur le VPS (jamais en clair dans le code)

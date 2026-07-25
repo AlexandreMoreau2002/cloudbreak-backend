@@ -10,6 +10,7 @@ def test_score_response_supports_region_and_context_codes() -> None:
         context_params={"cloud_base_gap_m": 250},
         cloud_base=1200,
         peak_slug="moucherotte",
+        prediction_id="pred-uuid-1",
         optimal_window_start="06:30",
         optimal_window_end="08:00",
         sunrise="06:42",

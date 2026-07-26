@@ -1,6 +1,6 @@
 # Cloudbreak — Audit produit
 
-_Dernière mise à jour : 2026-05-14_
+_Dernière mise à jour : 2026-07-26_
 
 ---
 
@@ -35,7 +35,7 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 | Domain layer (`app/domain/`) — logique métier pure (zero I/O) | ✅ Refactorisé |
 | Contrat score présentation — `label_code`, `context_code`, `context_params`, fenêtre, stabilité | ✅ Story 3.5 |
 | i18n score côté mobile — backend renvoie codes stables, traduction dans le front uniquement | ✅ Refacto i18n |
-| Onboarding mobile narratif (story 7.1) : splash + transition mer de nuages + 3 écrans, gate AsyncStorage, permission push, sommet par défaut via API publique | ✅ |
+| Onboarding mobile narratif (story 7.1) : splash + transition mer de nuages + 3 écrans, gate AsyncStorage, permissions, sommet par défaut via API publique | ✅ |
 
 | Recherche sommets (`GET /api/v1/peaks/search` + `GET /api/v1/peaks/{slug}`) | ✅ ILIKE, limit 20 — **publics depuis story 7.1** (onboarding pré-login, aucun JWT requis) |
 | Favoris (`POST/DELETE/GET /api/v1/user/favorites`) | ✅ Avec peak info jointe |
@@ -52,6 +52,7 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 - Photo optionnelle sur validation terrain + calcul du taux de précision — story 6.2
 - Notifications push
 - Déploiement VPS (infra prod)
+- Analytics PostHog réel (le backend expose uniquement le stub d'instrumentation)
 
 ---
 
@@ -150,7 +151,7 @@ Pour enrichir le champ `region` sans relancer Overpass : `python scripts/enrich_
 
 ## Prochaines étapes produit
 
-1. **Story 3-5** — détail conditions météo + fenêtre temporelle + stabilité (mobile)
-2. **Freemium** — quota 1 consultation/jour pour les non-abonnés (epic 4)
-3. **Validations terrain** — confirmation/infirmation sans photo faite (story 6.1) ; photo optionnelle + taux de précision restent à faire (story 6.2)
-4. **Recalibration de l'algo** — après 50+ validations terrain
+1. **Story 6.2** — photo optionnelle + taux de précision par zone
+2. **StoreKit 2** — abonnement réel (story 4.3)
+3. **Déploiement VPS** — infra et monitoring de production
+4. **Recalibration de l'algo** — après un volume suffisant de validations terrain

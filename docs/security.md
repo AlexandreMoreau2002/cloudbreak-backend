@@ -43,7 +43,7 @@ Document de référence sécurité. À mettre à jour à chaque story qui touche
 - JWT Supabase validé **localement** via clé publique ECC P-256 (JWKS)
 - Zéro appel réseau Supabase par requête
 - Dependency FastAPI `get_current_user` injectée sur chaque route protégée
-- `/health` est la seule route publique sans auth
+- `/health` et les lectures publiques des sommets (`GET /api/v1/peaks/search`, `GET /api/v1/peaks/{slug}`) sont accessibles sans auth ; les routes utilisateur restent protégées
 
 ### Configuration Supabase — dev vs prod
 
@@ -69,7 +69,7 @@ Document de référence sécurité. À mettre à jour à chaque story qui touche
 ## Données utilisateur & RGPD
 
 - Hébergement Supabase région **EU (Frankfurt)** — pas de transfert hors UE
-- Endpoint `DELETE /api/v1/user` prévu dès le MVP (droit à l'effacement)
+- Endpoint `DELETE /api/v1/user` implémenté (droit à l'effacement, story 2.4)
 - Géolocalisation : consentement explicite requis, refus sans blocage de l'app
 - Paiements : StoreKit 2 uniquement — **aucun numéro de carte stocké côté backend**
 

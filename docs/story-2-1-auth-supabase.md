@@ -45,7 +45,7 @@ payload → get_current_user → {"id": "...", "email": "..."}
 ## Comment tester
 
 ### Prérequis
-- Backend Docker lancé : `docker compose -f ../infra/docker-compose.dev.yml up -d`
+- Backend Docker lancé : `docker compose -f docker-compose.dev.yml up -d`
 - `.vscode/settings.json` configuré avec `supabaseUrl`, `supabaseKey`, `jwt`
 - Environnement REST Client sur `local`
 

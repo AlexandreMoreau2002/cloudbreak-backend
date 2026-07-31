@@ -64,7 +64,7 @@ pytest tests/test_open_meteo.py -v
 pytest tests/test_weather.py -v
 
 # 3. Test endpoint (nécessite infra locale)
-docker compose -f ../infra/docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml up -d
 # puis :
 curl -H "Authorization: Bearer $TOKEN" \
   "http://localhost:8000/api/v1/score?peak_id=peak-1&date=2026-10-15&hour=6"

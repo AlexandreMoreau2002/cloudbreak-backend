@@ -90,12 +90,12 @@ pytest tests/test_peaks_data.py -v   # doit passer tous les tests
 
 # 2. Vider et reseeder
 cd backend
-docker compose -f ../infra/docker-compose.dev.yml exec db \
+docker compose -f docker-compose.dev.yml exec db \
   psql -U postgres -d cloudbreak -c "DELETE FROM user_favorites; DELETE FROM peaks;"
 source .venv/bin/activate && python -m app.db.seed
 
 # 3. Vérifier en DB
-docker compose -f ../infra/docker-compose.dev.yml exec db \
+docker compose -f docker-compose.dev.yml exec db \
   psql -U postgres -d cloudbreak -c "SELECT COUNT(*) FROM peaks;"
 ```
 

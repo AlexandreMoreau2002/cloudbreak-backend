@@ -14,7 +14,7 @@ Document de référence sécurité. À mettre à jour à chaque story qui touche
 | 5432 | PostgreSQL | localhost uniquement | ✅ Aucun |
 | 6379 | Redis | localhost uniquement | ✅ Aucun |
 
-> En prod : seul Caddy expose les ports 80/443. L'API, PostgreSQL et Redis ne sont **jamais** exposés directement à internet — ils communiquent via le réseau Docker interne.
+> En prod : seul Traefik (intégré à Dokploy) expose les ports 80/443. L'API, PostgreSQL et Redis ne sont **jamais** exposés directement à internet — ils communiquent via le réseau Docker interne.
 
 ---
 
@@ -22,7 +22,7 @@ Document de référence sécurité. À mettre à jour à chaque story qui touche
 
 - Les secrets sont dans `.env` — **jamais commité** (dans `.gitignore`)
 - `.env.example` fourni sans valeurs sensibles — commité comme template
-- En prod : variables injectées via Docker Compose, stockées sur le VPS uniquement
+- En prod : variables injectées via l'UI Dokploy, stockées sur le VPS uniquement
 - **À ne jamais faire** : hardcoder une clé dans le code, même en dev
 
 ### Secrets à rotation régulière
@@ -60,7 +60,7 @@ Document de référence sécurité. À mettre à jour à chaque story qui touche
 | Contexte | Statut |
 |----------|--------|
 | Dev local | HTTP (localhost) — acceptable |
-| Prod | HTTPS TLS automatique via Caddy + Let's Encrypt |
+| Prod | HTTPS TLS automatique via Traefik (Dokploy) + Let's Encrypt |
 | DB → API | Réseau Docker interne (non chiffré mais isolé) |
 | Redis → API | Réseau Docker interne (non chiffré mais isolé) |
 
@@ -158,7 +158,7 @@ pip-audit  # à installer : pip install pip-audit
 ### WARNING
 
 - **[dependencies.py:122]** `peak_id` lu depuis `request.query_params.get("peak_id", "")` sans validation de longueur ni de format. La chaîne vide est rejetée par le `if not peak_id` immédiatement après, mais une valeur arbitrairement longue (ex: 10 000 caractères) ou contenant des caractères spéciaux (`\n`, `:`, espaces) passe et est insérée comme membre dans le SET Redis, polluant la clé `quota:{user_id}:{date}`. Le `peak_id` vient ensuite de la DB via le routeur FastAPI sur l'endpoint score (validé ORM), mais `check_quota` est une dependency générique qui n'a pas ce contexte. Recommandation : ajouter `max_length=255` et optionnellement un pattern `^[a-zA-Z0-9_-]+$` sur `peak_id` dans la dependency avant l'appel `check_and_increment`.
-- **[health.py]** L'endpoint `GET /health` est public (pas d'auth). Il expose l'état de Redis et PostgreSQL (`"ok"` / `"unavailable"`). En prod derrière Caddy, cet endpoint est accessible depuis Internet — un attaquant peut déduire si la DB ou Redis est en panne pour optimiser une tentative d'attaque. Recommandation : soit restreindre par IP dans Caddy (allow interne uniquement), soit ne retourner que `{"status": "ok"|"degraded"}` sans détailler quel service est indisponible.
+- **[health.py]** L'endpoint `GET /health` est public (pas d'auth). Il expose l'état de Redis et PostgreSQL (`"ok"` / `"unavailable"`). En prod derrière Traefik (Dokploy), cet endpoint est accessible depuis Internet — un attaquant peut déduire si la DB ou Redis est en panne pour optimiser une tentative d'attaque. Recommandation : soit restreindre par IP dans Traefik (middleware allow interne uniquement), soit ne retourner que `{"status": "ok"|"degraded"}` sans détailler quel service est indisponible.
 - **[seed_test_users.py]** Trois UUIDs Supabase réels sont hardcodés dans `app/db/seed_test_users.py` (lignes 31, 37, 43) avec leurs emails associés (`freemium@cloudbreak.app`, `pro@cloudbreak.app`, `test@cloudbreak.app`). Ces UUIDs correspondent à des comptes Supabase existants sur l'environnement de dev. Ils sont commités dans le repo. Si le repo devient public ou si un tiers accède au code, ces comptes sont identifiés. Recommandation : déplacer ces valeurs dans une variable d'environnement `TEST_USER_IDS` ou un fichier `.env.test` non commité ; utiliser des UUIDs fictifs dans le code.
 
 ### INFO
@@ -285,8 +285,8 @@ Nouveau flux : `GET /api/v1/score` persiste désormais une `Prediction` (best-ef
 ## Checklist avant mise en prod
 
 - [ ] Variables `.env` renseignées sur le VPS (jamais en clair dans le code)
-- [ ] PostgreSQL et Redis non exposés (ports non mappés dans `docker-compose.yml` prod)
-- [ ] Caddy HTTPS opérationnel (Let's Encrypt)
+- [ ] PostgreSQL et Redis non exposés (pas de port mappé publiquement — réseau Docker interne géré par Dokploy)
+- [ ] Traefik HTTPS opérationnel (Let's Encrypt via Dokploy)
 - [ ] Rate limiting activé sur les endpoints publics
 - [x] JWT validation opérationnelle sur toutes les routes protégées
 - [ ] Confirm email réactivé dans Supabase (avant release 1.0.0)

@@ -240,7 +240,7 @@ environment:
   - LOG_LEVEL=DEBUG
 
 # Relancer
-docker compose -f ../infra/docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml up -d
 
 # Voir les logs
 docker logs -f cloudbreak-backend

@@ -56,13 +56,13 @@ test:
 
 # Infra locale (db + redis)
 dev:
-	docker compose -f ../infra/docker-compose.dev.yml up -d
+	docker compose -f docker-compose.dev.yml up -d
 
 down:
-	docker compose -f ../infra/docker-compose.dev.yml down
+	docker compose -f docker-compose.dev.yml down
 
 logs:
-	docker compose -f ../infra/docker-compose.dev.yml logs -f
+	docker compose -f docker-compose.dev.yml logs -f
 
 # Migrations
 migrate:

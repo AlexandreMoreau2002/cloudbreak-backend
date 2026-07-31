@@ -79,7 +79,7 @@ Résultat attendu : `403 Forbidden`.
 SUPABASE_SERVICE_ROLE_KEY=eyJ...  # Supabase Dashboard > Settings > API > service_role
 ```
 
-À ajouter dans `infra/docker-compose.dev.yml` :
+À ajouter dans `backend/docker-compose.dev.yml` :
 ```yaml
 - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
 ```

@@ -64,6 +64,17 @@ def test_current_user_defaults_to_permanent_when_claim_is_absent() -> None:
     assert user["is_anonymous"] is False
 
 
+def test_current_user_reads_provider_from_app_metadata() -> None:
+    """Le provider Supabase (ex: apple) est exposé comme auth_provider."""
+    from app.core.dependencies import decode_user_payload
+
+    user = decode_user_payload(
+        {"sub": "user-123", "app_metadata": {"provider": "apple"}}
+    )
+
+    assert user["auth_provider"] == "apple"
+
+
 def test_get_me_token_without_sub() -> None:
     payload = {"email": "test@cloudbreak.app"}
     with patch("app.core.dependencies.decode_supabase_jwt", return_value=payload):

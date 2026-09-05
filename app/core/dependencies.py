@@ -71,7 +71,7 @@ def get_permanent_user(
     user: dict[str, object] = Depends(get_current_user),
 ) -> dict[str, object]:
     """Refuse les actions réservées à un compte Supabase permanent."""
-    if user["is_anonymous"] is True:
+    if user.get("is_anonymous") is True:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"detail": "Compte requis", "code": ErrorCode.ACCOUNT_REQUIRED},

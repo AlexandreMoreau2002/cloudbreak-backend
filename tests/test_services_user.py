@@ -7,7 +7,7 @@ from sqlalchemy.dialects import postgresql
 
 from app.models.favorite import Favorite
 from app.services.user import delete_user_data
-from app.services.user import get_or_create_user, update_user_survey
+from app.services.user import get_or_create_user, get_user_profile, provision_user, update_user_survey
 from app.models.prediction import Prediction
 from app.models.subscription import Subscription
 from app.models.terrain_validation import TerrainValidation
@@ -136,3 +136,77 @@ async def test_update_user_survey_preserves_terminal_skip() -> None:
     assert actual.practice is None
     assert actual.newsletter_opt_in is None
     db.flush.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_user_profile_returns_row_or_none() -> None:
+    profile = User(supabase_user_id="user-123", auth_provider="email")
+    found = MagicMock()
+    found.scalar_one_or_none.return_value = profile
+    absent = MagicMock()
+    absent.scalar_one_or_none.return_value = None
+    db = AsyncMock()
+
+    db.execute.return_value = found
+    assert await get_user_profile("user-123", db) is profile
+
+    db.execute.return_value = absent
+    assert await get_user_profile("missing", db) is None
+
+
+@pytest.mark.asyncio
+async def test_provision_user_delegates_to_get_or_create() -> None:
+    profile = User(supabase_user_id="user-123", auth_provider="apple")
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = profile
+    db = AsyncMock()
+    db.execute.return_value = result
+
+    actual = await provision_user({"id": "user-123", "auth_provider": "apple"}, db)
+
+    assert actual is profile
+
+
+@pytest.mark.asyncio
+async def test_update_user_survey_records_first_answer() -> None:
+    profile = User(supabase_user_id="user-123", auth_provider="email")
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = profile
+    db = AsyncMock()
+    db.execute.return_value = result
+
+    actual = await update_user_survey(
+        {"id": "user-123", "auth_provider": "email"},
+        SurveyUpdate(
+            acquisition_source=AcquisitionSource.INSTAGRAM,
+            practice=Practice.PHOTOGRAPHER,
+            newsletter_opt_in=True,
+        ),
+        db,
+    )
+
+    assert actual.acquisition_source == AcquisitionSource.INSTAGRAM.value
+    assert actual.practice == Practice.PHOTOGRAPHER.value
+    assert actual.newsletter_opt_in is True
+    assert actual.survey_completed_at is not None
+    db.flush.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_update_user_survey_records_first_skip() -> None:
+    profile = User(supabase_user_id="user-123", auth_provider="email")
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = profile
+    db = AsyncMock()
+    db.execute.return_value = result
+
+    actual = await update_user_survey(
+        {"id": "user-123", "auth_provider": "email"},
+        SurveyUpdate(skipped=True),
+        db,
+    )
+
+    assert actual.survey_skipped_at is not None
+    assert actual.survey_completed_at is None
+    assert actual.acquisition_source is None
+    db.flush.assert_awaited_once_with()

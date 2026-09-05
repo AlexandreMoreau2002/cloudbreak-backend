@@ -1,13 +1,12 @@
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from app.db.session import get_db
 from app.core.config import settings
-from app.core.errors import ErrorCode
 from app.services.analytics import track
-from app.core.dependencies import get_current_user
 from app.core.security import delete_supabase_user
 from app.schemas.user import SurveyUpdate, UserProfile
+from app.core.dependencies import get_current_user, get_permanent_user
 from app.services.user import delete_user_data, get_user_profile, provision_user, update_user_survey
 
 logger = logging.getLogger(__name__)
@@ -32,20 +31,11 @@ async def get_me(
     }
 
 
-def _require_permanent(current_user: dict[str, object]) -> None:
-    if bool(current_user.get("is_anonymous", False)):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"detail": "Un compte permanent est requis", "code": ErrorCode.ACCOUNT_REQUIRED},
-        )
-
-
 @router.post("/provision", response_model=UserProfile)
 async def provision(
-    current_user: dict[str, object] = Depends(get_current_user),
+    current_user: dict[str, object] = Depends(get_permanent_user),
     db: AsyncSession = Depends(get_db),
 ) -> object:
-    _require_permanent(current_user)
     profile = await provision_user(current_user, db)
     await db.commit()
     return profile
@@ -54,10 +44,9 @@ async def provision(
 @router.patch("/survey", response_model=UserProfile)
 async def survey(
     payload: SurveyUpdate,
-    current_user: dict[str, object] = Depends(get_current_user),
+    current_user: dict[str, object] = Depends(get_permanent_user),
     db: AsyncSession = Depends(get_db),
 ) -> object:
-    _require_permanent(current_user)
     profile = await update_user_survey(current_user, payload, db)
     await db.commit()
     return profile
@@ -65,7 +54,7 @@ async def survey(
 
 @router.delete("", status_code=204)
 async def delete_user(
-    current_user: dict[str, object] = Depends(get_current_user),
+    current_user: dict[str, object] = Depends(get_permanent_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Supprime le compte utilisateur et toutes ses données (RGPD).

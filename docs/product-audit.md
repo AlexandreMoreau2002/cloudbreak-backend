@@ -42,7 +42,11 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 | Quota freemium Redis — 1 sommet unique/jour, bypass Premium/Pro, reset minuit UTC | ✅ Story 4.1 |
 | `make seed-test` / `make unseed-test` — users de test Supabase (freemium, pro) | ✅ Story 4.1 |
 | `make clean-subscriptions` / `make reset-db` — maintenance DB dev | ✅ Story 4.1 |
-| Suppression compte RGPD (`DELETE /api/v1/user/`) — suppression DB + Supabase Auth → 204 | ✅ Story 2.4 |
+| Suppression compte RGPD (`DELETE /api/v1/user/`) — suppression DB + Supabase Auth → 204, compte permanent requis | ✅ Story 2.4 |
+| Provisioning compte permanent (`POST /api/v1/user/provision`) — projection `users` idempotente (get-or-create) à la conversion depuis une session anonyme | ✅ Stories 2.5/2.6 — JWT permanent requis (403 `ACCOUNT_REQUIRED` si anonyme) |
+| Profil / état sondage (`GET /api/v1/user/me`) — expose `is_anonymous`, `provisioned`, `survey_completed_at`, `survey_skipped_at` | ✅ Stories 2.5/2.8 |
+| Mini-sondage post-création (`PATCH /api/v1/user/survey`) — `acquisition_source`, `practice`, `newsletter_opt_in` ou `skipped`, colonnes typées de `users`, terminal + idempotent | ✅ Story 2.8 — JWT permanent requis |
+| Favoris — refus explicite d'une session anonyme (403 `ACCOUNT_REQUIRED`) | ✅ Stories 2.5/3.3 |
 | Instrumentation analytics — `track()` stub DEBUG-only sur `score_calculated`, `quota_bypassed`, `quota_exceeded`, `favorite_added/removed`, `account_deleted` (story 1.7) | ✅ Stub, aucun réseau |
 | Validation terrain (`POST /api/v1/validations`) — confirmation/infirmation d'une prédiction, persistance `Prediction` best-effort à chaque `GET /api/v1/score`, table `terrain_validations` (`result`, `lat`/`lng` optionnels) (story 6.1) | ✅ Sans photo — voir story 6.2 |
 

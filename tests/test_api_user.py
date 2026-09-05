@@ -5,7 +5,7 @@ from app.main import app
 from app.db.session import get_db
 from app.core.dependencies import get_current_user
 
-_FAKE_USER = {"id": "user-123", "email": "t@t.com"}
+_FAKE_USER = {"id": "user-123", "email": "t@t.com", "is_anonymous": False}
 
 
 async def _override_db():
@@ -45,6 +45,42 @@ def test_anonymous_cannot_provision() -> None:
         app.dependency_overrides.clear()
     assert response.status_code == 403
     assert response.json()["detail"]["code"] == "ACCOUNT_REQUIRED"
+
+
+def test_anonymous_cannot_submit_survey() -> None:
+    app.dependency_overrides[get_current_user] = lambda: {
+        "id": "anon-123",
+        "is_anonymous": True,
+    }
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        with TestClient(app) as client:
+            response = client.patch("/api/v1/user/survey", json={"skipped": True})
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "ACCOUNT_REQUIRED"
+
+
+@patch("app.api.v1.endpoints.user.get_user_profile", new_callable=AsyncMock, return_value=None)
+def test_get_me_for_anonymous_session_skips_profile_lookup(mock_profile: AsyncMock) -> None:
+    app.dependency_overrides[get_current_user] = lambda: {
+        "id": "anon-123",
+        "email": None,
+        "is_anonymous": True,
+    }
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        with TestClient(app) as client:
+            response = client.get("/api/v1/user/me")
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 200
+    body = response.json()
+    assert body["is_anonymous"] is True
+    assert body["provisioned"] is False
+    assert body["survey_completed_at"] is None
+    mock_profile.assert_not_awaited()
 
 
 @patch("app.api.v1.endpoints.user.provision_user", new_callable=AsyncMock)
@@ -88,6 +124,33 @@ def test_survey_rejects_unknown_fields_and_invalid_enum(mock_update: AsyncMock) 
         app.dependency_overrides.clear()
     assert response.status_code == 422
     mock_update.assert_not_awaited()
+
+
+@patch("app.api.v1.endpoints.user.update_user_survey", new_callable=AsyncMock)
+def test_survey_persists_answer_for_permanent_account(mock_update: AsyncMock) -> None:
+    mock_update.return_value = {
+        "supabase_user_id": "user-123",
+        "auth_provider": "email",
+        "created_at": datetime.now(UTC),
+        "converted_at": datetime.now(UTC),
+    }
+    app.dependency_overrides[get_current_user] = lambda: {
+        "id": "user-123",
+        "email": "a@example.com",
+        "is_anonymous": False,
+    }
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        with TestClient(app) as client:
+            response = client.patch(
+                "/api/v1/user/survey",
+                json={"acquisition_source": "app_store", "practice": "hiker"},
+            )
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert response.json()["supabase_user_id"] == "user-123"
+    mock_update.assert_awaited_once()
 
 
 @patch("app.api.v1.endpoints.user.delete_supabase_user", new_callable=AsyncMock)

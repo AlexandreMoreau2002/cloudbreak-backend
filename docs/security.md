@@ -342,3 +342,17 @@ Story 4.4 (AC6) — checklist à reporter dans **App Store Connect → App Priva
 - **[backend/app/core/dependencies.py:47-79; backend/app/api/v1/endpoints/favorites.py:37,89,116]** Le JWT est validé localement, l’identité provient de `sub`, et les comptes anonymes sont refusés pour les favoris; aucun `user_id` client n’est accepté.
 - **[backend/app/api/v1/endpoints/user.py:43-63; backend/app/schemas/user.py:22-45]** Provisioning et sondage sont protégés par JWT et valident les champs via Pydantic (`extra="forbid"`, enums, booléen); les requêtes de service utilisent SQLAlchemy.
 - **[mobile/src/contexts/AccountGateContext.tsx:41-60; mobile/src/app/verify.tsx:11-15]** Les credentials e-mail restent en mémoire React et sont effacés à la fin/annulation du parcours; aucune écriture du mot de passe dans AsyncStorage n’a été introduite.
+
+### Corrections et compléments d’audit (2026-09-05 — cloudbreak-security)
+
+**Correction du CRITIQUE 2 :** `beginEmailUpgrade`, `completeEmailUpgrade` et `resendEmailUpgrade` dans `AuthContext.tsx` sont entièrement stubés et retournent immédiatement `EMAIL_UPGRADE_UNAVAILABLE`. Le chemin qui appelle `gate.setEmailUpgradeCredentials` dans `account.tsx` n’est donc jamais atteint (l’erreur est retournée avant le `router.push(‘/verify’)`). La préoccupation OTP/`email_change` du CRITIQUE 2 et du WARNING 1 est sans objet dans l’implémentation actuelle — à ré-auditer lors de l’activation réelle du flux email.
+
+**WARNING supplémentaire :**
+- **[backend/app/api/v1/endpoints/user.py:68]** `DELETE /api/v1/user` utilise `get_current_user` sans appel à `_require_permanent`. Un JWT anonyme valide peut donc déclencher cet endpoint, qui appelera l’API Admin Supabase (`delete_supabase_user`) pour supprimer le compte anonyme. Il n’y a pas d’IDOR (le `user_id` est extrait du JWT), mais le chemin appelle inutilement la `service_role_key` pour des comptes éphémères. Si la suppression de comptes anonymes est volontairement supportée, documenter ce choix. Sinon, ajouter `_require_permanent` au même titre que `/provision` et `/survey`.
+
+**INFO supplémentaires :**
+- **[mobile/src/contexts/AuthContext.tsx:185-207]** Sign in with Apple : nonce généré depuis 32 octets cryptographiques (`Crypto.getRandomBytesAsync(32)`), SHA-256 envoyé à Apple (`hashedNonce`), nonce brut (`rawNonce`) envoyé à Supabase. Ni l’un ni l’autre n’est loggé ni stocké dans AsyncStorage. Pattern conforme aux exigences Apple et résistant au rejeu.
+- **[backend/app/core/security.py:23-24]** Les erreurs de décodage JWT (`JWTError` de python-jose) sont encapsulées dans `ValueError` puis interceptées en `except ValueError` dans `dependencies.py`, qui retourne `"Token invalide ou expiré"` au client — aucun détail interne de l’erreur jose n’est exposé.
+- **[backend/app/models/user.py; alembic/versions/f2a3b4c5d6e7]** La table `users` ne stocke aucun champ email, téléphone ou mot de passe — uniquement `supabase_user_id` (UUID PK), `auth_provider`, timestamps et réponses sondage. Pas de duplication de PII depuis Supabase auth.
+- **[backend/http/user-provisioning.http; backend/http/auth.http]** Aucun token réel commité : les fichiers `.http` utilisent `{{$dotenv CLOUDBREAK_JWT}}` et `{{testEmail}}`/`{{password}}` — variables d’environnement VS Code REST Client, jamais de valeur en dur.
+- **[backend/app/services/user.py:72-83]** `update_user_survey` est idempotent : la mise à jour est un no-op si `survey_completed_at` ou `survey_skipped_at` est déjà renseigné — aucun écrasement cross-user possible puisque `user_id` provient du JWT.

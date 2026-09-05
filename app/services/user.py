@@ -5,12 +5,12 @@ from datetime import UTC, datetime
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.models.user import User
 from app.models.favorite import Favorite
+from app.schemas.user import SurveyUpdate
 from app.models.prediction import Prediction
 from app.models.subscription import Subscription
 from app.models.terrain_validation import TerrainValidation
-from app.models.user import User
-from app.schemas.user import SurveyUpdate
 
 logger = logging.getLogger(__name__)
 

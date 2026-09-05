@@ -320,3 +320,25 @@ Story 4.4 (AC6) — checklist à reporter dans **App Store Connect → App Priva
 4. **Pas de pub, pas de tracking tiers** → section "Tracking" App Store Connect = vide
 
 > ⚠️ **Déclarer honnêtement** — une fausse déclaration App Privacy est une cause de bannissement Apple.
+
+---
+
+## 2026-09-05 Stories 2.5 / 2.6 / 2.8 — Parcours compte invité, Apple et sondage
+
+### CRITIQUE
+
+- **[Supabase dev / mobile/docs/story-2-5-manual-test-guide.md:15,20]** Anonymous Auth et le provider Apple sont désactivés (`external.anonymous_users: false`, `external.apple: false`). L’application ne peut donc pas créer la session invitée nécessaire au quota et le parcours Sign in with Apple ne peut pas fonctionner. → Activer les deux providers sur l’instance dev ciblée, puis refaire une preuve sur build native avant merge.
+- **[Supabase dev / mobile/docs/story-2-5-manual-test-guide.md:16-18]** `mailer_autoconfirm: true` et aucun template OTP/type `verifyOtp` n’ont été validés. Le parcours e-mail implémenté utilise provisoirement `verifyOtp.type: 'email_change'`; il est impossible de garantir la vérification d’adresse ou la conversion de la session anonyme. → Activer Confirm email, vérifier le template `{{ .Token }}` et confirmer le type OTP ainsi que l’UUID avant/après sur une boîte de test avant d’autoriser la mise en production.
+- **[mobile/src/services/supabaseClient.ts:3,8]** La session Supabase, qui contient le JWT d’accès, est persistée dans `AsyncStorage`, stockage non chiffré. Le nouveau flux introduit en plus des sessions anonymes et des conversions de compte, ce qui augmente l’impact d’une extraction du stockage local. → Migrer le storage Supabase vers `expo-secure-store` avant release/merge de l’authentification.
+
+### WARNING
+
+- **[mobile/src/contexts/AuthContext.tsx:165-177; mobile/docs/story-2-5-manual-test-guide.md:17-19]** Le code OTP et le type `email_change` sont câblés sans preuve de compatibilité avec la configuration Supabase actuelle; le guide confirme que le type, la réception et la conservation de l’UUID restent non déterminés. → Ne valider le contrat qu’après un flow réel avec code erroné, expiration et renvoi.
+- **[backend/app/core/config.py:8-15; backend/app/main.py:25-27]** Les paramètres critiques (`supabase_jwt_jwks`, `supabase_url`, `supabase_service_role_key`) ont encore une valeur vide par défaut et ne sont pas validés au démarrage. Un déploiement mal configuré démarre puis échoue sur l’auth/provisioning/suppression. → Refuser le démarrage en production si ces secrets/configurations sont absents ou invalides; conserver des clés dev/prod distinctes.
+- **[backend/app/api/v1/endpoints/user.py:54-63]** Le sondage accepte un consentement newsletter mais aucun endpoint de retrait/modification n’est fourni; la valeur est persistée de façon terminale avec le sondage. → Prévoir un mécanisme de retrait du consentement avant la collecte en production.
+
+### INFO
+
+- **[backend/app/core/dependencies.py:47-79; backend/app/api/v1/endpoints/favorites.py:37,89,116]** Le JWT est validé localement, l’identité provient de `sub`, et les comptes anonymes sont refusés pour les favoris; aucun `user_id` client n’est accepté.
+- **[backend/app/api/v1/endpoints/user.py:43-63; backend/app/schemas/user.py:22-45]** Provisioning et sondage sont protégés par JWT et valident les champs via Pydantic (`extra="forbid"`, enums, booléen); les requêtes de service utilisent SQLAlchemy.
+- **[mobile/src/contexts/AccountGateContext.tsx:41-60; mobile/src/app/verify.tsx:11-15]** Les credentials e-mail restent en mémoire React et sont effacés à la fin/annulation du parcours; aucune écriture du mot de passe dans AsyncStorage n’a été introduite.

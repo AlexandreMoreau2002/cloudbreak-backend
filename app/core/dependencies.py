@@ -24,10 +24,15 @@ _redis: Redis | None = None
 
 def decode_user_payload(payload: dict[str, Any]) -> dict[str, object]:
     """Construit le contexte utilisateur métier depuis les claims Supabase validés."""
+    app_metadata = payload.get("app_metadata")
+    provider = "email"
+    if isinstance(app_metadata, dict) and isinstance(app_metadata.get("provider"), str):
+        provider = app_metadata["provider"]
     return {
         "id": payload["sub"],
         "email": payload.get("email"),
         "is_anonymous": payload.get("is_anonymous") is True,
+        "auth_provider": provider,
     }
 
 

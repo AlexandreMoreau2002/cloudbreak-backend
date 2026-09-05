@@ -24,7 +24,14 @@ def test_get_me_invalid_token() -> None:
 
 def test_get_me_valid_token() -> None:
     payload = {"sub": "user-123", "email": "test@cloudbreak.app"}
-    with patch("app.core.dependencies.decode_supabase_jwt", return_value=payload):
+    with (
+        patch("app.core.dependencies.decode_supabase_jwt", return_value=payload),
+        patch(
+            "app.api.v1.endpoints.user.get_user_profile",
+            new_callable=AsyncMock,
+            return_value=None,
+        ),
+    ):
         response = client.get(
             "/api/v1/user/me",
             headers={"Authorization": "Bearer valid.token.here"},
@@ -40,7 +47,12 @@ def test_current_user_exposes_anonymous_claim() -> None:
 
     user = decode_user_payload({"sub": "guest", "is_anonymous": True})
 
-    assert user == {"id": "guest", "email": None, "is_anonymous": True}
+    assert user == {
+        "id": "guest",
+        "email": None,
+        "is_anonymous": True,
+        "auth_provider": "email",
+    }
 
 
 def test_current_user_defaults_to_permanent_when_claim_is_absent() -> None:

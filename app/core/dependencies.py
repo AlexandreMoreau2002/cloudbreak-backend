@@ -2,17 +2,17 @@ import logging
 from typing import Any
 from sqlalchemy import select
 from redis.asyncio import Redis
-from app.db.session import get_db
 from datetime import UTC, datetime
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from app.db.session import get_db
 from app.core.config import settings
 from app.core.errors import ErrorCode
 from app.services.analytics import track
-from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.subscription import Subscription
 from app.core.security import decode_supabase_jwt
-from fastapi import Depends, HTTPException, Request, status
 from app.services.quota import QuotaService, QuotaExceededException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 logger = logging.getLogger(__name__)
 

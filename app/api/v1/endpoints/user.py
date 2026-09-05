@@ -1,14 +1,14 @@
 import logging
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, HTTPException, status
 from app.db.session import get_db
 from app.core.config import settings
-from fastapi import APIRouter, Depends, HTTPException, status
-from app.services.analytics import track
-from app.services.user import delete_user_data, get_user_profile, provision_user, update_user_survey
-from app.schemas.user import SurveyUpdate, UserProfile
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.dependencies import get_current_user
 from app.core.errors import ErrorCode
+from app.services.analytics import track
+from app.core.dependencies import get_current_user
 from app.core.security import delete_supabase_user
+from app.schemas.user import SurveyUpdate, UserProfile
+from app.services.user import delete_user_data, get_user_profile, provision_user, update_user_survey
 
 logger = logging.getLogger(__name__)
 

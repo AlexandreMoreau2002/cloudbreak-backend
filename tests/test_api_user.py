@@ -1,9 +1,9 @@
-from app.main import app
+from datetime import UTC, datetime
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch
-from app.core.dependencies import get_current_user
+from app.main import app
 from app.db.session import get_db
-from datetime import UTC, datetime
+from app.core.dependencies import get_current_user
 
 _FAKE_USER = {"id": "user-123", "email": "t@t.com"}
 

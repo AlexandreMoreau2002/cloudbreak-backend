@@ -6,8 +6,13 @@ from sqlalchemy.sql.dml import Delete
 from sqlalchemy.dialects import postgresql
 
 from app.models.favorite import Favorite
-from app.services.user import delete_user_data
-from app.services.user import get_or_create_user, get_user_profile, provision_user, update_user_survey
+from app.services.user import (
+    delete_user_data,
+    get_or_create_user,
+    get_user_profile,
+    provision_user,
+    update_user_survey,
+)
 from app.models.prediction import Prediction
 from app.models.subscription import Subscription
 from app.models.terrain_validation import TerrainValidation

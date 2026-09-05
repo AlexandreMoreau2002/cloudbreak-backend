@@ -34,6 +34,24 @@ def test_get_me_valid_token() -> None:
     assert response.json()["email"] == "test@cloudbreak.app"
 
 
+def test_current_user_exposes_anonymous_claim() -> None:
+    """Le JWT Supabase anonyme conserve son statut jusqu'aux dépendances métier."""
+    from app.core.dependencies import decode_user_payload
+
+    user = decode_user_payload({"sub": "guest", "is_anonymous": True})
+
+    assert user == {"id": "guest", "email": None, "is_anonymous": True}
+
+
+def test_current_user_defaults_to_permanent_when_claim_is_absent() -> None:
+    """Les JWT permanents existants sans claim explicite restent compatibles."""
+    from app.core.dependencies import decode_user_payload
+
+    user = decode_user_payload({"sub": "user-123", "email": "test@cloudbreak.app"})
+
+    assert user["is_anonymous"] is False
+
+
 def test_get_me_token_without_sub() -> None:
     payload = {"email": "test@cloudbreak.app"}
     with patch("app.core.dependencies.decode_supabase_jwt", return_value=payload):

@@ -22,6 +22,15 @@ bearer_scheme = HTTPBearer()
 _redis: Redis | None = None
 
 
+def decode_user_payload(payload: dict[str, Any]) -> dict[str, object]:
+    """Construit le contexte utilisateur métier depuis les claims Supabase validés."""
+    return {
+        "id": payload["sub"],
+        "email": payload.get("email"),
+        "is_anonymous": payload.get("is_anonymous") is True,
+    }
+
+
 async def get_redis() -> Redis:
     """Retourne le client Redis (singleton)."""
     global _redis
@@ -50,7 +59,19 @@ def get_current_user(
             detail="Token invalide",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return {"id": user_id, "email": payload.get("email")}
+    return decode_user_payload(payload)
+
+
+def get_permanent_user(
+    user: dict[str, object] = Depends(get_current_user),
+) -> dict[str, object]:
+    """Refuse les actions réservées à un compte Supabase permanent."""
+    if user["is_anonymous"] is True:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"detail": "Compte requis", "code": ErrorCode.ACCOUNT_REQUIRED},
+        )
+    return user
 
 
 async def get_user_subscription(user_id: str, db: AsyncSession) -> Subscription | None:

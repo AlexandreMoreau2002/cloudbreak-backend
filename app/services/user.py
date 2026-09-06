@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import User
 from app.models.favorite import Favorite
-from app.schemas.user import SurveyUpdate
+from app.schemas.user import SurveyUpdate, PreferencesUpdate
 from app.models.prediction import Prediction
 from app.models.subscription import Subscription
 from app.models.terrain_validation import TerrainValidation
@@ -81,5 +81,19 @@ async def update_user_survey(
         profile.practice = survey.practice.value if survey.practice else None
         profile.newsletter_opt_in = survey.newsletter_opt_in
         profile.survey_completed_at = datetime.now(UTC)
+    await db.flush()
+    return profile
+
+
+async def update_user_preferences(
+    user: dict[str, object], prefs: PreferencesUpdate, db: AsyncSession
+) -> User:
+    """Met à jour le consentement newsletter — toujours modifiable, dans les deux sens.
+
+    Contrairement au sondage (`update_user_survey`), il n'y a pas de champ terminal :
+    l'utilisateur peut retirer son consentement à tout moment (RGPD art. 7-3).
+    """
+    profile = await get_or_create_user(str(user["id"]), str(user.get("auth_provider", "email")), db)
+    profile.newsletter_opt_in = prefs.newsletter_opt_in  # type: ignore[assignment]
     await db.flush()
     return profile

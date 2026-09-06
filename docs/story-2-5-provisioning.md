@@ -18,6 +18,11 @@ permanent, jamais pour une session anonyme.
 - `PATCH /api/v1/user/survey` accepte uniquement `acquisition_source`, `practice`,
   `newsletter_opt_in` et `skipped`. La première réponse (ou le skip) est conservée ; les appels
   suivants sont sans effet.
+- `PATCH /api/v1/user/preferences` accepte uniquement `newsletter_opt_in` (booléen requis) et
+  exige un JWT permanent (`403 ACCOUNT_REQUIRED` sinon). Contrairement au sondage, il n'a **pas
+  de champ terminal** : le consentement newsletter est modifiable dans les deux sens à tout
+  moment (RGPD art. 7-3, retrait du consentement aussi simple que son octroi). C'est le seul
+  chemin pour revenir sur le `newsletter_opt_in` fixé au sondage.
 - `GET /api/v1/user/me` expose `is_anonymous`, `provisioned`, `survey_completed_at` et
   `survey_skipped_at`.
 
@@ -38,6 +43,9 @@ variable d’environnement. Vérifier deux provisions successifs (même profil),
 partielle, un skip puis `GET /me`. Vérifier qu'un second PATCH après réponse ou skip est sans
 effet, qu'un champ inconnu ou une valeur d'enum invalide est rejeté (`422`) et que la concurrence
 ne crée pas deux lignes. Tester enfin la suppression RGPD (données locales puis `auth.users`).
+Vérifier enfin `PATCH /api/v1/user/preferences` : retrait puis ré-octroi du consentement
+(`newsletter_opt_in` bascule dans les deux sens), champ inconnu ou body vide rejeté (`422`),
+sans `Authorization` (`403`), JWT anonyme (`403 ACCOUNT_REQUIRED`).
 Ne jamais inscrire de token dans ce fichier.
 
 ## Dépendances de configuration

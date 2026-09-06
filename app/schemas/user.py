@@ -31,6 +31,14 @@ class SurveyUpdate(BaseModel):
     skipped: bool = False
 
 
+class PreferencesUpdate(BaseModel):
+    """Consentements modifiables à tout moment (RGPD art. 7-3)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    newsletter_opt_in: bool
+
+
 class UserProfile(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

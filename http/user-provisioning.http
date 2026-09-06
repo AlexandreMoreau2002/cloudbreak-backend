@@ -33,6 +33,33 @@ Content-Type: application/json
 
 {"skipped": true}
 
+### Newsletter consent — withdraw (RGPD, always mutable, unlike the survey)
+PATCH {{baseUrl}}/api/v1/user/preferences
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"newsletter_opt_in": false}
+
+### Newsletter consent — grant again
+PATCH {{baseUrl}}/api/v1/user/preferences
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"newsletter_opt_in": true}
+
+### Preferences without Authorization: expected 403
+PATCH {{baseUrl}}/api/v1/user/preferences
+Content-Type: application/json
+
+{"newsletter_opt_in": false}
+
+### Preferences with unknown field: expected 422
+PATCH {{baseUrl}}/api/v1/user/preferences
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"unexpected": true}
+
 ### Anonymous JWT: expected 403 ACCOUNT_REQUIRED
 # POST {{baseUrl}}/api/v1/user/provision
 # Authorization: Bearer <anonymous-jwt>

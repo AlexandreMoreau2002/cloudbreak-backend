@@ -153,6 +153,65 @@ def test_survey_persists_answer_for_permanent_account(mock_update: AsyncMock) ->
     mock_update.assert_awaited_once()
 
 
+def test_anonymous_cannot_update_preferences() -> None:
+    app.dependency_overrides[get_current_user] = lambda: {
+        "id": "anon-123",
+        "is_anonymous": True,
+    }
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        with TestClient(app) as client:
+            response = client.patch(
+                "/api/v1/user/preferences", json={"newsletter_opt_in": False}
+            )
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "ACCOUNT_REQUIRED"
+
+
+@patch("app.api.v1.endpoints.user.update_user_preferences", new_callable=AsyncMock)
+def test_preferences_rejects_unknown_or_missing_fields(mock_update: AsyncMock) -> None:
+    app.dependency_overrides[get_current_user] = lambda: {
+        "id": "user-123",
+        "is_anonymous": False,
+    }
+    try:
+        with TestClient(app) as client:
+            response = client.patch("/api/v1/user/preferences", json={"unexpected": True})
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 422
+    mock_update.assert_not_awaited()
+
+
+@patch("app.api.v1.endpoints.user.update_user_preferences", new_callable=AsyncMock)
+def test_preferences_withdraws_consent_for_permanent_account(mock_update: AsyncMock) -> None:
+    mock_update.return_value = {
+        "supabase_user_id": "user-123",
+        "auth_provider": "email",
+        "created_at": datetime.now(UTC),
+        "converted_at": datetime.now(UTC),
+        "newsletter_opt_in": False,
+    }
+    app.dependency_overrides[get_current_user] = lambda: {
+        "id": "user-123",
+        "email": "a@example.com",
+        "is_anonymous": False,
+    }
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        with TestClient(app) as client:
+            response = client.patch(
+                "/api/v1/user/preferences", json={"newsletter_opt_in": False}
+            )
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert response.json()["newsletter_opt_in"] is False
+    mock_update.assert_awaited_once()
+
+
 @patch("app.api.v1.endpoints.user.delete_supabase_user", new_callable=AsyncMock)
 @patch("app.api.v1.endpoints.user.delete_user_data", new_callable=AsyncMock)
 def test_delete_user_retourne_204(

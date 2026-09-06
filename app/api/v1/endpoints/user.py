@@ -5,9 +5,15 @@ from app.db.session import get_db
 from app.core.config import settings
 from app.services.analytics import track
 from app.core.security import delete_supabase_user
-from app.schemas.user import SurveyUpdate, UserProfile
 from app.core.dependencies import get_current_user, get_permanent_user
-from app.services.user import delete_user_data, get_user_profile, provision_user, update_user_survey
+from app.schemas.user import SurveyUpdate, UserProfile, PreferencesUpdate
+from app.services.user import (
+    delete_user_data,
+    get_user_profile,
+    provision_user,
+    update_user_survey,
+    update_user_preferences,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +54,18 @@ async def survey(
     db: AsyncSession = Depends(get_db),
 ) -> object:
     profile = await update_user_survey(current_user, payload, db)
+    await db.commit()
+    return profile
+
+
+@router.patch("/preferences", response_model=UserProfile)
+async def preferences(
+    payload: PreferencesUpdate,
+    current_user: dict[str, object] = Depends(get_permanent_user),
+    db: AsyncSession = Depends(get_db),
+) -> object:
+    """Met à jour le consentement newsletter (RGPD — retrait de consentement à tout moment)."""
+    profile = await update_user_preferences(current_user, payload, db)
     await db.commit()
     return profile
 

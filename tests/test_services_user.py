@@ -12,12 +12,13 @@ from app.services.user import (
     get_user_profile,
     provision_user,
     update_user_survey,
+    update_user_preferences,
 )
 from app.models.prediction import Prediction
 from app.models.subscription import Subscription
 from app.models.terrain_validation import TerrainValidation
 from app.models.user import User
-from app.schemas.user import AcquisitionSource, Practice, SurveyUpdate
+from app.schemas.user import AcquisitionSource, Practice, SurveyUpdate, PreferencesUpdate
 
 
 @pytest.mark.asyncio
@@ -141,6 +142,32 @@ async def test_update_user_survey_preserves_terminal_skip() -> None:
     assert actual.practice is None
     assert actual.newsletter_opt_in is None
     db.flush.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_update_user_preferences_sets_consent_both_ways() -> None:
+    profile = User(supabase_user_id="user-123", auth_provider="email")
+    profile.survey_completed_at = datetime.now(UTC)
+    profile.newsletter_opt_in = True
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = profile
+    db = AsyncMock()
+    db.execute.return_value = result
+
+    withdrawn = await update_user_preferences(
+        {"id": "user-123", "auth_provider": "email"},
+        PreferencesUpdate(newsletter_opt_in=False),
+        db,
+    )
+    assert withdrawn.newsletter_opt_in is False
+
+    granted = await update_user_preferences(
+        {"id": "user-123", "auth_provider": "email"},
+        PreferencesUpdate(newsletter_opt_in=True),
+        db,
+    )
+    assert granted.newsletter_opt_in is True
+    assert db.flush.await_count == 2
 
 
 @pytest.mark.asyncio

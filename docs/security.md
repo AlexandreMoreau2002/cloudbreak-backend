@@ -357,3 +357,22 @@ Story 4.4 (AC6) — checklist à reporter dans **App Store Connect → App Priva
 - **[backend/http/user-provisioning.http; backend/http/auth.http]** Aucun token réel commité : les fichiers `.http` utilisent `{{$dotenv CLOUDBREAK_JWT}}` et `{{testEmail}}`/`{{password}}` — variables d’environnement VS Code REST Client, jamais de valeur en dur.
 - **[backend/app/services/user.py:72-83]** `update_user_survey` est idempotent : la mise à jour est un no-op si `survey_completed_at` ou `survey_skipped_at` est déjà renseigné — aucun écrasement cross-user possible puisque `user_id` provient du JWT.
 - **[backend/app/services/user.py — `update_user_preferences`]** N'écrit que `newsletter_opt_in`, `user_id` issu du JWT (pas d'IDOR), JWT permanent exigé via `get_permanent_user`. Schéma `PreferencesUpdate` en `extra="forbid"` : tout champ inconnu → `422`.
+
+---
+
+## 2026-09-06 Session additions — Keychain iOS + consentement newsletter
+
+### RÉSOLU
+
+- **[CRITIQUE 3 — mobile/src/services/supabaseClient.ts]** La session Supabase (JWT access + refresh token) est désormais rangée dans le **Keychain iOS** via `expo-secure-store`. L'adaptateur `secureSessionStorage` fragmente la valeur par blocs de 1 536 octets (limite ~2 048 octets de SecureStore) et migre au premier accès une session héritée d'AsyncStorage (recopie dans le Keychain puis suppression du plaintext). Plus aucun token en clair dans AsyncStorage. Plugin `expo-secure-store` déclaré dans `app.config.ts`. Rebuild natif requis avant le prochain test sur simulateur.
+- **[WARNING 2026-09-05 — backend/app/api/v1/endpoints/user.py:76]** `DELETE /api/v1/user` utilisait `get_current_user` et pouvait être déclenché par un JWT anonyme. Corrigé dans cette session : l'endpoint utilise désormais `get_permanent_user` (même garde que `/provision`, `/survey`, `/preferences`). Un JWT anonyme reçoit maintenant `403 ACCOUNT_REQUIRED`.
+
+### WARNING
+
+- **[mobile/src/services/secureSessionStorage.ts:83-86]** `setItem` appelle `writeChunked` mais n'efface pas le pendant AsyncStorage. Si un crash survient entre `writeChunked` et `AsyncStorage.removeItem` dans le chemin de migration (`getItem`), les appels ultérieurs à `setItem` (ex : rafraîchissement du token) mettront à jour le Keychain mais laisseront le token en clair résiduel dans AsyncStorage jusqu'à la prochaine déconnexion (`removeItem`). Recommandation : ajouter `await AsyncStorage.removeItem(key)` dans `setItem` juste après `writeChunked` pour purger tout résidu de migration :\n  ```ts\n  async setItem(key, value) {\n    await writeChunked(key, value);\n    await AsyncStorage.removeItem(key); // purge résidu migration\n  }\n  ```
+
+### INFO
+
+- **[backend/app/api/v1/endpoints/user.py; app/schemas/user.py; app/services/user.py]** `PATCH /api/v1/user/preferences` : aucun IDOR — `user_id` extrait exclusivement du JWT via `get_permanent_user`. `PreferencesUpdate` en `extra="forbid"` : tout champ inconnu → `422`. Seul `newsletter_opt_in` (booléen) est persisté — pas de PII supplémentaire.
+- **[backend/app/api/v1/endpoints/user.py:22-35]** `GET /api/v1/user/me` : retourne `newsletter_opt_in: null` pour les utilisateurs anonymes (profil non provisionné → `profile = None`) — pas d'exposition de données d'un autre compte.
+- **[mobile/src/hooks/useNewsletterConsent.ts:20,24-26]** La logique de load court-circuite sur `anonymous || !token` : aucun appel réseau pour un compte anonyme. Le toggle vérifie `state.status !== 'success'` avant d'agir — pas d'action possible si le chargement initial a échoué.

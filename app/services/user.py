@@ -3,14 +3,14 @@
 import logging
 from datetime import UTC, datetime
 from sqlalchemy import delete, select
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import insert
 from app.models.user import User
 from app.models.favorite import Favorite
-from app.schemas.user import SurveyUpdate, PreferencesUpdate
 from app.models.prediction import Prediction
 from app.models.subscription import Subscription
 from app.models.terrain_validation import TerrainValidation
+from app.schemas.user import SurveyUpdate, PreferencesUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +94,8 @@ async def update_user_preferences(
     l'utilisateur peut retirer son consentement à tout moment (RGPD art. 7-3).
     """
     profile = await get_or_create_user(str(user["id"]), str(user.get("auth_provider", "email")), db)
+    # mypy voit la colonne comme `Column[bool]` sur une affectation d'un `bool` nu
+    # (friction stubs SQLAlchemy, cf. `favorites.py` / `validations.py`).
     profile.newsletter_opt_in = prefs.newsletter_opt_in  # type: ignore[assignment]
     await db.flush()
     return profile

@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from app.main import app
 from app.db.session import get_db
 from app.core.dependencies import get_current_user
@@ -30,6 +30,33 @@ def test_get_me_returns_current_user(mock_profile: AsyncMock) -> None:
     assert response.status_code == 200
     assert response.json()["id"] == "user-123"
     assert response.json()["is_anonymous"] is False
+
+
+def test_get_me_surfaces_newsletter_consent_for_provisioned_profile() -> None:
+    profile = MagicMock()
+    profile.survey_completed_at = None
+    profile.survey_skipped_at = None
+    profile.newsletter_opt_in = True
+    with patch(
+        "app.api.v1.endpoints.user.get_user_profile",
+        new_callable=AsyncMock,
+        return_value=profile,
+    ):
+        app.dependency_overrides[get_current_user] = lambda: {
+            "id": "user-123",
+            "email": "a@example.com",
+            "is_anonymous": False,
+        }
+        app.dependency_overrides[get_db] = _override_db
+        try:
+            with TestClient(app) as client:
+                response = client.get("/api/v1/user/me")
+        finally:
+            app.dependency_overrides.clear()
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provisioned"] is True
+    assert body["newsletter_opt_in"] is True
 
 
 def test_anonymous_cannot_provision() -> None:
@@ -80,6 +107,7 @@ def test_get_me_for_anonymous_session_skips_profile_lookup(mock_profile: AsyncMo
     assert body["is_anonymous"] is True
     assert body["provisioned"] is False
     assert body["survey_completed_at"] is None
+    assert body["newsletter_opt_in"] is None
     mock_profile.assert_not_awaited()
 
 

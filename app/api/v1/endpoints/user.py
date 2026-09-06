@@ -34,6 +34,7 @@ async def get_me(
         "provisioned": profile is not None,
         "survey_completed_at": profile.survey_completed_at if profile else None,
         "survey_skipped_at": profile.survey_skipped_at if profile else None,
+        "newsletter_opt_in": profile.newsletter_opt_in if profile else None,
     }
 
 

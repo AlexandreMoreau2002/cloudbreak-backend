@@ -1,14 +1,20 @@
 import json
 import httpx
+import logging
 from jose import JWTError, jwt
 from jose.backends import ECKey
 from fastapi import HTTPException
 from app.core.errors import ErrorCode
 
+logger = logging.getLogger(__name__)
 
-def decode_supabase_jwt(token: str, jwks_json: str) -> dict[str, object]:
+
+def decode_supabase_jwt(token: str, jwks_json: str, supabase_url: str) -> dict[str, object]:
     """Valide un JWT Supabase localement via la clé publique ECC (P-256).
     Zéro appel réseau — la clé publique est chargée depuis les variables d'environnement.
+    Vérifie aussi `aud` (doit être "authenticated", valeur standard Supabase Auth pour
+    toute session y compris anonyme) et `iss` (doit correspondre au projet Supabase
+    configuré) pour empêcher l'acceptation d'un token émis pour un autre contexte.
     """
     try:
         jwk = json.loads(jwks_json)
@@ -17,11 +23,21 @@ def decode_supabase_jwt(token: str, jwks_json: str) -> dict[str, object]:
             token,
             public_key,
             algorithms=["ES256"],
-            options={"verify_aud": False},
+            audience="authenticated",
+            options={"require_aud": True},
         )
-        return payload
     except JWTError as e:
         raise ValueError(f"{ErrorCode.INVALID_TOKEN}: {e}") from e
+
+    expected_issuer = f"{supabase_url.rstrip('/')}/auth/v1"
+    if payload.get("iss") != expected_issuer:
+        logger.debug(
+            "jwt_issuer_mismatch",
+            extra={"expected": expected_issuer, "got": payload.get("iss")},
+        )
+        raise ValueError(f"{ErrorCode.INVALID_TOKEN}: issuer invalide")
+    logger.debug("jwt_decode_ok", extra={"sub": payload.get("sub"), "iss": payload.get("iss")})
+    return payload
 
 
 async def delete_supabase_user(user_id: str, supabase_url: str, service_role_key: str) -> None:

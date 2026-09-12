@@ -5,5 +5,6 @@ from app.models.favorite import Favorite
 from app.models.prediction import Prediction
 from app.models.subscription import Subscription
 from app.models.terrain_validation import TerrainValidation
+from app.models.user import User
 
-__all__ = ["Favorite", "Peak", "Prediction", "Subscription", "TerrainValidation"]
+__all__ = ["Favorite", "Peak", "Prediction", "Subscription", "TerrainValidation", "User"]

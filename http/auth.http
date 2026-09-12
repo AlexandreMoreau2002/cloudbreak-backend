@@ -6,6 +6,14 @@
 # proEmail
 
 ###
+# Creer une session invitee (le JWT retourne contient is_anonymous: true)
+POST {{supabaseUrl}}/auth/v1/signup
+Content-Type: application/json
+apikey: {{supabaseKey}}
+
+{}
+
+###
 # Creer un compte
 POST {{supabaseUrl}}/auth/v1/signup
 Content-Type: application/json

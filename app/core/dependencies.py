@@ -50,7 +50,7 @@ def get_current_user(
     """Valide JWT Supabase et retourne l'utilisateur actuel."""
     token = credentials.credentials
     try:
-        payload = decode_supabase_jwt(token, settings.supabase_jwt_jwks, settings.supabase_url)
+        payload = decode_supabase_jwt(token, settings.supabase_jwt_jwks)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

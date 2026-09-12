@@ -1,12 +1,13 @@
 import json
 import time
+from typing import Any
+from unittest.mock import AsyncMock
+
 import httpx
 import pytest
 from jose import jwt
-from typing import Any
 from jose.backends import ECKey
 from fastapi import HTTPException
-from unittest.mock import AsyncMock
 from app.core.errors import ErrorCode
 from tests.helpers import encode_test_jwt
 from app.core.security import decode_supabase_jwt, delete_supabase_user
@@ -35,120 +36,26 @@ def test_decode_valid_token() -> None:
         "sub": "user-123",
         "email": "test@cloudbreak.app",
         "exp": int(time.time()) + 3600,
-        "aud": "authenticated",
-        "iss": "https://test.supabase.co/auth/v1",
     }
     token = _make_token(payload)
-    result = decode_supabase_jwt(
-        token,
-        json.dumps(TEST_PUBLIC_JWK),
-        supabase_url="https://test.supabase.co",
-    )
+    result = decode_supabase_jwt(token, json.dumps(TEST_PUBLIC_JWK))
     assert result["sub"] == "user-123"
     assert result["email"] == "test@cloudbreak.app"
 
 
-def test_decode_rejects_wrong_audience() -> None:
-    payload = {
-        "sub": "user-123",
-        "exp": int(time.time()) + 3600,
-        "aud": "some-other-audience",
-        "iss": "https://test.supabase.co/auth/v1",
-    }
-    token = _make_token(payload)
-    with pytest.raises(ValueError):
-        decode_supabase_jwt(
-            token,
-            json.dumps(TEST_PUBLIC_JWK),
-            supabase_url="https://test.supabase.co",
-        )
-
-
-def test_decode_rejects_wrong_issuer() -> None:
-    payload = {
-        "sub": "user-123",
-        "exp": int(time.time()) + 3600,
-        "aud": "authenticated",
-        "iss": "https://attacker.supabase.co/auth/v1",
-    }
-    token = _make_token(payload)
-    with pytest.raises(ValueError):
-        decode_supabase_jwt(
-            token,
-            json.dumps(TEST_PUBLIC_JWK),
-            supabase_url="https://test.supabase.co",
-        )
-
-
-def test_decode_rejects_missing_issuer() -> None:
-    payload = {
-        "sub": "user-123",
-        "exp": int(time.time()) + 3600,
-        "aud": "authenticated",
-    }
-    token = _make_token(payload)
-    with pytest.raises(ValueError):
-        decode_supabase_jwt(
-            token,
-            json.dumps(TEST_PUBLIC_JWK),
-            supabase_url="https://test.supabase.co",
-        )
-
-
-def test_decode_rejects_missing_audience() -> None:
-    payload = {
-        "sub": "user-123",
-        "exp": int(time.time()) + 3600,
-        "iss": "https://test.supabase.co/auth/v1",
-    }
-    token = _make_token(payload)
-    with pytest.raises(ValueError):
-        decode_supabase_jwt(
-            token,
-            json.dumps(TEST_PUBLIC_JWK),
-            supabase_url="https://test.supabase.co",
-        )
-
-
 def test_decode_invalid_token() -> None:
     with pytest.raises(ValueError):
-        decode_supabase_jwt(
-            "not.a.valid.token",
-            json.dumps(TEST_PUBLIC_JWK),
-            supabase_url="https://test.supabase.co",
-        )
+        decode_supabase_jwt("not.a.valid.token", json.dumps(TEST_PUBLIC_JWK))
 
 
 def test_decode_expired_token() -> None:
     payload = {
         "sub": "user-123",
         "exp": int(time.time()) - 3600,
-        "aud": "authenticated",
-        "iss": "https://test.supabase.co/auth/v1",
     }
     token = _make_token(payload)
     with pytest.raises(ValueError):
-        decode_supabase_jwt(
-            token,
-            json.dumps(TEST_PUBLIC_JWK),
-            supabase_url="https://test.supabase.co",
-        )
-
-
-def test_decode_accepts_trailing_slash_in_supabase_url() -> None:
-    payload = {
-        "sub": "user-123",
-        "exp": int(time.time()) + 3600,
-        "aud": "authenticated",
-        "iss": "https://test.supabase.co/auth/v1",
-    }
-    token = _make_token(payload)
-    result = decode_supabase_jwt(
-        token,
-        json.dumps(TEST_PUBLIC_JWK),
-        supabase_url="https://test.supabase.co/",
-    )
-    assert result["sub"] == "user-123"
+        decode_supabase_jwt(token, json.dumps(TEST_PUBLIC_JWK))
 
 
 def test_encode_test_jwt_signs_payload_with_dev_secret() -> None:

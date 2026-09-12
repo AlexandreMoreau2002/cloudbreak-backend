@@ -189,9 +189,7 @@ def test_anonymous_cannot_update_preferences() -> None:
     app.dependency_overrides[get_db] = _override_db
     try:
         with TestClient(app) as client:
-            response = client.patch(
-                "/api/v1/user/preferences", json={"newsletter_opt_in": False}
-            )
+            response = client.patch("/api/v1/user/preferences", json={"newsletter_opt_in": False})
     finally:
         app.dependency_overrides.clear()
     assert response.status_code == 403
@@ -230,9 +228,7 @@ def test_preferences_withdraws_consent_for_permanent_account(mock_update: AsyncM
     app.dependency_overrides[get_db] = _override_db
     try:
         with TestClient(app) as client:
-            response = client.patch(
-                "/api/v1/user/preferences", json={"newsletter_opt_in": False}
-            )
+            response = client.patch("/api/v1/user/preferences", json={"newsletter_opt_in": False})
     finally:
         app.dependency_overrides.clear()
     assert response.status_code == 200

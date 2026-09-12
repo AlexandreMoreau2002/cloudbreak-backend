@@ -68,9 +68,7 @@ def test_current_user_reads_provider_from_app_metadata() -> None:
     """Le provider Supabase (ex: apple) est exposé comme auth_provider."""
     from app.core.dependencies import decode_user_payload
 
-    user = decode_user_payload(
-        {"sub": "user-123", "app_metadata": {"provider": "apple"}}
-    )
+    user = decode_user_payload({"sub": "user-123", "app_metadata": {"provider": "apple"}})
 
     assert user["auth_provider"] == "apple"
 

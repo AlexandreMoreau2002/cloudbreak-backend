@@ -50,6 +50,7 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 | Favoris — refus explicite d'une session anonyme (403 `ACCOUNT_REQUIRED`) | ✅ Stories 2.5/3.3 |
 | Instrumentation analytics — `track()` stub DEBUG-only sur `score_calculated`, `quota_bypassed`, `quota_exceeded`, `favorite_added/removed`, `account_deleted` (story 1.7) | ✅ Stub, aucun réseau |
 | Validation terrain (`POST /api/v1/validations`) — confirmation/infirmation d'une prédiction, persistance `Prediction` best-effort à chaque `GET /api/v1/score`, table `terrain_validations` (`result`, `lat`/`lng` optionnels) (story 6.1) | ✅ Sans photo — voir story 6.2 |
+| JWT Supabase — vérification `issuer`/`audience` en plus de la signature ECC (2026-09-12) | ✅ `decode_supabase_jwt` prend `supabase_url`, rejette `aud`/`iss` invalides ou absents |
 
 ### Ce qui n'existe pas encore
 

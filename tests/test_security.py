@@ -1,13 +1,12 @@
 import json
 import time
-from typing import Any
-from unittest.mock import AsyncMock
-
 import httpx
 import pytest
 from jose import jwt
+from typing import Any
 from jose.backends import ECKey
 from fastapi import HTTPException
+from unittest.mock import AsyncMock
 from app.core.errors import ErrorCode
 from tests.helpers import encode_test_jwt
 from app.core.security import decode_supabase_jwt, delete_supabase_user
@@ -134,6 +133,22 @@ def test_decode_expired_token() -> None:
             json.dumps(TEST_PUBLIC_JWK),
             supabase_url="https://test.supabase.co",
         )
+
+
+def test_decode_accepts_trailing_slash_in_supabase_url() -> None:
+    payload = {
+        "sub": "user-123",
+        "exp": int(time.time()) + 3600,
+        "aud": "authenticated",
+        "iss": "https://test.supabase.co/auth/v1",
+    }
+    token = _make_token(payload)
+    result = decode_supabase_jwt(
+        token,
+        json.dumps(TEST_PUBLIC_JWK),
+        supabase_url="https://test.supabase.co/",
+    )
+    assert result["sub"] == "user-123"
 
 
 def test_encode_test_jwt_signs_payload_with_dev_secret() -> None:

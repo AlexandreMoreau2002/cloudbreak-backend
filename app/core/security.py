@@ -1,9 +1,12 @@
 import json
 import httpx
+import logging
 from jose import JWTError, jwt
 from jose.backends import ECKey
 from fastapi import HTTPException
 from app.core.errors import ErrorCode
+
+logger = logging.getLogger(__name__)
 
 
 def decode_supabase_jwt(token: str, jwks_json: str, supabase_url: str) -> dict[str, object]:
@@ -26,9 +29,14 @@ def decode_supabase_jwt(token: str, jwks_json: str, supabase_url: str) -> dict[s
     except JWTError as e:
         raise ValueError(f"{ErrorCode.INVALID_TOKEN}: {e}") from e
 
-    expected_issuer = f"{supabase_url}/auth/v1"
+    expected_issuer = f"{supabase_url.rstrip('/')}/auth/v1"
     if payload.get("iss") != expected_issuer:
+        logger.debug(
+            "jwt_issuer_mismatch",
+            extra={"expected": expected_issuer, "got": payload.get("iss")},
+        )
         raise ValueError(f"{ErrorCode.INVALID_TOKEN}: issuer invalide")
+    logger.debug("jwt_decode_ok", extra={"sub": payload.get("sub"), "iss": payload.get("iss")})
     return payload
 
 

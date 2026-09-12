@@ -376,3 +376,15 @@ Story 4.4 (AC6) — checklist à reporter dans **App Store Connect → App Priva
 - **[backend/app/api/v1/endpoints/user.py; app/schemas/user.py; app/services/user.py]** `PATCH /api/v1/user/preferences` : aucun IDOR — `user_id` extrait exclusivement du JWT via `get_permanent_user`. `PreferencesUpdate` en `extra="forbid"` : tout champ inconnu → `422`. Seul `newsletter_opt_in` (booléen) est persisté — pas de PII supplémentaire.
 - **[backend/app/api/v1/endpoints/user.py:22-35]** `GET /api/v1/user/me` : retourne `newsletter_opt_in: null` pour les utilisateurs anonymes (profil non provisionné → `profile = None`) — pas d'exposition de données d'un autre compte.
 - **[mobile/src/hooks/useNewsletterConsent.ts:20,24-26]** La logique de load court-circuite sur `anonymous || !token` : aucun appel réseau pour un compte anonyme. Le toggle vérifie `state.status !== 'success'` avant d'agir — pas d'action possible si le chargement initial a échoué.
+
+---
+
+## 2026-09-12 Session additions — Durcissement post-merge auth (JWT issuer/audience)
+
+### RÉSOLU
+
+- **[CRITIQUE — backend/app/core/security.py]** `decode_supabase_jwt()` décodait sans vérifier `aud` (`verify_aud: False`) ni `iss`. Un JWT signé par la même paire de clés ECC mais destiné à un autre contexte (autre projet Supabase, autre audience) aurait été accepté. Corrigé : `jwt.decode(..., audience="authenticated", options={"require_aud": True})` (le `require_aud` explicite est nécessaire — sans lui, python-jose n'exige pas la présence de la réclamation `aud`, il ne la valide que si elle est présente), puis vérification manuelle `payload.get("iss") == f"{supabase_url}/auth/v1"` qui lève `ValueError` sinon. `decode_supabase_jwt` prend désormais un 3ᵉ paramètre `supabase_url`, passé par `dependencies.py:53` depuis `settings.supabase_url`. Le comportement des sessions réelles (y compris Anonymous Auth) n'est pas affecté : Supabase émet toujours `aud: "authenticated"`.
+
+### INFO
+
+- **[backend/tests/test_security.py]** Couverture ajoutée : `aud` incorrect, `iss` incorrect, `iss` absent, `aud` absent — 4 nouveaux tests de rejet, tous vérifient `ValueError`.

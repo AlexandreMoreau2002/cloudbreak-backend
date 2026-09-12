@@ -19,7 +19,7 @@ from app.models.favorite import Favorite
 from app.services.analytics import track
 from app.schemas.peak import PeakSearchResult
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.dependencies import get_permanent_user
+from app.core.dependencies import get_current_user
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.schemas.favorite import FavoriteCreate, FavoriteResponse
 
@@ -37,7 +37,7 @@ def _optional_region(value: object) -> str | None:
 )
 async def add_favorite(
     body: FavoriteCreate,
-    current_user: dict[str, Any] = Depends(get_permanent_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> FavoriteResponse:
     """Ajoute un sommet aux favoris de l'utilisateur."""
@@ -89,7 +89,7 @@ async def add_favorite(
 @router.delete("/user/favorites/{peak_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_favorite(
     peak_id: str,
-    current_user: dict[str, Any] = Depends(get_permanent_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Retire un sommet des favoris de l'utilisateur."""
@@ -116,7 +116,7 @@ async def remove_favorite(
 
 @router.get("/user/favorites", response_model=list[FavoriteResponse])
 async def list_favorites(
-    current_user: dict[str, Any] = Depends(get_permanent_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[FavoriteResponse]:
     """Liste les favoris de l'utilisateur avec le détail du sommet."""

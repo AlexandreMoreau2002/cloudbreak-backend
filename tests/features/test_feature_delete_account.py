@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch
 from app.core.dependencies import get_current_user
 
-_FAKE_USER = {"id": "user-456", "email": "feature@test.com", "is_anonymous": False}
+_FAKE_USER = {"id": "user-456", "email": "feature@test.com"}
 
 
 def test_delete_account_sans_auth_retourne_403() -> None:

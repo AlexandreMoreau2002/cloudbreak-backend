@@ -24,14 +24,7 @@ def test_get_me_invalid_token() -> None:
 
 def test_get_me_valid_token() -> None:
     payload = {"sub": "user-123", "email": "test@cloudbreak.app"}
-    with (
-        patch("app.core.dependencies.decode_supabase_jwt", return_value=payload),
-        patch(
-            "app.api.v1.endpoints.user.get_user_profile",
-            new_callable=AsyncMock,
-            return_value=None,
-        ),
-    ):
+    with patch("app.core.dependencies.decode_supabase_jwt", return_value=payload):
         response = client.get(
             "/api/v1/user/me",
             headers={"Authorization": "Bearer valid.token.here"},
@@ -39,40 +32,6 @@ def test_get_me_valid_token() -> None:
     assert response.status_code == 200
     assert response.json()["id"] == "user-123"
     assert response.json()["email"] == "test@cloudbreak.app"
-
-
-def test_current_user_exposes_anonymous_claim() -> None:
-    """Le JWT Supabase anonyme conserve son statut jusqu'aux dépendances métier."""
-    from app.core.dependencies import decode_user_payload
-
-    user = decode_user_payload({"sub": "guest", "is_anonymous": True})
-
-    assert user == {
-        "id": "guest",
-        "email": None,
-        "is_anonymous": True,
-        "auth_provider": "email",
-    }
-
-
-def test_current_user_defaults_to_permanent_when_claim_is_absent() -> None:
-    """Les JWT permanents existants sans claim explicite restent compatibles."""
-    from app.core.dependencies import decode_user_payload
-
-    user = decode_user_payload({"sub": "user-123", "email": "test@cloudbreak.app"})
-
-    assert user["is_anonymous"] is False
-
-
-def test_current_user_reads_provider_from_app_metadata() -> None:
-    """Le provider Supabase (ex: apple) est exposé comme auth_provider."""
-    from app.core.dependencies import decode_user_payload
-
-    user = decode_user_payload(
-        {"sub": "user-123", "app_metadata": {"provider": "apple"}}
-    )
-
-    assert user["auth_provider"] == "apple"
 
 
 def test_get_me_token_without_sub() -> None:

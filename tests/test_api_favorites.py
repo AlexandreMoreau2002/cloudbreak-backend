@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from app.main import app
 
 
-MOCK_USER = {"id": "user-123", "email": "alex@test.com", "is_anonymous": False}
+MOCK_USER = {"id": "user-123", "email": "alex@test.com"}
 
 MOCK_PEAK = MagicMock()
 MOCK_PEAK.id = "peak-1"
@@ -149,26 +149,6 @@ async def test_add_favorite_sans_jwt_retourne_403() -> None:
     assert response.status_code == 403
 
 
-@pytest.mark.asyncio
-async def test_anonymous_jwt_cannot_add_a_favorite() -> None:
-    """Un invité ne peut pas créer de favori, avant même tout accès DB."""
-    from app.core.dependencies import get_current_user
-
-    app.dependency_overrides[get_current_user] = lambda: {
-        "id": "guest",
-        "email": None,
-        "is_anonymous": True,
-    }
-    try:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.post("/api/v1/user/favorites", json={"peak_id": "peak-1"})
-    finally:
-        app.dependency_overrides.clear()
-
-    assert response.status_code == 403
-    assert response.json()["detail"]["code"] == "ACCOUNT_REQUIRED"
-
-
 # ---------------------------------------------------------------------------
 # DELETE /api/v1/user/favorites/{peak_id}
 # ---------------------------------------------------------------------------
@@ -215,26 +195,6 @@ async def test_remove_favorite_inexistant_retourne_404(auth_override: None) -> N
     assert response.json()["detail"]["code"] == "NOT_FOUND"
 
 
-@pytest.mark.asyncio
-async def test_anonymous_jwt_cannot_remove_a_favorite() -> None:
-    """Un invité ne peut pas retirer de favori."""
-    from app.core.dependencies import get_current_user
-
-    app.dependency_overrides[get_current_user] = lambda: {
-        "id": "guest",
-        "email": None,
-        "is_anonymous": True,
-    }
-    try:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.delete("/api/v1/user/favorites/peak-1")
-    finally:
-        app.dependency_overrides.clear()
-
-    assert response.status_code == 403
-    assert response.json()["detail"]["code"] == "ACCOUNT_REQUIRED"
-
-
 # ---------------------------------------------------------------------------
 # GET /api/v1/user/favorites
 # ---------------------------------------------------------------------------
@@ -272,26 +232,6 @@ async def test_list_favorites_sans_jwt_retourne_403() -> None:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/api/v1/user/favorites")
     assert response.status_code == 403
-
-
-@pytest.mark.asyncio
-async def test_anonymous_jwt_cannot_list_favorites() -> None:
-    """Un invité ne peut pas lister ses favoris."""
-    from app.core.dependencies import get_current_user
-
-    app.dependency_overrides[get_current_user] = lambda: {
-        "id": "guest",
-        "email": None,
-        "is_anonymous": True,
-    }
-    try:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get("/api/v1/user/favorites")
-    finally:
-        app.dependency_overrides.clear()
-
-    assert response.status_code == 403
-    assert response.json()["detail"]["code"] == "ACCOUNT_REQUIRED"
 
 
 # ---------------------------------------------------------------------------

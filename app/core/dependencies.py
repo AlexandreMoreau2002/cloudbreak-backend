@@ -2,17 +2,17 @@ import logging
 from typing import Any
 from sqlalchemy import select
 from redis.asyncio import Redis
-from app.db.session import get_db
 from datetime import UTC, datetime
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from app.db.session import get_db
 from app.core.config import settings
 from app.core.errors import ErrorCode
 from app.services.analytics import track
-from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.subscription import Subscription
 from app.core.security import decode_supabase_jwt
-from fastapi import Depends, HTTPException, Request, status
 from app.services.quota import QuotaService, QuotaExceededException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,20 @@ bearer_scheme = HTTPBearer()
 
 # Redis singleton
 _redis: Redis | None = None
+
+
+def decode_user_payload(payload: dict[str, Any]) -> dict[str, object]:
+    """Construit le contexte utilisateur métier depuis les claims Supabase validés."""
+    app_metadata = payload.get("app_metadata")
+    provider = "email"
+    if isinstance(app_metadata, dict) and isinstance(app_metadata.get("provider"), str):
+        provider = app_metadata["provider"]
+    return {
+        "id": payload["sub"],
+        "email": payload.get("email"),
+        "is_anonymous": payload.get("is_anonymous") is True,
+        "auth_provider": provider,
+    }
 
 
 async def get_redis() -> Redis:
@@ -36,7 +50,7 @@ def get_current_user(
     """Valide JWT Supabase et retourne l'utilisateur actuel."""
     token = credentials.credentials
     try:
-        payload = decode_supabase_jwt(token, settings.supabase_jwt_jwks)
+        payload = decode_supabase_jwt(token, settings.supabase_jwt_jwks, settings.supabase_url)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -50,7 +64,19 @@ def get_current_user(
             detail="Token invalide",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return {"id": user_id, "email": payload.get("email")}
+    return decode_user_payload(payload)
+
+
+def get_permanent_user(
+    user: dict[str, object] = Depends(get_current_user),
+) -> dict[str, object]:
+    """Refuse les actions réservées à un compte Supabase permanent."""
+    if user.get("is_anonymous") is True:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"detail": "Compte requis", "code": ErrorCode.ACCOUNT_REQUIRED},
+        )
+    return user
 
 
 async def get_user_subscription(user_id: str, db: AsyncSession) -> Subscription | None:

@@ -320,3 +320,73 @@ Story 4.4 (AC6) — checklist à reporter dans **App Store Connect → App Priva
 4. **Pas de pub, pas de tracking tiers** → section "Tracking" App Store Connect = vide
 
 > ⚠️ **Déclarer honnêtement** — une fausse déclaration App Privacy est une cause de bannissement Apple.
+
+---
+
+## 2026-09-05 Stories 2.5 / 2.6 / 2.8 — Parcours compte invité, Apple et sondage
+
+### CRITIQUE
+
+- **[Supabase dev / mobile/docs/story-2-5-manual-test-guide.md:15,20]** Anonymous Auth et le provider Apple sont désactivés (`external.anonymous_users: false`, `external.apple: false`). L’application ne peut donc pas créer la session invitée nécessaire au quota et le parcours Sign in with Apple ne peut pas fonctionner. → Activer les deux providers sur l’instance dev ciblée, puis refaire une preuve sur build native avant merge.
+- **[Supabase dev / mobile/docs/story-2-5-manual-test-guide.md:16-18]** `mailer_autoconfirm: true` et aucun template OTP/type `verifyOtp` n’ont été validés. Le parcours e-mail implémenté utilise provisoirement `verifyOtp.type: 'email_change'`; il est impossible de garantir la vérification d’adresse ou la conversion de la session anonyme. → Activer Confirm email, vérifier le template `{{ .Token }}` et confirmer le type OTP ainsi que l’UUID avant/après sur une boîte de test avant d’autoriser la mise en production.
+- **[mobile/src/services/supabaseClient.ts:3,8]** La session Supabase, qui contient le JWT d’accès, est persistée dans `AsyncStorage`, stockage non chiffré. Le nouveau flux introduit en plus des sessions anonymes et des conversions de compte, ce qui augmente l’impact d’une extraction du stockage local. → Migrer le storage Supabase vers `expo-secure-store` avant release/merge de l’authentification.
+
+### WARNING
+
+- **[mobile/src/contexts/AuthContext.tsx:165-177; mobile/docs/story-2-5-manual-test-guide.md:17-19]** Le code OTP et le type `email_change` sont câblés sans preuve de compatibilité avec la configuration Supabase actuelle; le guide confirme que le type, la réception et la conservation de l’UUID restent non déterminés. → Ne valider le contrat qu’après un flow réel avec code erroné, expiration et renvoi.
+- **[backend/app/core/config.py:8-15; backend/app/main.py:25-27]** Les paramètres critiques (`supabase_jwt_jwks`, `supabase_url`, `supabase_service_role_key`) ont encore une valeur vide par défaut et ne sont pas validés au démarrage. Un déploiement mal configuré démarre puis échoue sur l’auth/provisioning/suppression. → Refuser le démarrage en production si ces secrets/configurations sont absents ou invalides; conserver des clés dev/prod distinctes.
+- **[RÉSOLU — backend/app/api/v1/endpoints/user.py]** Le sondage persiste `newsletter_opt_in` de façon terminale, mais `PATCH /api/v1/user/preferences` (JWT permanent requis) permet désormais de retirer **ou** ré-accorder le consentement newsletter à tout moment, dans les deux sens (RGPD art. 7-3). Reste à câbler l'effet réel côté collecte/ESP quand la newsletter sera branchée.
+
+### INFO
+
+- **[backend/app/core/dependencies.py:47-79; backend/app/api/v1/endpoints/favorites.py:37,89,116]** Le JWT est validé localement, l’identité provient de `sub`, et les comptes anonymes sont refusés pour les favoris; aucun `user_id` client n’est accepté.
+- **[backend/app/api/v1/endpoints/user.py:43-63; backend/app/schemas/user.py:22-45]** Provisioning et sondage sont protégés par JWT et valident les champs via Pydantic (`extra="forbid"`, enums, booléen); les requêtes de service utilisent SQLAlchemy.
+- **[mobile/src/contexts/AccountGateContext.tsx:41-60; mobile/src/app/verify.tsx:11-15]** Les credentials e-mail restent en mémoire React et sont effacés à la fin/annulation du parcours; aucune écriture du mot de passe dans AsyncStorage n’a été introduite.
+
+### Corrections et compléments d’audit (2026-09-05 — cloudbreak-security)
+
+**Correction du CRITIQUE 2 :** `beginEmailUpgrade`, `completeEmailUpgrade` et `resendEmailUpgrade` dans `AuthContext.tsx` sont entièrement stubés et retournent immédiatement `EMAIL_UPGRADE_UNAVAILABLE`. Le chemin qui appelle `gate.setEmailUpgradeCredentials` dans `account.tsx` n’est donc jamais atteint (l’erreur est retournée avant le `router.push(‘/verify’)`). La préoccupation OTP/`email_change` du CRITIQUE 2 et du WARNING 1 est sans objet dans l’implémentation actuelle — à ré-auditer lors de l’activation réelle du flux email.
+
+**WARNING supplémentaire :**
+- **[backend/app/api/v1/endpoints/user.py:68]** `DELETE /api/v1/user` utilise `get_current_user` sans appel à `_require_permanent`. Un JWT anonyme valide peut donc déclencher cet endpoint, qui appelera l’API Admin Supabase (`delete_supabase_user`) pour supprimer le compte anonyme. Il n’y a pas d’IDOR (le `user_id` est extrait du JWT), mais le chemin appelle inutilement la `service_role_key` pour des comptes éphémères. Si la suppression de comptes anonymes est volontairement supportée, documenter ce choix. Sinon, ajouter `_require_permanent` au même titre que `/provision` et `/survey`.
+
+**INFO supplémentaires :**
+- **[mobile/src/contexts/AuthContext.tsx:185-207]** Sign in with Apple : nonce généré depuis 32 octets cryptographiques (`Crypto.getRandomBytesAsync(32)`), SHA-256 envoyé à Apple (`hashedNonce`), nonce brut (`rawNonce`) envoyé à Supabase. Ni l’un ni l’autre n’est loggé ni stocké dans AsyncStorage. Pattern conforme aux exigences Apple et résistant au rejeu.
+- **[backend/app/core/security.py:23-24]** Les erreurs de décodage JWT (`JWTError` de python-jose) sont encapsulées dans `ValueError` puis interceptées en `except ValueError` dans `dependencies.py`, qui retourne `"Token invalide ou expiré"` au client — aucun détail interne de l’erreur jose n’est exposé.
+- **[backend/app/models/user.py; alembic/versions/f2a3b4c5d6e7]** La table `users` ne stocke aucun champ email, téléphone ou mot de passe — uniquement `supabase_user_id` (UUID PK), `auth_provider`, timestamps et réponses sondage. Pas de duplication de PII depuis Supabase auth.
+- **[backend/http/user-provisioning.http; backend/http/auth.http]** Aucun token réel commité : les fichiers `.http` utilisent `{{$dotenv CLOUDBREAK_JWT}}` et `{{testEmail}}`/`{{password}}` — variables d’environnement VS Code REST Client, jamais de valeur en dur.
+- **[backend/app/services/user.py:72-83]** `update_user_survey` est idempotent : la mise à jour est un no-op si `survey_completed_at` ou `survey_skipped_at` est déjà renseigné — aucun écrasement cross-user possible puisque `user_id` provient du JWT.
+- **[backend/app/services/user.py — `update_user_preferences`]** N'écrit que `newsletter_opt_in`, `user_id` issu du JWT (pas d'IDOR), JWT permanent exigé via `get_permanent_user`. Schéma `PreferencesUpdate` en `extra="forbid"` : tout champ inconnu → `422`.
+
+---
+
+## 2026-09-06 Session additions — Keychain iOS + consentement newsletter
+
+### RÉSOLU
+
+- **[CRITIQUE 3 — mobile/src/services/supabaseClient.ts]** La session Supabase (JWT access + refresh token) est désormais rangée dans le **Keychain iOS** via `expo-secure-store`. L'adaptateur `secureSessionStorage` fragmente la valeur par blocs de 1 536 octets (limite ~2 048 octets de SecureStore) et migre au premier accès une session héritée d'AsyncStorage (recopie dans le Keychain puis suppression du plaintext). Plus aucun token en clair dans AsyncStorage. Plugin `expo-secure-store` déclaré dans `app.config.ts`. Rebuild natif requis avant le prochain test sur simulateur.
+- **[WARNING 2026-09-05 — backend/app/api/v1/endpoints/user.py:76]** `DELETE /api/v1/user` utilisait `get_current_user` et pouvait être déclenché par un JWT anonyme. Corrigé dans cette session : l'endpoint utilise désormais `get_permanent_user` (même garde que `/provision`, `/survey`, `/preferences`). Un JWT anonyme reçoit maintenant `403 ACCOUNT_REQUIRED`.
+
+### WARNING
+
+- **[mobile/src/services/secureSessionStorage.ts:83-86]** `setItem` appelle `writeChunked` mais n'efface pas le pendant AsyncStorage. Si un crash survient entre `writeChunked` et `AsyncStorage.removeItem` dans le chemin de migration (`getItem`), les appels ultérieurs à `setItem` (ex : rafraîchissement du token) mettront à jour le Keychain mais laisseront le token en clair résiduel dans AsyncStorage jusqu'à la prochaine déconnexion (`removeItem`). Recommandation : ajouter `await AsyncStorage.removeItem(key)` dans `setItem` juste après `writeChunked` pour purger tout résidu de migration :\n  ```ts\n  async setItem(key, value) {\n    await writeChunked(key, value);\n    await AsyncStorage.removeItem(key); // purge résidu migration\n  }\n  ```
+
+### INFO
+
+- **[backend/app/api/v1/endpoints/user.py; app/schemas/user.py; app/services/user.py]** `PATCH /api/v1/user/preferences` : aucun IDOR — `user_id` extrait exclusivement du JWT via `get_permanent_user`. `PreferencesUpdate` en `extra="forbid"` : tout champ inconnu → `422`. Seul `newsletter_opt_in` (booléen) est persisté — pas de PII supplémentaire.
+- **[backend/app/api/v1/endpoints/user.py:22-35]** `GET /api/v1/user/me` : retourne `newsletter_opt_in: null` pour les utilisateurs anonymes (profil non provisionné → `profile = None`) — pas d'exposition de données d'un autre compte.
+- **[mobile/src/hooks/useNewsletterConsent.ts:20,24-26]** La logique de load court-circuite sur `anonymous || !token` : aucun appel réseau pour un compte anonyme. Le toggle vérifie `state.status !== 'success'` avant d'agir — pas d'action possible si le chargement initial a échoué.
+
+---
+
+## 2026-09-12 Session additions — Durcissement post-merge auth (JWT issuer/audience)
+
+### RÉSOLU
+
+- **[CRITIQUE — backend/app/core/security.py]** `decode_supabase_jwt()` décodait sans vérifier `aud` (`verify_aud: False`) ni `iss`. Un JWT signé par la même paire de clés ECC mais destiné à un autre contexte (autre projet Supabase, autre audience) aurait été accepté. Corrigé : `jwt.decode(..., audience="authenticated", options={"require_aud": True})` (le `require_aud` explicite est nécessaire — sans lui, python-jose n'exige pas la présence de la réclamation `aud`, il ne la valide que si elle est présente), puis vérification manuelle `payload.get("iss") == f"{supabase_url}/auth/v1"` qui lève `ValueError` sinon. `decode_supabase_jwt` prend désormais un 3ᵉ paramètre `supabase_url`, passé par `dependencies.py:53` depuis `settings.supabase_url`. Le comportement des sessions réelles (y compris Anonymous Auth) n'est pas affecté : Supabase émet toujours `aud: "authenticated"`.
+
+### INFO
+
+- **[backend/app/core/security.py]** `options={"require_aud": True}` est bien un option reconnue par python-jose 3.3.0 (défaut `False`) — oblige la présence de la réclamation `aud` dans le token indépendamment du paramètre `audience`. Combiné avec `audience="authenticated"`, les deux conditions sont strictement vérifiées : présence ET valeur exacte.
+- **[backend/tests/test_security.py]** Couverture ajoutée : `aud` incorrect, `iss` incorrect, `iss` absent, `aud` absent — 4 nouveaux tests de rejet, tous vérifient `ValueError`. 13/13 tests passent.
+- **[backend/app/core/security.py]** Trailing slash sur `supabase_url` corrigé : `expected_issuer = f"{supabase_url.rstrip('/')}/auth/v1"` — une valeur `.env` avec ou sans slash final produit désormais le même issuer attendu. Logs debug ajoutés (`jwt_decode_ok`, `jwt_issuer_mismatch`), silencieux en prod. Test de non-régression : `test_decode_accepts_trailing_slash_in_supabase_url`. Détails : `docs/fix-durcissement-jwt-issuer-audience.md`.

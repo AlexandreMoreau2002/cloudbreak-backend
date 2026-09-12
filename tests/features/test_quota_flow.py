@@ -34,6 +34,7 @@ def _make_mock_redis() -> AsyncMock:
 
 
 MOCK_USER = {"id": "user-123", "email": "alex@test.com"}
+MOCK_ANONYMOUS_USER = {"id": "guest-123", "email": None, "is_anonymous": True}
 MOCK_PREMIUM_USER = {"id": "user-premium", "email": "premium@test.com"}
 MOCK_PRO_USER = {"id": "user-pro", "email": "pro@test.com"}
 
@@ -82,6 +83,20 @@ def auth_freemium() -> object:
 
     original = app.dependency_overrides.get(get_current_user)
     app.dependency_overrides[get_current_user] = lambda: MOCK_USER
+    yield
+    if original is not None:
+        app.dependency_overrides[get_current_user] = original
+    elif get_current_user in app.dependency_overrides:
+        del app.dependency_overrides[get_current_user]
+
+
+@pytest.fixture
+def auth_anonymous() -> object:
+    """Auth override pour un invité Supabase."""
+    from app.core.dependencies import get_current_user
+
+    original = app.dependency_overrides.get(get_current_user)
+    app.dependency_overrides[get_current_user] = lambda: MOCK_ANONYMOUS_USER
     yield
     if original is not None:
         app.dependency_overrides[get_current_user] = original
@@ -164,6 +179,47 @@ async def test_quota_score_endpoint_first_call_returns_200(auth_freemium: object
     data = response.json()
     assert data["score"]
     assert data["verdict"] in ("none", "high", "medium", "low")
+
+
+@pytest.mark.asyncio
+async def test_anonymous_user_can_get_a_score_with_quota(auth_anonymous: object) -> None:
+    """Le quota et le score restent disponibles pour une session invitée."""
+    patch_peak = patch(
+        "app.api.v1.endpoints.score.get_peak_by_id",
+        new_callable=AsyncMock,
+        return_value=MOCK_PEAK,
+    )
+    patch_weather = patch(
+        "app.api.v1.endpoints.score.weather_service.get_forecast",
+        new_callable=AsyncMock,
+        return_value=MOCK_WEATHER,
+    )
+    patch_subscription = patch(
+        "app.core.dependencies.get_user_subscription",
+        new_callable=AsyncMock,
+        return_value=None,
+    )
+    mock_redis = _make_mock_redis()
+    mock_redis.sismember.return_value = False
+    mock_redis.scard.return_value = 0
+
+    async def mock_get_redis_impl() -> AsyncMock:
+        return mock_redis
+
+    app.dependency_overrides[get_redis] = mock_get_redis_impl
+    try:
+        with patch_peak, patch_weather, patch_subscription:
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as client:
+                response = await client.get(
+                    "/api/v1/score",
+                    params={"peak_id": "peak-1", "date": "2026-04-01", "hour": 7},
+                )
+    finally:
+        app.dependency_overrides.pop(get_redis, None)
+
+    assert response.status_code == 200
 
 
 @pytest.mark.asyncio

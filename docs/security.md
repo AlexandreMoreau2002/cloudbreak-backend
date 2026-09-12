@@ -387,4 +387,6 @@ Story 4.4 (AC6) — checklist à reporter dans **App Store Connect → App Priva
 
 ### INFO
 
-- **[backend/tests/test_security.py]** Couverture ajoutée : `aud` incorrect, `iss` incorrect, `iss` absent, `aud` absent — 4 nouveaux tests de rejet, tous vérifient `ValueError`.
+- **[backend/app/core/security.py]** `options={"require_aud": True}` est bien un option reconnue par python-jose 3.3.0 (défaut `False`) — oblige la présence de la réclamation `aud` dans le token indépendamment du paramètre `audience`. Combiné avec `audience="authenticated"`, les deux conditions sont strictement vérifiées : présence ET valeur exacte.
+- **[backend/tests/test_security.py]** Couverture ajoutée : `aud` incorrect, `iss` incorrect, `iss` absent, `aud` absent — 4 nouveaux tests de rejet, tous vérifient `ValueError`. 13/13 tests passent.
+- **[backend/app/core/security.py]** Trailing slash sur `supabase_url` corrigé : `expected_issuer = f"{supabase_url.rstrip('/')}/auth/v1"` — une valeur `.env` avec ou sans slash final produit désormais le même issuer attendu. Logs debug ajoutés (`jwt_decode_ok`, `jwt_issuer_mismatch`), silencieux en prod. Test de non-régression : `test_decode_accepts_trailing_slash_in_supabase_url`. Détails : `docs/fix-durcissement-jwt-issuer-audience.md`.

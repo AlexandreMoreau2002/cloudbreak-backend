@@ -11,6 +11,7 @@ from app.services.user import (
     get_or_create_user,
     get_user_profile,
     provision_user,
+    update_user_notification_preferences,
     update_user_survey,
     update_user_preferences,
 )
@@ -18,7 +19,13 @@ from app.models.prediction import Prediction
 from app.models.subscription import Subscription
 from app.models.terrain_validation import TerrainValidation
 from app.models.user import User
-from app.schemas.user import AcquisitionSource, Practice, SurveyUpdate, PreferencesUpdate
+from app.schemas.user import (
+    AcquisitionSource,
+    NotificationPreferencesUpdate,
+    PreferencesUpdate,
+    Practice,
+    SurveyUpdate,
+)
 
 
 @pytest.mark.asyncio
@@ -168,6 +175,52 @@ async def test_update_user_preferences_sets_consent_both_ways() -> None:
     )
     assert granted.newsletter_opt_in is True
     assert db.flush.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_update_notification_preferences_partial_update() -> None:
+    profile = User(supabase_user_id="user-123", auth_provider="email")
+    profile.notif_favorites = True
+    profile.notif_regional = True
+    profile.notif_terrain = True
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = profile
+    db = AsyncMock()
+    db.execute.return_value = result
+
+    updated = await update_user_notification_preferences(
+        {"id": "user-123", "auth_provider": "email"},
+        NotificationPreferencesUpdate(notif_regional=False),
+        db,
+    )
+
+    assert updated.notif_favorites is True
+    assert updated.notif_regional is False
+    assert updated.notif_terrain is True
+    db.flush.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_update_notification_preferences_empty_payload_no_op() -> None:
+    profile = User(supabase_user_id="user-123", auth_provider="email")
+    profile.notif_favorites = True
+    profile.notif_regional = False
+    profile.notif_terrain = True
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = profile
+    db = AsyncMock()
+    db.execute.return_value = result
+
+    updated = await update_user_notification_preferences(
+        {"id": "user-123", "auth_provider": "email"},
+        NotificationPreferencesUpdate(),
+        db,
+    )
+
+    assert updated.notif_favorites is True
+    assert updated.notif_regional is False
+    assert updated.notif_terrain is True
+    db.flush.assert_awaited_once()
 
 
 @pytest.mark.asyncio

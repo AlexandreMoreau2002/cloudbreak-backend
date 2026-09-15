@@ -2,6 +2,16 @@
 
 Document de référence sécurité. À mettre à jour à chaque story qui touche auth, réseau, données ou dépendances.
 
+## 2026-09-15 Story 2.2 — Préférences de notifications
+
+### 🔵 INFO
+- **[user.py]** Nouvel endpoint `PATCH /api/v1/user/notifications` — même garde que
+  `/preferences` (403 `ACCOUNT_REQUIRED` pour une session anonyme, JWT permanent requis). Aucune
+  donnée sensible transitée (3 booléens).
+
+### Verdict
+SECURE — pas de nouvelle surface d'exposition, pattern identique à un endpoint déjà audité.
+
 ---
 
 ## État actuel (story 1-2 — squelette)

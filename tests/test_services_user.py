@@ -2,8 +2,9 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from sqlalchemy.sql.dml import Delete
+from pydantic import ValidationError
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql.dml import Delete
 
 from app.models.favorite import Favorite
 from app.services.user import (
@@ -221,6 +222,12 @@ async def test_update_notification_preferences_empty_payload_no_op() -> None:
     assert updated.notif_regional is False
     assert updated.notif_terrain is True
     db.flush.assert_awaited_once()
+
+
+@pytest.mark.parametrize("field", ["notif_favorites", "notif_regional", "notif_terrain"])
+def test_notification_preferences_reject_explicit_null(field: str) -> None:
+    with pytest.raises(ValidationError):
+        NotificationPreferencesUpdate.model_validate({field: None})
 
 
 @pytest.mark.asyncio

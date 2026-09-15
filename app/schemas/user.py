@@ -1,6 +1,6 @@
 from enum import StrEnum
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class AcquisitionSource(StrEnum):
@@ -46,6 +46,13 @@ class NotificationPreferencesUpdate(BaseModel):
     notif_favorites: bool | None = None
     notif_regional: bool | None = None
     notif_terrain: bool | None = None
+
+    @field_validator("notif_favorites", "notif_regional", "notif_terrain")
+    @classmethod
+    def reject_explicit_null(cls, value: bool | None) -> bool | None:
+        if value is None:
+            raise ValueError("Notification preferences cannot be null")
+        return value
 
 
 class UserProfile(BaseModel):

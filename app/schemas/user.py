@@ -38,6 +38,16 @@ class PreferencesUpdate(BaseModel):
     newsletter_opt_in: bool
 
 
+class NotificationPreferencesUpdate(BaseModel):
+    """Update partiel — chaque préférence est indépendante et optionnelle."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    notif_favorites: bool | None = None
+    notif_regional: bool | None = None
+    notif_terrain: bool | None = None
+
+
 class UserProfile(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -50,3 +60,6 @@ class UserProfile(BaseModel):
     acquisition_source: str | None = None
     practice: str | None = None
     newsletter_opt_in: bool | None = None
+    notif_favorites: bool
+    notif_regional: bool
+    notif_terrain: bool

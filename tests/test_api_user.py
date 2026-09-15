@@ -118,6 +118,9 @@ def test_provision_creates_profile_from_current_jwt(mock_provision: AsyncMock) -
         "auth_provider": "email",
         "created_at": datetime.now(UTC),
         "converted_at": datetime.now(UTC),
+        "notif_favorites": True,
+        "notif_regional": True,
+        "notif_terrain": True,
     }
     app.dependency_overrides[get_current_user] = lambda: {
         "id": "user-123",
@@ -161,6 +164,9 @@ def test_survey_persists_answer_for_permanent_account(mock_update: AsyncMock) ->
         "auth_provider": "email",
         "created_at": datetime.now(UTC),
         "converted_at": datetime.now(UTC),
+        "notif_favorites": True,
+        "notif_regional": True,
+        "notif_terrain": True,
     }
     app.dependency_overrides[get_current_user] = lambda: {
         "id": "user-123",
@@ -219,6 +225,9 @@ def test_preferences_withdraws_consent_for_permanent_account(mock_update: AsyncM
         "created_at": datetime.now(UTC),
         "converted_at": datetime.now(UTC),
         "newsletter_opt_in": False,
+        "notif_favorites": True,
+        "notif_regional": True,
+        "notif_terrain": True,
     }
     app.dependency_overrides[get_current_user] = lambda: {
         "id": "user-123",

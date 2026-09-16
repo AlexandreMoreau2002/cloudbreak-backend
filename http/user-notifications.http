@@ -1,0 +1,49 @@
+### Variables: inject a permanent Supabase JWT locally; never commit tokens.
+@baseUrl = http://localhost:8000
+@token = {{$dotenv CLOUDBREAK_JWT}}
+@anonymousToken = {{$dotenv CLOUDBREAK_ANONYMOUS_JWT}}
+
+### Update d'une seule préférence (nominal)
+PATCH {{baseUrl}}/api/v1/user/notifications
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "notif_favorites": false
+}
+
+### Update des 3 préférences en un appel
+PATCH {{baseUrl}}/api/v1/user/notifications
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "notif_favorites": true,
+  "notif_regional": false,
+  "notif_terrain": true
+}
+
+### Payload vide — 200, aucun changement
+PATCH {{baseUrl}}/api/v1/user/notifications
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
+
+### Sans Authorization — attendu 403
+PATCH {{baseUrl}}/api/v1/user/notifications
+Content-Type: application/json
+
+{
+  "notif_favorites": false
+}
+
+### Session anonyme — attendu 403 ACCOUNT_REQUIRED
+# Remplacer {{anonymousToken}} par un token de session anonyme Supabase.
+PATCH {{baseUrl}}/api/v1/user/notifications
+Authorization: Bearer {{anonymousToken}}
+Content-Type: application/json
+
+{
+  "notif_favorites": false
+}

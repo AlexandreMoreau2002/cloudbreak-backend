@@ -10,7 +10,7 @@ from app.models.favorite import Favorite
 from app.models.prediction import Prediction
 from app.models.subscription import Subscription
 from app.models.terrain_validation import TerrainValidation
-from app.schemas.user import SurveyUpdate, PreferencesUpdate
+from app.schemas.user import NotificationPreferencesUpdate, PreferencesUpdate, SurveyUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -97,5 +97,21 @@ async def update_user_preferences(
     # mypy voit la colonne comme `Column[bool]` sur une affectation d'un `bool` nu
     # (friction stubs SQLAlchemy, cf. `favorites.py` / `validations.py`).
     profile.newsletter_opt_in = prefs.newsletter_opt_in  # type: ignore[assignment]
+    await db.flush()
+    return profile
+
+
+async def update_user_notification_preferences(
+    user: dict[str, object], prefs: NotificationPreferencesUpdate, db: AsyncSession
+) -> User:
+    """Met à jour une ou plusieurs préférences de notification — update partiel.
+
+    Seuls les champs explicitement envoyés dans le payload sont modifiés (les autres
+    préférences ne sont pas touchées) — contrairement à `update_user_preferences` qui
+    n'a qu'un seul champ toujours requis.
+    """
+    profile = await get_or_create_user(str(user["id"]), str(user.get("auth_provider", "email")), db)
+    for field, value in prefs.model_dump(exclude_unset=True).items():
+        setattr(profile, field, value)
     await db.flush()
     return profile

@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, Column, DateTime, String
+from sqlalchemy import Boolean, Column, DateTime, String, true
 
 from app.db.session import Base
 
@@ -21,3 +21,6 @@ class User(Base):
     acquisition_source = Column(String(50), nullable=True)
     practice = Column(String(50), nullable=True)
     newsletter_opt_in = Column(Boolean, nullable=True)
+    notif_favorites = Column(Boolean, nullable=False, server_default=true())
+    notif_regional = Column(Boolean, nullable=False, server_default=true())
+    notif_terrain = Column(Boolean, nullable=False, server_default=true())

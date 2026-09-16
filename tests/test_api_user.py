@@ -118,6 +118,9 @@ def test_provision_creates_profile_from_current_jwt(mock_provision: AsyncMock) -
         "auth_provider": "email",
         "created_at": datetime.now(UTC),
         "converted_at": datetime.now(UTC),
+        "notif_favorites": True,
+        "notif_regional": True,
+        "notif_terrain": True,
     }
     app.dependency_overrides[get_current_user] = lambda: {
         "id": "user-123",
@@ -161,6 +164,9 @@ def test_survey_persists_answer_for_permanent_account(mock_update: AsyncMock) ->
         "auth_provider": "email",
         "created_at": datetime.now(UTC),
         "converted_at": datetime.now(UTC),
+        "notif_favorites": True,
+        "notif_regional": True,
+        "notif_terrain": True,
     }
     app.dependency_overrides[get_current_user] = lambda: {
         "id": "user-123",
@@ -196,6 +202,127 @@ def test_anonymous_cannot_update_preferences() -> None:
     assert response.json()["detail"]["code"] == "ACCOUNT_REQUIRED"
 
 
+def test_anonymous_cannot_update_notifications() -> None:
+    app.dependency_overrides[get_current_user] = lambda: {
+        "id": "anon-123",
+        "is_anonymous": True,
+    }
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        with TestClient(app) as client:
+            response = client.patch("/api/v1/user/notifications", json={"notif_favorites": False})
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "ACCOUNT_REQUIRED"
+
+
+def test_notifications_requires_token() -> None:
+    with TestClient(app) as client:
+        response = client.patch("/api/v1/user/notifications", json={"notif_favorites": False})
+    assert response.status_code == 403
+
+
+@patch("app.api.v1.endpoints.user.update_user_notification_preferences", new_callable=AsyncMock)
+def test_notifications_updates_single_field(mock_update: AsyncMock) -> None:
+    profile = MagicMock()
+    profile.supabase_user_id = "user-123"
+    profile.auth_provider = "email"
+    profile.created_at = datetime.now(UTC)
+    profile.converted_at = datetime.now(UTC)
+    profile.survey_completed_at = None
+    profile.survey_skipped_at = None
+    profile.acquisition_source = None
+    profile.practice = None
+    profile.newsletter_opt_in = None
+    profile.notif_favorites = False
+    profile.notif_regional = True
+    profile.notif_terrain = True
+    mock_update.return_value = profile
+    app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        with TestClient(app) as client:
+            response = client.patch("/api/v1/user/notifications", json={"notif_favorites": False})
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert response.json()["notif_favorites"] is False
+    assert response.json()["notif_regional"] is True
+    mock_update.assert_awaited_once()
+
+
+@patch("app.api.v1.endpoints.user.update_user_notification_preferences", new_callable=AsyncMock)
+def test_notifications_accepts_empty_payload(mock_update: AsyncMock) -> None:
+    profile = MagicMock()
+    profile.supabase_user_id = "user-123"
+    profile.auth_provider = "email"
+    profile.created_at = datetime.now(UTC)
+    profile.converted_at = datetime.now(UTC)
+    profile.survey_completed_at = None
+    profile.survey_skipped_at = None
+    profile.acquisition_source = None
+    profile.practice = None
+    profile.newsletter_opt_in = None
+    profile.notif_favorites = True
+    profile.notif_regional = True
+    profile.notif_terrain = True
+    mock_update.return_value = profile
+    app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        with TestClient(app) as client:
+            response = client.patch("/api/v1/user/notifications", json={})
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 200
+
+
+def test_get_me_exposes_notification_preferences() -> None:
+    profile = MagicMock()
+    profile.survey_completed_at = None
+    profile.survey_skipped_at = None
+    profile.newsletter_opt_in = None
+    profile.notif_favorites = True
+    profile.notif_regional = False
+    profile.notif_terrain = True
+    with patch(
+        "app.api.v1.endpoints.user.get_user_profile",
+        new_callable=AsyncMock,
+        return_value=profile,
+    ):
+        app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+        app.dependency_overrides[get_db] = _override_db
+        try:
+            with TestClient(app) as client:
+                response = client.get("/api/v1/user/me")
+        finally:
+            app.dependency_overrides.clear()
+    body = response.json()
+    assert body["notif_favorites"] is True
+    assert body["notif_regional"] is False
+    assert body["notif_terrain"] is True
+
+
+def test_get_me_defaults_notification_preferences_when_not_provisioned() -> None:
+    app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+    app.dependency_overrides[get_db] = _override_db
+    with patch(
+        "app.api.v1.endpoints.user.get_user_profile",
+        new_callable=AsyncMock,
+        return_value=None,
+    ):
+        try:
+            with TestClient(app) as client:
+                response = client.get("/api/v1/user/me")
+        finally:
+            app.dependency_overrides.clear()
+    body = response.json()
+    assert body["notif_favorites"] is True
+    assert body["notif_regional"] is True
+    assert body["notif_terrain"] is True
+
+
 @patch("app.api.v1.endpoints.user.update_user_preferences", new_callable=AsyncMock)
 def test_preferences_rejects_unknown_or_missing_fields(mock_update: AsyncMock) -> None:
     app.dependency_overrides[get_current_user] = lambda: {
@@ -219,6 +346,9 @@ def test_preferences_withdraws_consent_for_permanent_account(mock_update: AsyncM
         "created_at": datetime.now(UTC),
         "converted_at": datetime.now(UTC),
         "newsletter_opt_in": False,
+        "notif_favorites": True,
+        "notif_regional": True,
+        "notif_terrain": True,
     }
     app.dependency_overrides[get_current_user] = lambda: {
         "id": "user-123",

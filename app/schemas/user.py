@@ -1,6 +1,6 @@
 from enum import StrEnum
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class AcquisitionSource(StrEnum):
@@ -38,6 +38,23 @@ class PreferencesUpdate(BaseModel):
     newsletter_opt_in: bool
 
 
+class NotificationPreferencesUpdate(BaseModel):
+    """Update partiel — chaque préférence est indépendante et optionnelle."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    notif_favorites: bool | None = None
+    notif_regional: bool | None = None
+    notif_terrain: bool | None = None
+
+    @field_validator("notif_favorites", "notif_regional", "notif_terrain")
+    @classmethod
+    def reject_explicit_null(cls, value: bool | None) -> bool | None:
+        if value is None:
+            raise ValueError("Notification preferences cannot be null")
+        return value
+
+
 class UserProfile(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -50,3 +67,6 @@ class UserProfile(BaseModel):
     acquisition_source: str | None = None
     practice: str | None = None
     newsletter_opt_in: bool | None = None
+    notif_favorites: bool
+    notif_regional: bool
+    notif_terrain: bool

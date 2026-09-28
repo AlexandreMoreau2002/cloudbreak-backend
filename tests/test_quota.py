@@ -12,10 +12,12 @@ Cas testés:
   8. get_remaining_checks : quota épuisé → 0 restants
 """
 
-import pytest
-from datetime import datetime
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
+
+import pytest
+
 from app.services.quota import QuotaExceededException, QuotaService
 
 
@@ -105,8 +107,6 @@ class TestQuotaService:
         self, mock_redis: AsyncMock, quota_service: QuotaService
     ) -> None:
         """TTL correct : ~12h quand appelé à 12:00 UTC."""
-        from datetime import UTC
-
         mock_redis.sismember.return_value = False
         mock_redis.scard.return_value = 0
 
@@ -192,3 +192,67 @@ class TestQuotaService:
         remaining = await quota_service.get_remaining_checks(user_id="user-123", date="2026-04-01")
 
         assert remaining == 0
+
+    @pytest.mark.asyncio
+    async def test_installation_new_peak_is_unlocked(
+        self, mock_redis: AsyncMock, quota_service: QuotaService
+    ) -> None:
+        """Une installation débloque un sommet dans son SET quotidien distinct."""
+        installation_hash = "a" * 64
+        mock_redis.sismember.return_value = False
+        mock_redis.scard.return_value = 0
+
+        await quota_service.check_and_increment_installation(
+            installation_hash, "2026-09-28", "peak-1"
+        )
+
+        expected_key = f"quota:installation:{installation_hash}:2026-09-28"
+        mock_redis.sismember.assert_called_once_with(expected_key, "peak-1")
+        mock_redis._pipe.sadd.assert_called_once_with(expected_key, "peak-1")
+
+    @pytest.mark.asyncio
+    async def test_installation_same_peak_does_not_consume_quota(
+        self, mock_redis: AsyncMock, quota_service: QuotaService
+    ) -> None:
+        """Un sommet déjà ouvert pour l'installation reste consultable."""
+        mock_redis.sismember.return_value = True
+
+        await quota_service.check_and_increment_installation("a" * 64, "2026-09-28", "peak-1")
+
+        mock_redis.scard.assert_not_called()
+        mock_redis._pipe.sadd.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_installation_quotas_are_independent(
+        self, mock_redis: AsyncMock, quota_service: QuotaService
+    ) -> None:
+        """Deux installations ne partagent pas leur quota quotidien."""
+        first_hash = "a" * 64
+        second_hash = "b" * 64
+        mock_redis.sismember.return_value = False
+        mock_redis.scard.side_effect = [1, 0]
+
+        with pytest.raises(QuotaExceededException):
+            await quota_service.check_and_increment_installation(first_hash, "2026-09-28", "peak-1")
+
+        await quota_service.check_and_increment_installation(second_hash, "2026-09-28", "peak-1")
+
+        expected_key = f"quota:installation:{second_hash}:2026-09-28"
+        mock_redis._pipe.sadd.assert_called_once_with(expected_key, "peak-1")
+
+    @pytest.mark.asyncio
+    async def test_installation_quota_expires_at_utc_midnight(
+        self, mock_redis: AsyncMock, quota_service: QuotaService
+    ) -> None:
+        """Le SET installation est supprimé au prochain minuit UTC."""
+        mock_redis.sismember.return_value = False
+        mock_redis.scard.return_value = 0
+        mock_now = datetime(2026, 9, 28, 12, 0, 0, tzinfo=UTC)
+
+        with patch("app.services.quota.datetime") as mock_datetime:
+            mock_datetime.now.return_value = mock_now
+            mock_datetime.UTC = UTC
+
+            await quota_service.check_and_increment_installation("a" * 64, "2026-09-28", "peak-1")
+
+        assert 43100 < mock_redis._pipe.expire.call_args.args[1] < 43300

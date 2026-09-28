@@ -14,8 +14,9 @@ Format erreur :
 """
 
 import logging
-from redis.asyncio import Redis
 from datetime import UTC, datetime, timedelta
+
+from redis.asyncio import Redis
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,16 @@ class QuotaService:
         Raises:
             QuotaExceededException: Si quota de sommets uniques dépassé
         """
-        quota_key = f"quota:{user_id}:{date}"
+        await self._check_and_increment(f"quota:{user_id}:{date}", peak_id)
+
+    async def check_and_increment_installation(
+        self, installation_hash: str, date: str, peak_id: str
+    ) -> None:
+        """Vérifie le quota quotidien attaché à une installation hachée."""
+        await self._check_and_increment(f"quota:installation:{installation_hash}:{date}", peak_id)
+
+    async def _check_and_increment(self, quota_key: str, peak_id: str) -> None:
+        """Déverrouille un sommet dans un SET quotidien, dans la limite configurée."""
 
         # Si ce sommet est déjà déverrouillé aujourd'hui → allow
         already_unlocked = await self._redis.sismember(quota_key, peak_id)  # type: ignore[misc]
@@ -69,13 +79,11 @@ class QuotaService:
             logger.warning(
                 "quota_exceeded",
                 extra={
-                    "user_id": user_id,
-                    "date": date,
                     "peak_id": peak_id,
                     "unlocked_count": int(unlocked_count),
                 },
             )
-            raise QuotaExceededException(f"Daily quota exceeded for {user_id} on {date}")
+            raise QuotaExceededException("Daily quota exceeded")
 
         # Déverrouiller ce sommet pour aujourd'hui (opération atomique)
         now_utc = datetime.now(UTC)
@@ -89,8 +97,6 @@ class QuotaService:
         logger.info(
             "quota_peak_unlocked",
             extra={
-                "user_id": user_id,
-                "date": date,
                 "peak_id": peak_id,
                 "unlocked_count": int(unlocked_count) + 1,
             },

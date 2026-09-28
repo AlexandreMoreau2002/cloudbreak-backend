@@ -446,12 +446,16 @@ la configuration effective de Traefik/Dokploy n'a pas été inspectée sur le se
   pour le quota utilisateur et est réutilisé pour l'installation. → Arrondir au supérieur avec
   une borne minimale de 1 seconde, ou employer une expiration absolue à minuit ; tester
   explicitement `23:59:59.500000 UTC`.
-- **[Dockerfile:12; app/core/dependencies.py:194]** `--forwarded-allow-ips=*` fait dépendre
-  l'intégrité de l'IP de la frontière réseau : un accès direct à Uvicorn, ou des forwarded headers
-  non nettoyés par Traefik, permettrait de choisir l'IP du compteur. Ce contournement n'est pas
-  démontré sur le déploiement actuel. → Vérifier avant déploiement l'absence d'accès direct,
-  les pairs réseau autorisés et la configuration `forwardedHeaders` de Traefik ; rejouer une
-  requête avec un faux `X-Forwarded-For` et vérifier que le compteur conserve l'IP réelle.
+
+### ✅ RÉSOLU
+
+- **[Dockerfile:12; app/core/dependencies.py:194]** La confiance des forwarded headers est
+  limitée au sous-réseau `10.0.1.0/24` de l'overlay Dokploy `dokploy-network`. L'inspection du
+  VPS a confirmé que seul `dokploy-traefik` publie les ports 80/443, que le service backend
+  `app-reboot-primary-circuit-vmgb6t` n'a aucun port publié, et que le service dynamique Traefik
+  joint le backend sur le port 8000 via `dokploy-network`. Un pair immédiat hors de ce CIDR ne
+  peut donc pas fournir de forwarded headers de confiance à Uvicorn. → Re-vérifier ce CIDR si
+  Dokploy recrée l'overlay réseau.
   Références : [Uvicorn](https://www.uvicorn.org/settings/),
   [Traefik](https://doc.traefik.io/traefik/reference/install-configuration/entrypoints/).
 

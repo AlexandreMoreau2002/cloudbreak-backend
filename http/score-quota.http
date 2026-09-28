@@ -132,11 +132,12 @@ Authorization: Bearer {{proEmail-jwt}}
 
 # ═══════════════════════════════════════════════════════════
 # BLOC 4 — AC4 : Reset quota le lendemain (TTL Redis)
-# ⚠ Nécessite d'avoir déclenché AC2 (quota épuisé)
+# ⚠ Exécuter uniquement après le prochain minuit UTC du serveur. Changer `date` dans l'URL
+# ne réinitialise pas le quota : cette date sert au score, pas à la clé Redis.
 # ═══════════════════════════════════════════════════════════
 
-### 4.1 — Freemium, appel le lendemain → 200 OK (quota reset)
-GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date=2026-04-02&hour=9
+### 4.1 — Freemium, appel après minuit UTC serveur → 200 OK (quota reset)
+GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date={{testDate}}&hour=9
 Authorization: Bearer {{freemiumEmail-jwt}}
 
 

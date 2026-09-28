@@ -1,8 +1,7 @@
 """Tests unitaires du quota journalier Redis."""
 
-import asyncio
-from hashlib import sha256
 from datetime import UTC, datetime
+import asyncio
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -11,8 +10,8 @@ from app.services.quota import QuotaExceededException, QuotaService
 
 
 def _user_quota_key(user_id: str, date: str) -> str:
-    """Construit une clé utilisateur sans UUID brut."""
-    return f"quota:{sha256(user_id.encode()).hexdigest()}:{date}"
+    """Construit la clé utilisateur historique."""
+    return f"quota:{user_id}:{date}"
 
 
 @pytest.fixture
@@ -31,10 +30,10 @@ class TestQuotaService:
     """Tests des quotas utilisateur et installation."""
 
     @pytest.mark.asyncio
-    async def test_user_quota_uses_exact_hashed_key(
+    async def test_user_quota_preserves_exact_historical_key(
         self, mock_redis: AsyncMock, quota_service: QuotaService
     ) -> None:
-        """La clé utilisateur emploie le SHA-256 exact, jamais l'UUID brut."""
+        """La clé utilisateur reste compatible avec le quota déjà déployé."""
         mock_redis.eval.return_value = 1
 
         await quota_service.check_and_increment("user-123", "2026-04-01", "peak-abc")
@@ -42,11 +41,10 @@ class TestQuotaService:
         args = mock_redis.eval.call_args.args
         assert args[1:5] == (
             1,
-            "quota:fcdec6df4d44dbc637c7c5b58efface52a7f8a88535423430255be0bb89bedd8:2026-04-01",
+            "quota:user-123:2026-04-01",
             "peak-abc",
             "1",
         )
-        assert "user-123" not in args[2]
 
     @pytest.mark.asyncio
     async def test_same_peak_is_allowed_without_consuming_another_slot(
@@ -133,10 +131,10 @@ class TestQuotaService:
         assert sum(isinstance(result, QuotaExceededException) for result in results) == 1
 
     @pytest.mark.asyncio
-    async def test_get_remaining_checks_uses_hashed_user_key(
+    async def test_get_remaining_checks_uses_historical_user_key(
         self, mock_redis: AsyncMock, quota_service: QuotaService
     ) -> None:
-        """Le contrôle des checks restants utilise la même clé utilisateur hachée."""
+        """Le contrôle des checks restants utilise la même clé historique."""
         mock_redis.scard.return_value = 0
 
         remaining = await quota_service.get_remaining_checks("user-123", "2026-04-01")

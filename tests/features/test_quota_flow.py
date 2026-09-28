@@ -562,7 +562,7 @@ async def test_anonymous_score_rejects_missing_empty_or_non_v4_installation_id(
         app.dependency_overrides.pop(get_redis, None)
 
     assert response.status_code == 400
-    assert response.json()["detail"]["code"] == "INSTALLATION_ID_INVALID"
+    assert response.json()["code"] == "INSTALLATION_ID_INVALID"
     mock_redis.eval.assert_not_awaited()
 
 
@@ -728,4 +728,4 @@ async def test_anonymous_score_rate_limit_allows_60_then_rejects_61st() -> None:
         app.dependency_overrides.pop(get_db, None)
 
     assert rejected.status_code == 429
-    assert rejected.json()["detail"]["code"] == "RATE_LIMIT_EXCEEDED"
+    assert rejected.json()["code"] == "RATE_LIMIT_EXCEEDED"

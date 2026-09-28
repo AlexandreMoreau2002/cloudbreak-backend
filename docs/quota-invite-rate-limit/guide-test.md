@@ -37,14 +37,14 @@ minute plutôt que de supprimer une clé qui pourrait servir à quelqu'un d'autr
 1. Exécuter `7.1` dans `http/score-quota.http` avec `guestFirst-jwt` et `@installationId`.
 2. Vérifier `200` et une réponse score.
 3. Exécuter `7.2` avec `guestRotated-jwt`, le même `@installationId` et un autre sommet.
-4. Vérifier `429` et `detail.code = QUOTA_EXCEEDED`.
+4. Vérifier `429` et le code `QUOTA_EXCEEDED`.
 
 Le deuxième JWT ne doit donc pas réinitialiser le quota de l'installation.
 
 ### 2. En-tête d'installation invalide
 
 1. Exécuter `7.3` (en-tête absent).
-2. Vérifier `400` et `detail.code = INSTALLATION_ID_INVALID`.
+2. Vérifier `400`, avec le corps direct `{"detail":"Identifiant d'installation invalide","code":"INSTALLATION_ID_INVALID"}`.
 3. Exécuter `7.4` (UUID version 1, donc pas version 4).
 4. Vérifier le même `400 INSTALLATION_ID_INVALID`.
 
@@ -126,6 +126,18 @@ Le deuxième JWT ne doit donc pas réinitialiser le quota de l'installation.
 2. Exécuter `7.6` avec le token Premium, sans en-tête d'installation ; vérifier `200`.
 3. Exécuter `7.7` avec le token Pro, sans en-tête d'installation ; vérifier `200`.
 
+### 5. Persistance Keychain sur iOS
+
+1. Lancer une build native de développement : `cd mobile && npx expo run:ios`.
+2. Poser un point d'arrêt dans `getInstallationId()` puis noter l'UUID retourné au premier score invité.
+3. Forcer la recréation de la session anonyme dans le débogueur React Native avec
+   `supabase.auth.signOut({ scope: 'local' })`, puis relancer le flux qui crée une nouvelle session
+   anonyme et refaire un score.
+4. Vérifier que l'UUID retourné reste identique, tandis que le `sub` du JWT a changé. Le second
+   sommet doit répondre `429 QUOTA_EXCEEDED`.
+5. Fermer complètement puis rouvrir l'app : l'UUID doit rester le même. Désinstaller l'app est
+   hors périmètre de ce test : l'étage App Attest/DeviceCheck traitera ultérieurement ce cas.
+
 ## Cas limites à garder en tête
 
 - Le quota expire à minuit UTC du serveur, quel que soit le jour demandé dans `@testDate`.
@@ -146,4 +158,5 @@ Le deuxième JWT ne doit donc pas réinitialiser le quota de l'installation.
 - [ ] Date invalide : `422`.
 - [ ] Premium sans header : `200`.
 - [ ] Pro sans header : `200`.
+- [ ] Sur iOS, une rotation de session anonyme conserve l'UUID SecureStore et le quota installation.
 - [ ] Aucun `FLUSHDB` exécuté.

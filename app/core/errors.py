@@ -1,3 +1,12 @@
+class ApiError(Exception):
+    """Erreur API dont le handler conserve le contrat de réponse direct."""
+
+    def __init__(self, status_code: int, detail: str, code: str) -> None:
+        self.status_code = status_code
+        self.detail = detail
+        self.code = code
+
+
 class ErrorCode:
     NOT_FOUND = "NOT_FOUND"
     INVALID_TOKEN = "INVALID_TOKEN"

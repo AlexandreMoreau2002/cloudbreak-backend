@@ -12,7 +12,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.db.session import get_db
 from app.core.config import settings
-from app.core.errors import ErrorCode
+from app.core.errors import ApiError, ErrorCode
 from app.services.analytics import track
 from app.models.subscription import Subscription
 from app.core.security import decode_supabase_jwt
@@ -40,12 +40,10 @@ def _parse_installation_uuid4(value: str | None) -> UUID:
         installation_uuid = None
 
     if installation_uuid is None or installation_uuid.version != 4:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "detail": "Identifiant d'installation invalide",
-                "code": ErrorCode.INSTALLATION_ID_INVALID,
-            },
+        raise ApiError(
+            status.HTTP_400_BAD_REQUEST,
+            "Identifiant d'installation invalide",
+            ErrorCode.INSTALLATION_ID_INVALID,
         )
     return installation_uuid
 
@@ -203,12 +201,10 @@ async def check_quota(
                     "installation_hash": installation_hash,
                 },
             )
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail={
-                    "detail": "Trop de requêtes",
-                    "code": ErrorCode.RATE_LIMIT_EXCEEDED,
-                },
+            raise ApiError(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                "Trop de requêtes",
+                ErrorCode.RATE_LIMIT_EXCEEDED,
             ) from None
 
     try:

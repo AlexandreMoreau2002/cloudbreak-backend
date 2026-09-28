@@ -2,7 +2,7 @@
 Service quota — vérification du quota journalier freemium.
 
 Système :
-  - Clé Redis : quota:{sha256(user_id)}:{date_iso}
+  - Clé Redis historique : quota:{user_id}:{date_iso}
   - Stockage : SET de peak_ids déverrouillés (pas un compteur)
   - Limite freemium : 1 sommet unique/jour
   - Règle : toutes les heures d'un même sommet passent sans consommer de quota
@@ -14,9 +14,8 @@ Format erreur :
 """
 
 import logging
-from math import ceil
-from hashlib import sha256
 from datetime import UTC, datetime, timedelta
+from math import ceil
 
 from redis.asyncio import Redis
 
@@ -106,8 +105,8 @@ class QuotaService:
 
     @staticmethod
     def _user_quota_key(user_id: str, date: str) -> str:
-        """Construit une clé quota sans exposer l'identifiant utilisateur brut."""
-        return f"quota:{sha256(user_id.encode()).hexdigest()}:{date}"
+        """Construit la clé quota utilisateur historique."""
+        return f"quota:{user_id}:{date}"
 
     async def get_remaining_checks(self, user_id: str, date: str) -> int:
         """

@@ -1,5 +1,10 @@
 # Story 4.1 — Quota Freemium Backend (1 check/jour)
 
+> **Mise à jour 2026-09-29.** La mitigation anti-contournement invitée est documentée dans
+> [`quota-invite-rate-limit/`](quota-invite-rate-limit/) : le quota utilisateur historique reste
+> `quota:{user_id}:{date}`, complété pour les sessions anonymes par un quota d'installation et une
+> limite de rafale IP. Ce document conserve le fonctionnement initial du quota freemium.
+
 ## Ce qui a été fait
 
 ### Fichiers créés

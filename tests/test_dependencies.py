@@ -268,8 +268,8 @@ async def test_anonymous_quota_rejects_invalid_installation_id_without_redis(
     installation_id: str | None,
 ) -> None:
     """Un invité sans UUID v4 valide reçoit 400 avant tout accès Redis."""
-    from fastapi import HTTPException
     from app.core.dependencies import check_quota
+    from app.core.errors import ApiError
 
     request = MagicMock()
     request.query_params = {"peak_id": "peak-1"}
@@ -284,7 +284,7 @@ async def test_anonymous_quota_rejects_invalid_installation_id_without_redis(
         new_callable=AsyncMock,
         return_value=None,
     ):
-        with pytest.raises(HTTPException) as raised:
+        with pytest.raises(ApiError) as raised:
             await check_quota(
                 request=request,
                 user={"id": "guest-123", "is_anonymous": True},
@@ -293,8 +293,7 @@ async def test_anonymous_quota_rejects_invalid_installation_id_without_redis(
             )
 
     assert raised.value.status_code == 400
-    assert isinstance(raised.value.detail, dict)
-    assert raised.value.detail["code"] == "INSTALLATION_ID_INVALID"
+    assert raised.value.code == "INSTALLATION_ID_INVALID"
     redis.eval.assert_not_awaited()
 
 
@@ -369,8 +368,8 @@ async def test_anonymous_quota_runs_rate_installation_then_user_quota() -> None:
 @pytest.mark.asyncio
 async def test_anonymous_rate_limit_maps_to_stable_429_error() -> None:
     """Le dépassement IP est exposé comme une erreur API stable sans continuer les quotas."""
-    from fastapi import HTTPException
     from app.core.dependencies import check_quota
+    from app.core.errors import ApiError
     from app.services.rate_limit import RateLimitExceededException
 
     request = MagicMock()
@@ -398,7 +397,7 @@ async def test_anonymous_rate_limit_maps_to_stable_429_error() -> None:
             new_callable=AsyncMock,
         ) as user_quota,
     ):
-        with pytest.raises(HTTPException) as raised:
+        with pytest.raises(ApiError) as raised:
             await check_quota(
                 request=request,
                 user={"id": "guest-123", "is_anonymous": True},
@@ -407,7 +406,6 @@ async def test_anonymous_rate_limit_maps_to_stable_429_error() -> None:
             )
 
     assert raised.value.status_code == 429
-    assert isinstance(raised.value.detail, dict)
-    assert raised.value.detail["code"] == "RATE_LIMIT_EXCEEDED"
+    assert raised.value.code == "RATE_LIMIT_EXCEEDED"
     installation_quota.assert_not_awaited()
     user_quota.assert_not_awaited()

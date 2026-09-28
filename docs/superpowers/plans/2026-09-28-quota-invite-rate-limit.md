@@ -118,7 +118,7 @@ git commit -m "feat(quota): add installation and IP limits"
 ```python
 response = await client.get("/api/v1/score")
 assert response.status_code == 400
-assert response.json()["detail"]["code"] == "INSTALLATION_ID_INVALID"
+assert response.json()["code"] == "INSTALLATION_ID_INVALID"
 
 first = await score_for("guest-a", INSTALLATION_ID, "peak-1")
 second = await score_for("guest-b", INSTALLATION_ID, "peak-2")

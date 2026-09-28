@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from sqlalchemy.exc import OperationalError
 
 from app.core.config import settings
+from app.core.errors import ApiError
 from app.api.v1.endpoints.user import router as user_router
 from app.api.v1.endpoints.peaks import router as peaks_router
 from app.api.v1.endpoints.score import router as score_router
@@ -31,6 +32,15 @@ app.include_router(score_router)
 app.include_router(health_router)
 app.include_router(favorites_router)
 app.include_router(validations_router)
+
+
+@app.exception_handler(ApiError)
+async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
+    """Sérialise les erreurs métier avec un code au premier niveau."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail, "code": exc.code},
+    )
 
 
 @app.exception_handler(OperationalError)

@@ -2,7 +2,7 @@
 Service quota — vérification du quota journalier freemium.
 
 Système :
-  - Clé Redis : quota:{user_id}:{date_iso}
+  - Clé Redis : quota:{sha256(user_id)}:{date_iso}
   - Stockage : SET de peak_ids déverrouillés (pas un compteur)
   - Limite freemium : 1 sommet unique/jour
   - Règle : toutes les heures d'un même sommet passent sans consommer de quota
@@ -15,10 +15,25 @@ Format erreur :
 
 import logging
 from datetime import UTC, datetime, timedelta
+from hashlib import sha256
 
 from redis.asyncio import Redis
 
 logger = logging.getLogger(__name__)
+
+CHECK_AND_INCREMENT_SCRIPT = """
+if redis.call('SISMEMBER', KEYS[1], ARGV[1]) == 1 then
+    return 0
+end
+
+if redis.call('SCARD', KEYS[1]) >= tonumber(ARGV[2]) then
+    return -1
+end
+
+redis.call('SADD', KEYS[1], ARGV[1])
+redis.call('EXPIRE', KEYS[1], ARGV[3])
+return 1
+"""
 
 
 class QuotaExceededException(Exception):
@@ -57,7 +72,7 @@ class QuotaService:
         Raises:
             QuotaExceededException: Si quota de sommets uniques dépassé
         """
-        await self._check_and_increment(f"quota:{user_id}:{date}", peak_id)
+        await self._check_and_increment(self._user_quota_key(user_id, date), peak_id)
 
     async def check_and_increment_installation(
         self, installation_hash: str, date: str, peak_id: str
@@ -67,40 +82,31 @@ class QuotaService:
 
     async def _check_and_increment(self, quota_key: str, peak_id: str) -> None:
         """Déverrouille un sommet dans un SET quotidien, dans la limite configurée."""
+        now_utc = datetime.now(UTC)
+        tomorrow = now_utc.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        ttl = int((tomorrow - now_utc).total_seconds())
+        result = await self._redis.eval(
+            CHECK_AND_INCREMENT_SCRIPT,
+            1,
+            quota_key,
+            peak_id,
+            str(self._daily_limit),
+            str(ttl),
+        )  # type: ignore[misc]
 
-        # Si ce sommet est déjà déverrouillé aujourd'hui → allow
-        already_unlocked = await self._redis.sismember(quota_key, peak_id)  # type: ignore[misc]
-        if already_unlocked:
-            return
-
-        # Vérifier si le quota de sommets uniques est atteint
-        unlocked_count = await self._redis.scard(quota_key)  # type: ignore[misc]
-        if unlocked_count >= self._daily_limit:
+        if result == -1:
             logger.warning(
                 "quota_exceeded",
                 extra={
                     "peak_id": peak_id,
-                    "unlocked_count": int(unlocked_count),
                 },
             )
             raise QuotaExceededException("Daily quota exceeded")
 
-        # Déverrouiller ce sommet pour aujourd'hui (opération atomique)
-        now_utc = datetime.now(UTC)
-        tomorrow = now_utc.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-        ttl = int((tomorrow - now_utc).total_seconds())
-        async with self._redis.pipeline() as pipe:
-            await pipe.sadd(quota_key, peak_id)  # type: ignore[misc]
-            await pipe.expire(quota_key, ttl)
-            await pipe.execute()
-
-        logger.info(
-            "quota_peak_unlocked",
-            extra={
-                "peak_id": peak_id,
-                "unlocked_count": int(unlocked_count) + 1,
-            },
-        )
+    @staticmethod
+    def _user_quota_key(user_id: str, date: str) -> str:
+        """Construit une clé quota sans exposer l'identifiant utilisateur brut."""
+        return f"quota:{sha256(user_id.encode()).hexdigest()}:{date}"
 
     async def get_remaining_checks(self, user_id: str, date: str) -> int:
         """
@@ -113,6 +119,6 @@ class QuotaService:
         Returns:
             Nombre de sommets uniques restants (0 ou 1 pour limit=1)
         """
-        quota_key = f"quota:{user_id}:{date}"
+        quota_key = self._user_quota_key(user_id, date)
         unlocked_count = await self._redis.scard(quota_key)  # type: ignore[misc]
         return max(0, self._daily_limit - int(unlocked_count))

@@ -119,7 +119,7 @@ pip-audit  # à installer : pip install pip-audit
 - `GET /api/v1/score` — auth JWT requise + quota Redis (check_quota dependency), `peak_id`/`date`/`hour` validés par Pydantic/Query
 
 ### Ce qui n'existe pas encore
-- Pas de rate limiting (à implémenter avant prod)
+- Pas de rate limiting global : la limite actuelle couvre seulement `GET /api/v1/score` des invités
 - Pas de limite sur le nombre de favoris par utilisateur (à prévoir avant prod)
 
 ---
@@ -400,3 +400,29 @@ Story 4.4 (AC6) — checklist à reporter dans **App Store Connect → App Priva
 - **[backend/app/core/security.py]** `options={"require_aud": True}` est bien un option reconnue par python-jose 3.3.0 (défaut `False`) — oblige la présence de la réclamation `aud` dans le token indépendamment du paramètre `audience`. Combiné avec `audience="authenticated"`, les deux conditions sont strictement vérifiées : présence ET valeur exacte.
 - **[backend/tests/test_security.py]** Couverture ajoutée : `aud` incorrect, `iss` incorrect, `iss` absent, `aud` absent — 4 nouveaux tests de rejet, tous vérifient `ValueError`. 13/13 tests passent.
 - **[backend/app/core/security.py]** Trailing slash sur `supabase_url` corrigé : `expected_issuer = f"{supabase_url.rstrip('/')}/auth/v1"` — une valeur `.env` avec ou sans slash final produit désormais le même issuer attendu. Logs debug ajoutés (`jwt_decode_ok`, `jwt_issuer_mismatch`), silencieux en prod. Test de non-régression : `test_decode_accepts_trailing_slash_in_supabase_url`. Détails : `docs/fix-durcissement-jwt-issuer-audience.md`.
+
+---
+
+## 2026-09-28 — Quota invité et rate limit de `/score`
+
+### RÉSOLU — P0 atténuée
+
+Un invité ne peut plus contourner le quota journalier en créant simplement un nouveau JWT
+Supabase. Pour une session anonyme freemium, `GET /api/v1/score` exige un
+`X-Cloudbreak-Installation-Id` UUID v4, le hache, puis applique le quota sur cette installation
+avant le quota lié au JWT. Un nouveau JWT sur la même installation et un nouveau sommet reçoit
+donc `429 QUOTA_EXCEEDED`.
+
+La route limite également les invités à 60 demandes par adresse IP et par fenêtre fixe de
+60 secondes. La 61e demande renvoie `429 RATE_LIMIT_EXCEEDED`. Les identifiants d'installation et
+les IP ne sont pas conservés en clair dans les clés Redis utilisées par ces contrôles.
+
+### Limites et suite nécessaire
+
+- Le client reste sous le contrôle de l'utilisateur : une application modifiée peut générer un
+  autre UUID v4 et se présenter comme une nouvelle installation.
+- Une limite IP est une défense de rafale, pas une identité fiable : l'IP peut changer, être
+  partagée (NAT) ou être masquée derrière un proxy/VPN.
+- **À prévoir : App Attest iOS.** Une attestation d'application doit apporter un signal lié à une
+  app authentique et rendre la falsification du signal d'installation plus coûteuse. Elle complète
+  ces contrôles Redis ; elle ne doit pas être présentée comme une garantie absolue.

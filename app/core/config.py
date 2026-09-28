@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     app_version: str = "1.0.0"
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 settings = Settings()

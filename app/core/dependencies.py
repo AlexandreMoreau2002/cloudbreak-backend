@@ -1,11 +1,15 @@
 import logging
+from uuid import UUID
 from typing import Any
+from hashlib import sha256
+from datetime import UTC, datetime
+
 from sqlalchemy import select
 from redis.asyncio import Redis
-from datetime import UTC, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
 from app.db.session import get_db
 from app.core.config import settings
 from app.core.errors import ErrorCode
@@ -13,6 +17,7 @@ from app.services.analytics import track
 from app.models.subscription import Subscription
 from app.core.security import decode_supabase_jwt
 from app.services.quota import QuotaService, QuotaExceededException
+from app.services.rate_limit import RateLimitService, RateLimitExceededException
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +25,29 @@ bearer_scheme = HTTPBearer()
 
 # Redis singleton
 _redis: Redis | None = None
+
+
+def _identifier_hash(identifier: object) -> str:
+    """Retourne un digest journalisable sans exposer l'identifiant source."""
+    return sha256(str(identifier).encode()).hexdigest()
+
+
+def _parse_installation_uuid4(value: str | None) -> UUID:
+    """Valide le signal d'installation anonyme attendu par l'API score."""
+    try:
+        installation_uuid = UUID(value) if value else None
+    except (ValueError, AttributeError, TypeError):
+        installation_uuid = None
+
+    if installation_uuid is None or installation_uuid.version != 4:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "detail": "Identifiant d'installation invalide",
+                "code": ErrorCode.INSTALLATION_ID_INVALID,
+            },
+        )
+    return installation_uuid
 
 
 def decode_user_payload(payload: dict[str, Any]) -> dict[str, object]:
@@ -95,7 +123,7 @@ async def get_user_subscription(user_id: str, db: AsyncSession) -> Subscription 
     logger.debug(
         "subscription_lookup",
         extra={
-            "user_id": user_id,
+            "user_hash": _identifier_hash(user_id),
             "plan": subscription.plan if subscription else None,
         },
     )
@@ -138,7 +166,7 @@ async def check_quota(
         logger.debug(
             "quota_bypassed",
             extra={
-                "user_id": user_id,
+                "user_hash": _identifier_hash(user_id),
                 "plan": subscription.plan,
             },
         )
@@ -157,9 +185,46 @@ async def check_quota(
             detail={"detail": "peak_id requis", "code": "VALIDATION_ERROR"},
         )
 
+    installation_hash: str | None = None
+    if user.get("is_anonymous") is True:
+        installation_uuid = _parse_installation_uuid4(
+            request.headers.get("X-Cloudbreak-Installation-Id")
+        )
+        installation_hash = _identifier_hash(installation_uuid)
+        client_ip = request.client.host if request.client else "unknown"
+        try:
+            await RateLimitService(redis).check_anonymous_score(client_ip)
+        except RateLimitExceededException:
+            logger.warning(
+                "anonymous_score_rate_limited",
+                extra={
+                    "plan": "free",
+                    "peak_id": peak_id,
+                    "installation_hash": installation_hash,
+                },
+            )
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={
+                    "detail": "Trop de requêtes",
+                    "code": ErrorCode.RATE_LIMIT_EXCEEDED,
+                },
+            ) from None
+
     try:
-        await quota_service.check_and_increment(user_id, today, peak_id)
+        if installation_hash is not None:
+            await quota_service.check_and_increment_installation(installation_hash, today, peak_id)
+        await quota_service.check_and_increment(str(user_id), today, peak_id)
     except QuotaExceededException:
+        logger.warning(
+            "score_quota_exceeded",
+            extra={
+                "plan": "free",
+                "peak_id": peak_id,
+                "user_hash": _identifier_hash(user_id),
+                "installation_hash": installation_hash,
+            },
+        )
         track("quota_exceeded", user_id, {"peak_id": peak_id, "plan": "free"})
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

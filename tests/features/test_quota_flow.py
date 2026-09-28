@@ -17,6 +17,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
+from app.db.session import get_db
 from app.core.dependencies import get_redis
 from app.domain.weather_types import PressureLevelData, WeatherData
 
@@ -26,6 +27,31 @@ def _make_mock_redis() -> AsyncMock:
     mock_redis = AsyncMock()
     mock_redis.eval.return_value = 1
     return mock_redis
+
+
+class _StatefulRedis:
+    """Double Redis minimal qui exécute les contrats des deux scripts Lua."""
+
+    def __init__(self) -> None:
+        self._rate_counts: dict[str, int] = {}
+        self._quota_sets: dict[str, set[str]] = {}
+        self.eval = AsyncMock(side_effect=self._eval)
+
+    async def _eval(self, script: str, key_count: int, key: str, *args: str) -> int:
+        del script, key_count
+        if key.startswith("rate_limit:anonymous_score:"):
+            count = self._rate_counts.get(key, 0) + 1
+            self._rate_counts[key] = count
+            return count
+
+        peak_id, limit, _ttl = args
+        unlocked = self._quota_sets.setdefault(key, set())
+        if peak_id in unlocked:
+            return 0
+        if len(unlocked) >= int(limit):
+            return -1
+        unlocked.add(peak_id)
+        return 1
 
 
 MOCK_USER = {"id": "user-123", "email": "alex@test.com"}
@@ -207,12 +233,15 @@ async def test_anonymous_user_can_get_a_score_with_quota(auth_anonymous: object)
                 response = await client.get(
                     "/api/v1/score",
                     params={"peak_id": "peak-1", "date": "2026-04-01", "hour": 7},
+                    headers={
+                        "X-Cloudbreak-Installation-Id": "550e8400-e29b-41d4-a716-446655440000"
+                    },
                 )
     finally:
         app.dependency_overrides.pop(get_redis, None)
 
     assert response.status_code == 200
-    mock_redis.eval.assert_awaited_once()
+    assert mock_redis.eval.await_count == 3
 
 
 @pytest.mark.asyncio
@@ -494,3 +523,209 @@ async def test_quota_no_subscription_record_is_freemium(auth_freemium: object) -
 
     assert response.status_code == 200
     mock_redis.eval.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "installation_id",
+    [None, "", "6ba7b810-9dad-11d1-80b4-00c04fd430c8"],
+)
+async def test_anonymous_score_rejects_missing_empty_or_non_v4_installation_id(
+    auth_anonymous: object,
+    installation_id: str | None,
+) -> None:
+    """Le contrat HTTP refuse l'installation invalide avant Redis."""
+    mock_redis = _make_mock_redis()
+
+    async def mock_get_redis_impl() -> AsyncMock:
+        return mock_redis
+
+    app.dependency_overrides[get_redis] = mock_get_redis_impl
+    headers = (
+        {"X-Cloudbreak-Installation-Id": installation_id} if installation_id is not None else {}
+    )
+    try:
+        with patch(
+            "app.core.dependencies.get_user_subscription",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as client:
+                response = await client.get(
+                    "/api/v1/score",
+                    params={"peak_id": "peak-1", "date": "2026-04-01", "hour": 7},
+                    headers=headers,
+                )
+    finally:
+        app.dependency_overrides.pop(get_redis, None)
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["code"] == "INSTALLATION_ID_INVALID"
+    mock_redis.eval.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_same_installation_blocks_a_new_peak_after_guest_rotation() -> None:
+    """Créer une autre session Supabase ne réinitialise pas le quota installation."""
+    from app.core.dependencies import get_current_user
+
+    user_state = {"current": {"id": "guest-a", "is_anonymous": True}}
+    redis = _StatefulRedis()
+
+    async def mock_get_redis_impl() -> _StatefulRedis:
+        return redis
+
+    app.dependency_overrides[get_current_user] = lambda: user_state["current"]
+    app.dependency_overrides[get_redis] = mock_get_redis_impl
+    try:
+        with (
+            patch(
+                "app.core.dependencies.get_user_subscription",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
+                "app.api.v1.endpoints.score.get_peak_by_id",
+                new_callable=AsyncMock,
+                return_value=MOCK_PEAK,
+            ),
+            patch(
+                "app.api.v1.endpoints.score.weather_service.get_forecast",
+                new_callable=AsyncMock,
+                return_value=MOCK_WEATHER,
+            ),
+        ):
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as client:
+                headers = {"X-Cloudbreak-Installation-Id": "550e8400-e29b-41d4-a716-446655440000"}
+                first = await client.get(
+                    "/api/v1/score",
+                    params={"peak_id": "peak-1", "date": "2026-04-01", "hour": 7},
+                    headers=headers,
+                )
+                user_state["current"] = {"id": "guest-b", "is_anonymous": True}
+                second = await client.get(
+                    "/api/v1/score",
+                    params={"peak_id": "peak-2", "date": "2026-04-01", "hour": 7},
+                    headers=headers,
+                )
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+    assert second.json()["detail"]["code"] == "QUOTA_EXCEEDED"
+
+
+@pytest.mark.asyncio
+async def test_same_anonymous_peak_at_another_hour_remains_allowed() -> None:
+    """Le même sommet reste déverrouillé pour toutes ses heures."""
+    from app.core.dependencies import get_current_user
+
+    redis = _StatefulRedis()
+
+    async def mock_get_redis_impl() -> _StatefulRedis:
+        return redis
+
+    app.dependency_overrides[get_current_user] = lambda: MOCK_ANONYMOUS_USER
+    app.dependency_overrides[get_redis] = mock_get_redis_impl
+    try:
+        with (
+            patch(
+                "app.core.dependencies.get_user_subscription",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
+                "app.api.v1.endpoints.score.get_peak_by_id",
+                new_callable=AsyncMock,
+                return_value=MOCK_PEAK,
+            ),
+            patch(
+                "app.api.v1.endpoints.score.weather_service.get_forecast",
+                new_callable=AsyncMock,
+                return_value=MOCK_WEATHER,
+            ),
+        ):
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as client:
+                headers = {"X-Cloudbreak-Installation-Id": "550e8400-e29b-41d4-a716-446655440000"}
+                first = await client.get(
+                    "/api/v1/score",
+                    params={"peak_id": "peak-1", "date": "2026-04-01", "hour": 7},
+                    headers=headers,
+                )
+                second = await client.get(
+                    "/api/v1/score",
+                    params={"peak_id": "peak-1", "date": "2026-04-01", "hour": 8},
+                    headers=headers,
+                )
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_anonymous_score_rate_limit_allows_60_then_rejects_61st() -> None:
+    """L'IP issue de Request.client obtient exactement 60 scores par fenêtre."""
+    from app.core.dependencies import get_current_user
+
+    redis = _StatefulRedis()
+    db = AsyncMock()
+    db.add = MagicMock()
+
+    async def mock_get_redis_impl() -> _StatefulRedis:
+        return redis
+
+    app.dependency_overrides[get_current_user] = lambda: MOCK_ANONYMOUS_USER
+    app.dependency_overrides[get_redis] = mock_get_redis_impl
+    app.dependency_overrides[get_db] = lambda: db
+    try:
+        with (
+            patch(
+                "app.core.dependencies.get_user_subscription",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
+                "app.api.v1.endpoints.score.get_peak_by_id",
+                new_callable=AsyncMock,
+                return_value=MOCK_PEAK,
+            ),
+            patch(
+                "app.api.v1.endpoints.score.weather_service.get_forecast",
+                new_callable=AsyncMock,
+                return_value=MOCK_WEATHER,
+            ),
+        ):
+            transport = ASGITransport(app=app, client=("198.51.100.8", 123))
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                headers = {"X-Cloudbreak-Installation-Id": "550e8400-e29b-41d4-a716-446655440000"}
+                for _ in range(60):
+                    accepted = await client.get(
+                        "/api/v1/score",
+                        params={"peak_id": "peak-1", "date": "2026-04-01", "hour": 7},
+                        headers=headers,
+                    )
+                    assert accepted.status_code == 200
+
+                rejected = await client.get(
+                    "/api/v1/score",
+                    params={"peak_id": "peak-1", "date": "2026-04-01", "hour": 7},
+                    headers=headers,
+                )
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_redis, None)
+        app.dependency_overrides.pop(get_db, None)
+
+    assert rejected.status_code == 429
+    assert rejected.json()["detail"]["code"] == "RATE_LIMIT_EXCEEDED"

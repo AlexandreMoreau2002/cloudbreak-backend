@@ -1,9 +1,10 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from app.main import app
-from fastapi.testclient import TestClient
 from httpx import AsyncClient, ASGITransport
+from fastapi.testclient import TestClient
+
+from app.main import app
 
 
 client = TestClient(app)
@@ -90,7 +91,11 @@ async def test_get_redis_returns_singleton(monkeypatch: pytest.MonkeyPatch) -> N
     fake_redis = object()
     monkeypatch.setattr(dependencies, "_redis", None)
 
-    with patch.object(dependencies.Redis, "from_url", return_value=fake_redis) as from_url:
+    with patch.object(
+        dependencies.Redis,  # type: ignore[attr-defined]
+        "from_url",
+        return_value=fake_redis,
+    ) as from_url:
         first = await dependencies.get_redis()
         second = await dependencies.get_redis()
 
@@ -252,3 +257,157 @@ async def test_check_quota_exceeded_appelle_track_quota_exceeded() -> None:
     mock_track.assert_called_once_with(
         "quota_exceeded", "user-123", {"peak_id": "peak-1", "plan": "free"}
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "installation_id",
+    [None, "", "not-a-uuid", "6ba7b810-9dad-11d1-80b4-00c04fd430c8"],
+)
+async def test_anonymous_quota_rejects_invalid_installation_id_without_redis(
+    installation_id: str | None,
+) -> None:
+    """Un invité sans UUID v4 valide reçoit 400 avant tout accès Redis."""
+    from fastapi import HTTPException
+    from app.core.dependencies import check_quota
+
+    request = MagicMock()
+    request.query_params = {"peak_id": "peak-1"}
+    request.headers = (
+        {"X-Cloudbreak-Installation-Id": installation_id} if installation_id is not None else {}
+    )
+    request.client = MagicMock(host="198.51.100.8")
+    redis = AsyncMock()
+
+    with patch(
+        "app.core.dependencies.get_user_subscription",
+        new_callable=AsyncMock,
+        return_value=None,
+    ):
+        with pytest.raises(HTTPException) as raised:
+            await check_quota(
+                request=request,
+                user={"id": "guest-123", "is_anonymous": True},
+                redis=redis,
+                db=AsyncMock(),
+            )
+
+    assert raised.value.status_code == 400
+    assert isinstance(raised.value.detail, dict)
+    assert raised.value.detail["code"] == "INSTALLATION_ID_INVALID"
+    redis.eval.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_anonymous_quota_runs_rate_installation_then_user_quota() -> None:
+    """Le pipeline invité respecte l'ordre IP, installation hachée, puis utilisateur."""
+    from datetime import UTC, datetime
+    from app.core.dependencies import check_quota
+
+    calls: list[tuple[str, ...]] = []
+    request = MagicMock()
+    request.query_params = {"peak_id": "peak-1"}
+    request.headers = {
+        "X-Cloudbreak-Installation-Id": "550e8400-e29b-41d4-a716-446655440000",
+        "X-Forwarded-For": "203.0.113.99",
+    }
+    request.client = MagicMock(host="198.51.100.8")
+
+    async def record_rate_limit(client_ip: str) -> None:
+        calls.append(("rate", client_ip))
+
+    async def record_installation_quota(installation_hash: str, date: str, peak_id: str) -> None:
+        calls.append(("installation", installation_hash, date, peak_id))
+
+    async def record_user_quota(user_id: str, date: str, peak_id: str) -> None:
+        calls.append(("user", user_id, date, peak_id))
+
+    with (
+        patch("app.core.dependencies.datetime") as mock_datetime,
+        patch(
+            "app.core.dependencies.get_user_subscription",
+            new_callable=AsyncMock,
+            return_value=None,
+        ),
+        patch(
+            "app.core.dependencies.RateLimitService.check_anonymous_score",
+            new_callable=AsyncMock,
+            side_effect=record_rate_limit,
+        ),
+        patch(
+            "app.core.dependencies.QuotaService.check_and_increment_installation",
+            new_callable=AsyncMock,
+            side_effect=record_installation_quota,
+        ),
+        patch(
+            "app.core.dependencies.QuotaService.check_and_increment",
+            new_callable=AsyncMock,
+            side_effect=record_user_quota,
+        ),
+    ):
+        mock_datetime.now.return_value = datetime(2026, 9, 28, tzinfo=UTC)
+        result = await check_quota(
+            request=request,
+            user={"id": "guest-123", "is_anonymous": True},
+            redis=AsyncMock(),
+            db=AsyncMock(),
+        )
+
+    assert result["plan"] == "free"
+    assert calls == [
+        ("rate", "198.51.100.8"),
+        (
+            "installation",
+            "a3a9e1ed9732cab28868127be00f1ce921acaefdd5c3b23a6e9e0072bd9c1a34",
+            "2026-09-28",
+            "peak-1",
+        ),
+        ("user", "guest-123", "2026-09-28", "peak-1"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_anonymous_rate_limit_maps_to_stable_429_error() -> None:
+    """Le dépassement IP est exposé comme une erreur API stable sans continuer les quotas."""
+    from fastapi import HTTPException
+    from app.core.dependencies import check_quota
+    from app.services.rate_limit import RateLimitExceededException
+
+    request = MagicMock()
+    request.query_params = {"peak_id": "peak-1"}
+    request.headers = {"X-Cloudbreak-Installation-Id": "550e8400-e29b-41d4-a716-446655440000"}
+    request.client = MagicMock(host="198.51.100.8")
+
+    with (
+        patch(
+            "app.core.dependencies.get_user_subscription",
+            new_callable=AsyncMock,
+            return_value=None,
+        ),
+        patch(
+            "app.core.dependencies.RateLimitService.check_anonymous_score",
+            new_callable=AsyncMock,
+            side_effect=RateLimitExceededException("limit reached"),
+        ),
+        patch(
+            "app.core.dependencies.QuotaService.check_and_increment_installation",
+            new_callable=AsyncMock,
+        ) as installation_quota,
+        patch(
+            "app.core.dependencies.QuotaService.check_and_increment",
+            new_callable=AsyncMock,
+        ) as user_quota,
+    ):
+        with pytest.raises(HTTPException) as raised:
+            await check_quota(
+                request=request,
+                user={"id": "guest-123", "is_anonymous": True},
+                redis=AsyncMock(),
+                db=AsyncMock(),
+            )
+
+    assert raised.value.status_code == 429
+    assert isinstance(raised.value.detail, dict)
+    assert raised.value.detail["code"] == "RATE_LIMIT_EXCEEDED"
+    installation_quota.assert_not_awaited()
+    user_quota.assert_not_awaited()

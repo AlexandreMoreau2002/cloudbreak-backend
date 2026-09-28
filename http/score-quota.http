@@ -10,12 +10,20 @@
 #      proEmail-jwt      : token d'un compte pro
 #   3. Sélectionner l'environnement "local" dans VS Code Rest Client (Ctrl+Alt+E)
 #
-# Reset quota entre les tests :
-#   docker exec cloudbreak-redis redis-cli FLUSHDB
+# Reset quota entre les tests : voir le bloc 7. Il supprime uniquement la clé de
+# l'installation de test ; ne jamais utiliser FLUSHDB sur un Redis partagé.
 # ─────────────────────────────────────────────────────────────
 
 @baseUrl     = http://localhost:8000/api/v1
-@testDate    = 2026-04-01
+# Remplacer avant chaque campagne par une date proche couverte par Open-Meteo (aujourd'hui ou dans
+# son horizon de prévision). Cette date sert au score ; elle ne détermine PAS la clé de quota.
+@testDate    = 2026-09-29
+@installationId = 550e8400-e29b-41d4-a716-446655440000
+@otherInstallationId = 123e4567-e89b-42d3-a456-426614174000
+
+# JWT anonymes distincts créés avec les deux premières requêtes de http/auth.http.
+# Les définir dans .vscode/settings.json > rest-client.environmentVariables > local.
+# guestFirst-jwt et guestRotated-jwt doivent être deux sessions anonymes distinctes.
 
 # UUIDs réels en DB (peak_id requis par /score)
 @peakVentoux  = 0728f7c7-a0c9-5fb0-b87d-d9edc8696840
@@ -33,13 +41,13 @@
 GET http://localhost:8000/health
 
 
-### 0.2 — Sans JWT → 403
-# Attendu : 403 Forbidden
+### 0.2 — En-tête Authorization absent → 403
+# Attendu : 403 Forbidden (HTTPBearer refuse l'absence de credentials).
 GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date={{testDate}}&hour=9
 
 
-### 0.3 — Token invalide → 401 ou 403
-# Attendu : 401 ou 403
+### 0.3 — Token invalide → 401
+# Attendu : 401 Unauthorized (un Bearer est fourni mais le JWT ne passe pas la validation).
 GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date={{testDate}}&hour=9
 Authorization: Bearer token.invalide.xxx
 
@@ -58,7 +66,7 @@ Authorization: Bearer {{freemiumEmail-jwt}}
 
 # ═══════════════════════════════════════════════════════════
 # BLOC 1 — AC1 : Freemium, 1er appel → 200 OK
-# ⚠ Faire FLUSHDB avant ce bloc si tests relancés
+# ⚠ Utiliser une date de test fraîche ou réinitialiser uniquement la clé concernée (bloc 7).
 # ═══════════════════════════════════════════════════════════
 
 ### 1.1 — Freemium, 1er appel → 200 OK + score
@@ -124,11 +132,12 @@ Authorization: Bearer {{proEmail-jwt}}
 
 # ═══════════════════════════════════════════════════════════
 # BLOC 4 — AC4 : Reset quota le lendemain (TTL Redis)
-# ⚠ Nécessite d'avoir déclenché AC2 (quota épuisé)
+# ⚠ Exécuter uniquement après le prochain minuit UTC du serveur. Changer `date` dans l'URL
+# ne réinitialise pas le quota : cette date sert au score, pas à la clé Redis.
 # ═══════════════════════════════════════════════════════════
 
-### 4.1 — Freemium, appel le lendemain → 200 OK (quota reset)
-GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date=2026-04-02&hour=9
+### 4.1 — Freemium, appel après minuit UTC serveur → 200 OK (quota reset)
+GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date={{testDate}}&hour=9
 Authorization: Bearer {{freemiumEmail-jwt}}
 
 
@@ -140,11 +149,94 @@ Authorization: Bearer {{freemiumEmail-jwt}}
 # Chaque membre du SET est un peak_id déverrouillé pour la journée.
 #
 #   docker exec cloudbreak-redis redis-cli KEYS "quota:*"
-#   docker exec cloudbreak-redis redis-cli SMEMBERS "quota:{user_id}:2026-04-01"
-#   docker exec cloudbreak-redis redis-cli SCARD "quota:{user_id}:2026-04-01"
-#   docker exec cloudbreak-redis redis-cli TTL "quota:{user_id}:2026-04-01"
-#   docker exec cloudbreak-redis redis-cli FLUSHDB   # reset complet
+#   # La date des clés est la date UTC actuelle du serveur, pas @testDate.
+#   QUOTA_DATE=$(date -u +%F)
+#   docker exec cloudbreak-redis redis-cli SMEMBERS "quota:{user_id}:${QUOTA_DATE}"
+#   docker exec cloudbreak-redis redis-cli SCARD "quota:{user_id}:${QUOTA_DATE}"
+#   docker exec cloudbreak-redis redis-cli TTL "quota:{user_id}:${QUOTA_DATE}"
+#   # Voir bloc 7 pour le reset ciblé d'une installation de test.
 # ═══════════════════════════════════════════════════════════
+
+
+# ═══════════════════════════════════════════════════════════
+# BLOC 7 — Invités : anti-contournement du quota et rate limit
+# Exécuter le bloc dans l'ordre. Les tokens guestFirst/guestRotated sont deux JWT
+# anonymes différents ; l'ID d'installation reste volontairement identique.
+# ═══════════════════════════════════════════════════════════
+
+### 7.1 — Invité, UUID v4 d'installation valide → 200
+# Attendu : 200. L'installation et le premier JWT invité déverrouillent peakVentoux.
+GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date={{testDate}}&hour=9
+Authorization: Bearer {{guestFirst-jwt}}
+X-Cloudbreak-Installation-Id: {{installationId}}
+
+
+### 7.2 — Même installation, nouveau JWT, nouveau sommet → 429 QUOTA_EXCEEDED
+# Attendu : 429 + {"detail": {"code": "QUOTA_EXCEEDED", ...}}.
+# Changer de session Supabase ne contourne pas le quota porté par l'installation.
+GET {{baseUrl}}/score?peak_id={{peakPuyDome}}&date={{testDate}}&hour=9
+Authorization: Bearer {{guestRotated-jwt}}
+X-Cloudbreak-Installation-Id: {{installationId}}
+
+
+### 7.3 — Invité sans en-tête d'installation → 400 INSTALLATION_ID_INVALID
+# Attendu : 400 + {"detail": {"code": "INSTALLATION_ID_INVALID", ...}}.
+GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date={{testDate}}&hour=9
+Authorization: Bearer {{guestFirst-jwt}}
+
+
+### 7.4 — Invité, UUID non-v4 → 400 INSTALLATION_ID_INVALID
+# Attendu : 400 + {"detail": {"code": "INSTALLATION_ID_INVALID", ...}}.
+GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date={{testDate}}&hour=9
+Authorization: Bearer {{guestFirst-jwt}}
+X-Cloudbreak-Installation-Id: 6ba7b810-9dad-11d1-80b4-00c04fd430c8
+
+
+### 7.5 — Date invalide → 422 (compte Premium, aucun en-tête requis)
+# Attendu : 422 Unprocessable Entity. Le compte payant contourne le quota, mais pas
+# la validation FastAPI des paramètres.
+GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date=pas-une-date&hour=9
+Authorization: Bearer {{premiumEmail-jwt}}
+
+
+### 7.6 — Premium sans en-tête d'installation → 200
+# Attendu : 200. L'en-tête n'est requis que pour une session anonyme freemium.
+GET {{baseUrl}}/score?peak_id={{peakPuyDome}}&date={{testDate}}&hour=9
+Authorization: Bearer {{premiumEmail-jwt}}
+
+
+### 7.7 — Pro sans en-tête d'installation → 200
+# Attendu : 200. Même bypass Premium/Pro, sans quota ni contrôle d'installation.
+GET {{baseUrl}}/score?peak_id={{peakBlanc}}&date={{testDate}}&hour=9
+Authorization: Bearer {{proEmail-jwt}}
+
+
+### 7.8 — Rate limit invité : requête à exécuter 60 fois, puis une 61e fois
+# Après 7.1 et 7.2, le guide attend automatiquement une nouvelle frontière de minute et invalide
+# le test si elle tourne pendant la rafale. Utiliser un JWT anonyme frais et une installation UUID
+# v4 fraîche pour neutraliser les quotas de sommet, puis lancer son script auto-validant : 60x 200
+# sans RATE_LIMIT_EXCEEDED, suivi de 429 RATE_LIMIT_EXCEEDED. Cette requête sert à l'inspection
+# manuelle du 61e corps de réponse.
+GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date={{testDate}}&hour=10
+Authorization: Bearer {{guestFirst-jwt}}
+X-Cloudbreak-Installation-Id: {{otherInstallationId}}
+
+
+### 7.9 — Reset Redis ciblé pour l'installation de test (terminal, jamais FLUSHDB)
+# INSTALLATION_ID='{{installationId}}'
+# QUOTA_DATE=$(date -u +%F)  # date UTC actuelle du serveur ; ne pas utiliser @testDate
+# INSTALLATION_HASH=$(printf '%s' "$INSTALLATION_ID" | shasum -a 256 | awk '{print $1}')
+# docker exec cloudbreak-redis redis-cli DEL "quota:installation:${INSTALLATION_HASH}:${QUOTA_DATE}"
+#
+# Pour le rate limit, attendre la prochaine frontière de minute plutôt que de supprimer une clé
+# partagée. Si le quota JWT a déjà été consommé, créer un JWT anonyme frais : il est séparé de la
+# clé d'installation.
+
+
+### 7.10 — Limitation REST Client : IP client indisponible
+# Cas non reproductible avec REST Client : il fournit normalement une adresse pair à l'ASGI.
+# La réponse 503 + code CLIENT_IP_UNAVAILABLE est couverte par le test unitaire automatisé
+# test_anonymous_quota_rejects_client_ip_unavailable_without_redis.
 
 
 # ═══════════════════════════════════════════════════════════

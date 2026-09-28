@@ -119,7 +119,7 @@ pip-audit  # à installer : pip install pip-audit
 - `GET /api/v1/score` — auth JWT requise + quota Redis (check_quota dependency), `peak_id`/`date`/`hour` validés par Pydantic/Query
 
 ### Ce qui n'existe pas encore
-- Pas de rate limiting (à implémenter avant prod)
+- Pas de rate limiting global : la limite actuelle couvre seulement `GET /api/v1/score` des invités
 - Pas de limite sur le nombre de favoris par utilisateur (à prévoir avant prod)
 
 ---
@@ -400,3 +400,92 @@ Story 4.4 (AC6) — checklist à reporter dans **App Store Connect → App Priva
 - **[backend/app/core/security.py]** `options={"require_aud": True}` est bien un option reconnue par python-jose 3.3.0 (défaut `False`) — oblige la présence de la réclamation `aud` dans le token indépendamment du paramètre `audience`. Combiné avec `audience="authenticated"`, les deux conditions sont strictement vérifiées : présence ET valeur exacte.
 - **[backend/tests/test_security.py]** Couverture ajoutée : `aud` incorrect, `iss` incorrect, `iss` absent, `aud` absent — 4 nouveaux tests de rejet, tous vérifient `ValueError`. 13/13 tests passent.
 - **[backend/app/core/security.py]** Trailing slash sur `supabase_url` corrigé : `expected_issuer = f"{supabase_url.rstrip('/')}/auth/v1"` — une valeur `.env` avec ou sans slash final produit désormais le même issuer attendu. Logs debug ajoutés (`jwt_decode_ok`, `jwt_issuer_mismatch`), silencieux en prod. Test de non-régression : `test_decode_accepts_trailing_slash_in_supabase_url`. Détails : `docs/fix-durcissement-jwt-issuer-audience.md`.
+
+---
+
+## 2026-09-28 — Quota invité et rate limit de `/score`
+
+### RÉSOLU — P0 atténuée
+
+Un invité ne peut plus contourner le quota journalier en créant simplement un nouveau JWT
+Supabase. Pour une session anonyme freemium, `GET /api/v1/score` exige un
+`X-Cloudbreak-Installation-Id` UUID v4, le hache, puis applique le quota sur cette installation
+avant le quota lié au JWT. Un nouveau JWT sur la même installation et un nouveau sommet reçoit
+donc `429 QUOTA_EXCEEDED`.
+
+La route limite également les invités à 60 demandes par adresse IP et par fenêtre fixe de
+60 secondes. La 61e demande renvoie `429 RATE_LIMIT_EXCEEDED`. Les identifiants d'installation et
+les IP ne sont pas conservés en clair dans les clés Redis utilisées par ces contrôles.
+
+### Limites et suite nécessaire
+
+- Le client reste sous le contrôle de l'utilisateur : une application modifiée peut générer un
+  autre UUID v4 et se présenter comme une nouvelle installation.
+- Une limite IP est une défense de rafale, pas une identité fiable : l'IP peut changer, être
+  partagée (NAT) ou être masquée derrière un proxy/VPN.
+- **À prévoir : App Attest iOS.** Une attestation d'application doit apporter un signal lié à une
+  app authentique et rendre la falsification du signal d'installation plus coûteuse. Elle complète
+  ces contrôles Redis ; elle ne doit pas être présentée comme une garantie absolue.
+
+---
+
+## 2026-09-28 Story quota-invite — Audit final du quota invité et du rate limit
+
+Périmètre : backend `aaeaa55..25bc22d`, mobile `3725b07..76e359b`. Lors de cet audit initial,
+seul le code local a été inspecté ; la configuration effective de Traefik/Dokploy n'a pas été
+inspectée sur le serveur. Elle a ensuite été vérifiée en lecture seule le 2026-09-29 pour clôturer
+le warning réseau ci-dessous.
+
+### 🔴 CRITIQUE
+
+- Aucun nouveau risque critique démontré dans ce périmètre.
+
+### 🟡 WARNING
+
+- **[app/services/quota.py:85-94]** Le TTL utilise `int()` : dans la dernière seconde avant
+  minuit UTC, il devient zéro et `EXPIRE key 0` supprime immédiatement le quota nouvellement
+  créé. Plusieurs sommets peuvent alors être autorisés dans cette seconde. Ce calcul préexistait
+  pour le quota utilisateur et est réutilisé pour l'installation. → Arrondir au supérieur avec
+  une borne minimale de 1 seconde, ou employer une expiration absolue à minuit ; tester
+  explicitement `23:59:59.500000 UTC`.
+
+### ✅ RÉSOLU
+
+- **[Dockerfile:12; app/core/dependencies.py:194]** La confiance des forwarded headers est
+  limitée au sous-réseau `10.0.1.0/24` de l'overlay Dokploy `dokploy-network`. L'inspection du
+  VPS a confirmé que seul `dokploy-traefik` publie les ports 80/443, que le service backend
+  `app-reboot-primary-circuit-vmgb6t` n'a aucun port publié, et que le service dynamique Traefik
+  joint le backend sur le port 8000 via `dokploy-network`. Un pair immédiat hors de ce CIDR ne
+  peut donc pas fournir de forwarded headers de confiance à Uvicorn. → Re-vérifier ce CIDR si
+  Dokploy recrée l'overlay réseau.
+  Références : [Uvicorn](https://www.uvicorn.org/settings/),
+  [Traefik](https://doc.traefik.io/traefik/reference/install-configuration/entrypoints/).
+
+### 🔵 INFO
+
+- **[mobile/src/services/installationId.ts:8-30; app/core/dependencies.py:35-50]** UUID v4
+  cryptographique conservé dans SecureStore, initialisation concurrente partagée, validation et
+  canonicalisation serveur avant hachage. Le signal reste falsifiable par un client modifié :
+  cette limite et la suite App Attest sont correctement documentées.
+- **[app/services/quota.py:24-36; app/services/rate_limit.py:11-17]** Chaque script Lua rend
+  atomiques la vérification et l'écriture de sa propre clé avec TTL. Les deux quotas sont
+  appliqués successivement : il ne s'agit pas d'une transaction commune. Un rejet du quota
+  utilisateur peut laisser consommé le quota installation, sans autoriser un sommet supplémentaire.
+- **[app/core/dependencies.py:159-175]** Le bypass Premium/Pro repose sur la souscription en base
+  du `sub` JWT et son expiration ; aucune valeur de plan provenant du client n'est acceptée.
+- **[app/services/rate_limit.py:35-37]** SHA-256 évite les IP en clair dans Redis, mais ne les
+  anonymise pas : l'espace IPv4 reste énumérable. La fenêtre fixe autorise jusqu'à 120 appels
+  autour d'une frontière de minute ; ce n'est pas une limite glissante ni une défense globale
+  contre le déni de service.
+- **[app/core/dependencies.py:173,228; app/services/analytics.py:17-21;
+  app/core/security.py:39]** Aucun JWT ni UUID d'installation brut ajouté aux logs. Les logs
+  DEBUG préexistants d'analytics et de décodage JWT gardent toutefois le `user_id`/`sub` brut :
+  le hachage des logs de quota ne constitue pas un assainissement global des logs.
+
+Vérification ciblée : 48 tests backend et 33 tests mobile passent. Redis est simulé dans ces
+tests ; ils ne valident ni l'exécution réelle de Lua ni la chaîne réseau Traefik/Uvicorn.
+
+### Verdict
+
+SECURE dans le périmètre de l'atténuation étage 1, avec les warnings ci-dessus à traiter.
+Ce verdict ne valide pas la configuration du déploiement ni une identité matérielle de l'invité.

@@ -40,6 +40,7 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 | Recherche sommets (`GET /api/v1/peaks/search` + `GET /api/v1/peaks/{slug}`) | ✅ ILIKE, limit 20 — **publics depuis story 7.1** (onboarding pré-login, aucun JWT requis) |
 | Favoris (`POST/DELETE/GET /api/v1/user/favorites`) | ✅ Avec peak info jointe |
 | Quota freemium Redis — 1 sommet unique/jour, bypass Premium/Pro, reset minuit UTC | ✅ Story 4.1 |
+| Invités score — UUID v4 d'installation haché, quota conservé après rotation du JWT, 60 requêtes/IP/minute | ✅ Quota invité + rate limit |
 | `make seed-test` / `make unseed-test` — users de test Supabase (freemium, pro) | ✅ Story 4.1 |
 | `make clean-subscriptions` / `make reset-db` — maintenance DB dev | ✅ Story 4.1 |
 | Suppression compte RGPD (`DELETE /api/v1/user/`) — suppression DB + Supabase Auth → 204, compte permanent requis | ✅ Story 2.4 |

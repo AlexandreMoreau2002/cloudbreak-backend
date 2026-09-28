@@ -1,8 +1,8 @@
 """Tests unitaires du quota journalier Redis."""
 
 import asyncio
-from datetime import UTC, datetime
 from hashlib import sha256
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -130,6 +130,17 @@ class TestQuotaService:
         mock_redis.scard.assert_awaited_once_with(_user_quota_key("user-123", "2026-04-01"))
 
     @pytest.mark.asyncio
+    async def test_get_remaining_checks_is_zero_at_limit(
+        self, mock_redis: AsyncMock, quota_service: QuotaService
+    ) -> None:
+        """Un quota épuisé ne laisse aucun sommet unique disponible."""
+        mock_redis.scard.return_value = 1
+
+        remaining = await quota_service.get_remaining_checks("user-123", "2026-04-01")
+
+        assert remaining == 0
+
+    @pytest.mark.asyncio
     async def test_installation_quota_has_separate_key(
         self, mock_redis: AsyncMock, quota_service: QuotaService
     ) -> None:
@@ -158,3 +169,49 @@ class TestQuotaService:
             await quota_service.check_and_increment_installation("a" * 64, "2026-09-28", "peak-1")
 
         assert mock_redis.eval.call_args.args[5] == "43200"
+
+    @pytest.mark.asyncio
+    async def test_installation_same_peak_is_allowed(self, mock_redis: AsyncMock) -> None:
+        """Un sommet déjà ouvert par une installation ne consomme pas de nouvelle place."""
+        mock_redis.eval.return_value = 0
+        service = QuotaService(mock_redis, daily_limit=1)
+
+        await service.check_and_increment_installation("a" * 64, "2026-09-28", "peak-1")
+
+        mock_redis.eval.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_distinct_users_have_independent_quotas(self, mock_redis: AsyncMock) -> None:
+        """Une limite atteinte par un utilisateur ne bloque pas un autre sujet."""
+        mock_redis.eval.side_effect = [-1, 1]
+        service = QuotaService(mock_redis, daily_limit=1)
+
+        with pytest.raises(QuotaExceededException):
+            await service.check_and_increment("user-one", "2026-04-01", "peak-1")
+
+        await service.check_and_increment("user-two", "2026-04-01", "peak-1")
+
+        keys = [call.args[2] for call in mock_redis.eval.await_args_list]
+        assert keys == [
+            _user_quota_key("user-one", "2026-04-01"),
+            _user_quota_key("user-two", "2026-04-01"),
+        ]
+
+    @pytest.mark.asyncio
+    async def test_distinct_installations_have_independent_quotas(
+        self, mock_redis: AsyncMock
+    ) -> None:
+        """Une installation épuisée ne bloque pas une autre installation hachée."""
+        mock_redis.eval.side_effect = [-1, 1]
+        service = QuotaService(mock_redis, daily_limit=1)
+
+        with pytest.raises(QuotaExceededException):
+            await service.check_and_increment_installation("a" * 64, "2026-09-28", "peak-1")
+
+        await service.check_and_increment_installation("b" * 64, "2026-09-28", "peak-1")
+
+        keys = [call.args[2] for call in mock_redis.eval.await_args_list]
+        assert keys == [
+            f"quota:installation:{'a' * 64}:2026-09-28",
+            f"quota:installation:{'b' * 64}:2026-09-28",
+        ]

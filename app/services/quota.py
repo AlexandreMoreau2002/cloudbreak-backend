@@ -14,8 +14,8 @@ Format erreur :
 """
 
 import logging
-from datetime import UTC, datetime, timedelta
 from hashlib import sha256
+from datetime import UTC, datetime, timedelta
 
 from redis.asyncio import Redis
 

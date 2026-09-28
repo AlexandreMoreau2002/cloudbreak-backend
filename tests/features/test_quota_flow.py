@@ -10,26 +10,21 @@ Cas testés:
   6. Pas de record subscription → freemium
 """
 
-import pytest
-from app.main import app
 from datetime import UTC
-from contextlib import asynccontextmanager
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+from app.main import app
 from app.core.dependencies import get_redis
-from httpx import AsyncClient, ASGITransport
-from unittest.mock import AsyncMock, patch, MagicMock
 from app.domain.weather_types import PressureLevelData, WeatherData
 
 
 def _make_mock_redis() -> AsyncMock:
-    """Mock Redis avec pipeline() correctement configuré comme async context manager."""
+    """Mock Redis dont EVAL renvoie une décision quota réaliste par défaut."""
     mock_redis = AsyncMock()
-    mock_pipe = AsyncMock()
-
-    @asynccontextmanager
-    async def mock_pipeline() -> object:
-        yield mock_pipe
-
-    mock_redis.pipeline = mock_pipeline
+    mock_redis.eval.return_value = 1
     return mock_redis
 
 
@@ -151,10 +146,8 @@ async def test_quota_score_endpoint_first_call_returns_200(auth_freemium: object
         return_value=None,
     )
 
-    # Mock Redis avec quota absent (1er check — sommet pas encore déverrouillé)
+    # Script Lua : nouveau sommet autorisé.
     mock_redis = _make_mock_redis()
-    mock_redis.sismember.return_value = False
-    mock_redis.scard.return_value = 0
 
     async def mock_get_redis_impl() -> AsyncMock:
         return mock_redis
@@ -179,6 +172,7 @@ async def test_quota_score_endpoint_first_call_returns_200(auth_freemium: object
     data = response.json()
     assert data["score"]
     assert data["verdict"] in ("none", "high", "medium", "low")
+    mock_redis.eval.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -200,8 +194,6 @@ async def test_anonymous_user_can_get_a_score_with_quota(auth_anonymous: object)
         return_value=None,
     )
     mock_redis = _make_mock_redis()
-    mock_redis.sismember.return_value = False
-    mock_redis.scard.return_value = 0
 
     async def mock_get_redis_impl() -> AsyncMock:
         return mock_redis
@@ -220,6 +212,7 @@ async def test_anonymous_user_can_get_a_score_with_quota(auth_anonymous: object)
         app.dependency_overrides.pop(get_redis, None)
 
     assert response.status_code == 200
+    mock_redis.eval.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -241,10 +234,9 @@ async def test_quota_score_endpoint_second_call_returns_429(auth_freemium: objec
         return_value=None,
     )
 
-    # Mock Redis avec quota déjà atteint (sommet différent, scard=1 = limite)
+    # Script Lua : sommet différent refusé à la limite quotidienne.
     mock_redis = _make_mock_redis()
-    mock_redis.sismember.return_value = False
-    mock_redis.scard.return_value = 1  # 1 sommet déjà déverrouillé = limite atteinte
+    mock_redis.eval.return_value = -1
 
     async def mock_get_redis_impl() -> AsyncMock:
         return mock_redis
@@ -268,6 +260,7 @@ async def test_quota_score_endpoint_second_call_returns_429(auth_freemium: objec
     data = response.json()
     assert data["detail"]["code"] == "QUOTA_EXCEEDED"
     assert "quota journalier" in data["detail"]["detail"].lower()
+    mock_redis.eval.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -417,15 +410,12 @@ async def test_quota_expired_subscription_falls_back_to_freemium(
         return_value=mock_subscription,
     )
 
-    # 1er appel : quota libre (scard=0)
+    # 1er appel : le script Lua autorise le sommet.
     mock_redis_first = _make_mock_redis()
-    mock_redis_first.sismember.return_value = False
-    mock_redis_first.scard.return_value = 0
 
-    # 2ème appel : quota atteint (scard=1 = limite)
+    # 2ème appel : le script Lua refuse le nouveau sommet.
     mock_redis_second = _make_mock_redis()
-    mock_redis_second.sismember.return_value = False
-    mock_redis_second.scard.return_value = 1
+    mock_redis_second.eval.return_value = -1
 
     call_count = 0
 
@@ -459,6 +449,8 @@ async def test_quota_expired_subscription_falls_back_to_freemium(
     assert response_first.status_code == 200
     assert response_second.status_code == 429
     assert response_second.json()["detail"]["code"] == "QUOTA_EXCEEDED"
+    mock_redis_first.eval.assert_awaited_once()
+    mock_redis_second.eval.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -481,8 +473,6 @@ async def test_quota_no_subscription_record_is_freemium(auth_freemium: object) -
     )
 
     mock_redis = _make_mock_redis()
-    mock_redis.sismember.return_value = False
-    mock_redis.scard.return_value = 0
 
     async def mock_get_redis_impl() -> AsyncMock:
         return mock_redis
@@ -503,3 +493,4 @@ async def test_quota_no_subscription_record_is_freemium(auth_freemium: object) -
             del app.dependency_overrides[get_redis]
 
     assert response.status_code == 200
+    mock_redis.eval.assert_awaited_once()

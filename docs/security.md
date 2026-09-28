@@ -431,8 +431,10 @@ les IP ne sont pas conservés en clair dans les clés Redis utilisées par ces c
 
 ## 2026-09-28 Story quota-invite — Audit final du quota invité et du rate limit
 
-Périmètre : backend `aaeaa55..25bc22d`, mobile `3725b07..76e359b`. Audit du code local ;
-la configuration effective de Traefik/Dokploy n'a pas été inspectée sur le serveur.
+Périmètre : backend `aaeaa55..25bc22d`, mobile `3725b07..76e359b`. Lors de cet audit initial,
+seul le code local a été inspecté ; la configuration effective de Traefik/Dokploy n'a pas été
+inspectée sur le serveur. Elle a ensuite été vérifiée en lecture seule le 2026-09-29 pour clôturer
+le warning réseau ci-dessous.
 
 ### 🔴 CRITIQUE
 

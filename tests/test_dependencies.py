@@ -298,6 +298,36 @@ async def test_anonymous_quota_rejects_invalid_installation_id_without_redis(
 
 
 @pytest.mark.asyncio
+async def test_anonymous_quota_rejects_client_ip_unavailable_without_redis() -> None:
+    """Un invité sans IP pair est refusé après validation de son UUID d'installation."""
+    from app.core.dependencies import check_quota
+    from app.core.errors import ApiError
+
+    request = MagicMock()
+    request.query_params = {"peak_id": "peak-1"}
+    request.headers = {"X-Cloudbreak-Installation-Id": "550e8400-e29b-41d4-a716-446655440000"}
+    request.client = None
+    redis = AsyncMock()
+
+    with patch(
+        "app.core.dependencies.get_user_subscription",
+        new_callable=AsyncMock,
+        return_value=None,
+    ):
+        with pytest.raises(ApiError) as raised:
+            await check_quota(
+                request=request,
+                user={"id": "guest-123", "is_anonymous": True},
+                redis=redis,
+                db=AsyncMock(),
+            )
+
+    assert raised.value.status_code == 503
+    assert raised.value.code == "CLIENT_IP_UNAVAILABLE"
+    redis.eval.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_anonymous_quota_runs_rate_installation_then_user_quota() -> None:
     """Le pipeline invité respecte l'ordre IP, installation hachée, puis utilisateur."""
     from datetime import UTC, datetime

@@ -174,7 +174,6 @@ async def check_quota(
 
     # Freemium : vérifier le quota
     today = datetime.now(UTC).strftime("%Y-%m-%d")
-    quota_service = QuotaService(redis)
 
     peak_id = request.query_params.get("peak_id", "")
     if not peak_id:
@@ -189,7 +188,13 @@ async def check_quota(
             request.headers.get("X-Cloudbreak-Installation-Id")
         )
         installation_hash = _identifier_hash(installation_uuid)
-        client_ip = request.client.host if request.client else "unknown"
+        if request.client is None:
+            raise ApiError(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "Adresse IP client indisponible",
+                ErrorCode.CLIENT_IP_UNAVAILABLE,
+            )
+        client_ip = request.client.host
         try:
             await RateLimitService(redis).check_anonymous_score(client_ip)
         except RateLimitExceededException:
@@ -207,6 +212,7 @@ async def check_quota(
                 ErrorCode.RATE_LIMIT_EXCEEDED,
             ) from None
 
+    quota_service = QuotaService(redis)
     try:
         if installation_hash is not None:
             await quota_service.check_and_increment_installation(installation_hash, today, peak_id)

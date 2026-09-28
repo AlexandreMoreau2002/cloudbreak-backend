@@ -233,6 +233,12 @@ X-Cloudbreak-Installation-Id: {{otherInstallationId}}
 # clé d'installation.
 
 
+### 7.10 — Limitation REST Client : IP client indisponible
+# Cas non reproductible avec REST Client : il fournit normalement une adresse pair à l'ASGI.
+# La réponse 503 + code CLIENT_IP_UNAVAILABLE est couverte par le test ASGI automatisé
+# test_anonymous_quota_rejects_client_ip_unavailable_without_redis.
+
+
 # ═══════════════════════════════════════════════════════════
 # BLOC 6 — Endpoints annexes (smoke tests)
 # ═══════════════════════════════════════════════════════════

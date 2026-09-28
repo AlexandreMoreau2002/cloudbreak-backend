@@ -14,6 +14,7 @@ Format erreur :
 """
 
 import logging
+from math import ceil
 from hashlib import sha256
 from datetime import UTC, datetime, timedelta
 
@@ -84,7 +85,7 @@ class QuotaService:
         """Déverrouille un sommet dans un SET quotidien, dans la limite configurée."""
         now_utc = datetime.now(UTC)
         tomorrow = now_utc.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-        ttl = int((tomorrow - now_utc).total_seconds())
+        ttl = max(1, ceil((tomorrow - now_utc).total_seconds()))
         result = await self._redis.eval(
             CHECK_AND_INCREMENT_SCRIPT,
             1,

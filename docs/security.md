@@ -426,3 +426,60 @@ les IP ne sont pas conservés en clair dans les clés Redis utilisées par ces c
 - **À prévoir : App Attest iOS.** Une attestation d'application doit apporter un signal lié à une
   app authentique et rendre la falsification du signal d'installation plus coûteuse. Elle complète
   ces contrôles Redis ; elle ne doit pas être présentée comme une garantie absolue.
+
+---
+
+## 2026-09-28 Story quota-invite — Audit final du quota invité et du rate limit
+
+Périmètre : backend `aaeaa55..25bc22d`, mobile `3725b07..76e359b`. Audit du code local ;
+la configuration effective de Traefik/Dokploy n'a pas été inspectée sur le serveur.
+
+### 🔴 CRITIQUE
+
+- Aucun nouveau risque critique démontré dans ce périmètre.
+
+### 🟡 WARNING
+
+- **[app/services/quota.py:85-94]** Le TTL utilise `int()` : dans la dernière seconde avant
+  minuit UTC, il devient zéro et `EXPIRE key 0` supprime immédiatement le quota nouvellement
+  créé. Plusieurs sommets peuvent alors être autorisés dans cette seconde. Ce calcul préexistait
+  pour le quota utilisateur et est réutilisé pour l'installation. → Arrondir au supérieur avec
+  une borne minimale de 1 seconde, ou employer une expiration absolue à minuit ; tester
+  explicitement `23:59:59.500000 UTC`.
+- **[Dockerfile:12; app/core/dependencies.py:194]** `--forwarded-allow-ips=*` fait dépendre
+  l'intégrité de l'IP de la frontière réseau : un accès direct à Uvicorn, ou des forwarded headers
+  non nettoyés par Traefik, permettrait de choisir l'IP du compteur. Ce contournement n'est pas
+  démontré sur le déploiement actuel. → Vérifier avant déploiement l'absence d'accès direct,
+  les pairs réseau autorisés et la configuration `forwardedHeaders` de Traefik ; rejouer une
+  requête avec un faux `X-Forwarded-For` et vérifier que le compteur conserve l'IP réelle.
+  Références : [Uvicorn](https://www.uvicorn.org/settings/),
+  [Traefik](https://doc.traefik.io/traefik/reference/install-configuration/entrypoints/).
+
+### 🔵 INFO
+
+- **[mobile/src/services/installationId.ts:8-30; app/core/dependencies.py:35-50]** UUID v4
+  cryptographique conservé dans SecureStore, initialisation concurrente partagée, validation et
+  canonicalisation serveur avant hachage. Le signal reste falsifiable par un client modifié :
+  cette limite et la suite App Attest sont correctement documentées.
+- **[app/services/quota.py:24-36; app/services/rate_limit.py:11-17]** Chaque script Lua rend
+  atomiques la vérification et l'écriture de sa propre clé avec TTL. Les deux quotas sont
+  appliqués successivement : il ne s'agit pas d'une transaction commune. Un rejet du quota
+  utilisateur peut laisser consommé le quota installation, sans autoriser un sommet supplémentaire.
+- **[app/core/dependencies.py:159-175]** Le bypass Premium/Pro repose sur la souscription en base
+  du `sub` JWT et son expiration ; aucune valeur de plan provenant du client n'est acceptée.
+- **[app/services/rate_limit.py:35-37]** SHA-256 évite les IP en clair dans Redis, mais ne les
+  anonymise pas : l'espace IPv4 reste énumérable. La fenêtre fixe autorise jusqu'à 120 appels
+  autour d'une frontière de minute ; ce n'est pas une limite glissante ni une défense globale
+  contre le déni de service.
+- **[app/core/dependencies.py:173,228; app/services/analytics.py:17-21;
+  app/core/security.py:39]** Aucun JWT ni UUID d'installation brut ajouté aux logs. Les logs
+  DEBUG préexistants d'analytics et de décodage JWT gardent toutefois le `user_id`/`sub` brut :
+  le hachage des logs de quota ne constitue pas un assainissement global des logs.
+
+Vérification ciblée : 48 tests backend et 33 tests mobile passent. Redis est simulé dans ces
+tests ; ils ne valident ni l'exécution réelle de Lua ni la chaîne réseau Traefik/Uvicorn.
+
+### Verdict
+
+SECURE dans le périmètre de l'atténuation étage 1, avec les warnings ci-dessus à traiter.
+Ce verdict ne valide pas la configuration du déploiement ni une identité matérielle de l'invité.

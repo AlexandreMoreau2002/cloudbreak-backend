@@ -85,6 +85,21 @@ class TestQuotaService:
         assert mock_redis.eval.call_args.args[5] == "43200"
 
     @pytest.mark.asyncio
+    async def test_quota_ttl_is_at_least_one_second_before_midnight(
+        self, mock_redis: AsyncMock, quota_service: QuotaService
+    ) -> None:
+        """La dernière fraction de seconde avant minuit conserve le quota."""
+        mock_redis.eval.return_value = 1
+        mock_now = datetime(2026, 4, 1, 23, 59, 59, 500_000, tzinfo=UTC)
+
+        with patch("app.services.quota.datetime") as mock_datetime:
+            mock_datetime.now.return_value = mock_now
+            mock_datetime.UTC = UTC
+            await quota_service.check_and_increment("user-123", "2026-04-01", "peak-abc")
+
+        assert mock_redis.eval.call_args.args[5] == "1"
+
+    @pytest.mark.asyncio
     async def test_concurrent_different_peaks_allow_only_one(self) -> None:
         """Deux sommets concurrents ne peuvent pas tous deux passer une limite de un."""
         members: set[str] = set()

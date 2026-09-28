@@ -35,9 +35,7 @@ class RateLimitService:
         ip_hash = sha256(client_ip.encode()).hexdigest()
         window = int(time.time() // WINDOW_SECONDS)
         key = f"rate_limit:anonymous_score:{ip_hash}:{window}"
-        count = await self._redis.eval(
-            INCREMENT_WITH_TTL_SCRIPT, 1, key, str(WINDOW_SECONDS)
-        )  # type: ignore[misc]
+        count = await self._redis.eval(INCREMENT_WITH_TTL_SCRIPT, 1, key, str(WINDOW_SECONDS))  # type: ignore[misc]
 
         if count > ANONYMOUS_SCORE_LIMIT:
             raise RateLimitExceededException("Anonymous score rate limit exceeded")

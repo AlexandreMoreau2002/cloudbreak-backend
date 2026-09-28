@@ -52,9 +52,12 @@ Le deuxième JWT ne doit donc pas réinitialiser le quota de l'installation.
 
 1. Terminer d'abord les scénarios invités 7.1 et 7.2. Ils consomment déjà deux appels de la
    fenêtre IP courante.
-2. Attendre la **prochaine frontière de minute UTC** (`date -u +%S` doit revenir à `00`) sans
-   envoyer d'autre score invité entre-temps. Cette attente crée une fenêtre IP propre.
-3. Exporter un JWT anonyme frais dans le terminal local :
+2. Préparer un **JWT anonyme fraîchement créé** et un UUID v4 d'installation jamais utilisés.
+   Cette paire neutralise les deux quotas de sommet avant la première requête : le nouveau JWT n'a
+   pas de quota utilisateur consommé et la nouvelle installation n'a pas de quota installation
+   consommé. Ne lancer aucun autre score invité depuis cette IP après le départ du script.
+3. Exporter les valeurs dans le terminal local. `TEST_SCORE_DATE` doit être la même date proche et
+   couverte par Open-Meteo que `@testDate` :
 
    ```bash
    export GUEST_JWT='copier-ici-un-jwt-anonyme-frais'
@@ -62,31 +65,60 @@ Le deuxième JWT ne doit donc pas réinitialiser le quota de l'installation.
    export RATE_INSTALLATION_ID='123e4567-e89b-42d3-a456-426614174000'
    ```
 
-4. Dès la frontière atteinte, envoyer les 60 requêtes suivantes. Les réponses doivent toutes être
-   `200` ; le même sommet ne consomme pas de nouveau quota :
+4. Lancer ce script auto-validant. Il attend lui-même la prochaine frontière de minute, mémorise
+   sa fenêtre epoch, puis abandonne avec `INVALID` si elle change avant la 61e réponse. Il exige
+   60 réponses `200` sans code `RATE_LIMIT_EXCEEDED`, puis une 61e réponse `429` contenant ce
+   code. Le même sommet est volontairement rejoué : il ne consomme pas de quota supplémentaire.
 
    ```bash
-   for attempt in {1..60}; do
-     curl --silent --output /dev/null --write-out "%{http_code}\n" \
+   set -eu
+   BODY_DIR=$(mktemp -d)
+   trap 'rm -rf "$BODY_DIR"' EXIT
+   PEAK_ID='0728f7c7-a0c9-5fb0-b87d-d9edc8696840'
+   SCORE_URL="http://localhost:8000/api/v1/score?peak_id=$PEAK_ID&date=$TEST_SCORE_DATE&hour=10"
+
+   # Ne jamais réutiliser la fenêtre où les scénarios 7.1/7.2 ont été joués.
+   OLD_WINDOW=$(( $(date +%s) / 60 ))
+   while [ $(( $(date +%s) / 60 )) -eq "$OLD_WINDOW" ]; do sleep 0.1; done
+   TARGET_WINDOW=$(( $(date +%s) / 60 ))
+   echo "Fenêtre fraîche démarrée : $TARGET_WINDOW"
+
+   for ATTEMPT in {1..60}; do
+     if [ $(( $(date +%s) / 60 )) -ne "$TARGET_WINDOW" ]; then
+       echo "INVALID: frontière de minute franchie avant l'appel $ATTEMPT" >&2
+       exit 1
+     fi
+     BODY="$BODY_DIR/$ATTEMPT.json"
+     STATUS=$(curl --silent --output "$BODY" --write-out '%{http_code}' \
        -H "Authorization: Bearer $GUEST_JWT" \
-       -H "X-Cloudbreak-Installation-Id: $RATE_INSTALLATION_ID" \
-       "http://localhost:8000/api/v1/score?peak_id=0728f7c7-a0c9-5fb0-b87d-d9edc8696840&date=$TEST_SCORE_DATE&hour=10"
+       -H "X-Cloudbreak-Installation-Id: $RATE_INSTALLATION_ID" "$SCORE_URL")
+     if [ "$STATUS" != 200 ] || rg -q 'RATE_LIMIT_EXCEEDED' "$BODY"; then
+       echo "FAIL: appel $ATTEMPT, HTTP $STATUS (attendu : 200 sans RATE_LIMIT_EXCEEDED)" >&2
+       exit 1
+     fi
    done
-   ```
 
-5. Avant la frontière de minute suivante, envoyer immédiatement une 61e fois (ou exécuter `7.8`
-   une fois dans REST Client avec les mêmes JWT/UUID/IP) :
-
-   ```bash
-   curl --silent --output /dev/null --write-out "%{http_code}\n" \
+   if [ $(( $(date +%s) / 60 )) -ne "$TARGET_WINDOW" ]; then
+     echo "INVALID: frontière de minute franchie avant le 61e appel" >&2
+     exit 1
+   fi
+   LAST_BODY="$BODY_DIR/61.json"
+   LAST_STATUS=$(curl --silent --output "$LAST_BODY" --write-out '%{http_code}' \
      -H "Authorization: Bearer $GUEST_JWT" \
-     -H "X-Cloudbreak-Installation-Id: $RATE_INSTALLATION_ID" \
-     "http://localhost:8000/api/v1/score?peak_id=0728f7c7-a0c9-5fb0-b87d-d9edc8696840&date=$TEST_SCORE_DATE&hour=10"
+     -H "X-Cloudbreak-Installation-Id: $RATE_INSTALLATION_ID" "$SCORE_URL")
+   if [ $(( $(date +%s) / 60 )) -ne "$TARGET_WINDOW" ]; then
+     echo "INVALID: frontière de minute franchie pendant le 61e appel" >&2
+     exit 1
+   fi
+   if [ "$LAST_STATUS" != 429 ] || ! rg -q 'RATE_LIMIT_EXCEEDED' "$LAST_BODY"; then
+     echo "FAIL: 61e appel, HTTP $LAST_STATUS (attendu : 429 RATE_LIMIT_EXCEEDED)" >&2
+     exit 1
+   fi
+   echo 'PASS: 60 réponses 200, puis 61e réponse 429 RATE_LIMIT_EXCEEDED dans la même fenêtre.'
    ```
 
-6. Vérifier `429` et `detail.code = RATE_LIMIT_EXCEEDED` si la réponse est inspectée dans REST
-   Client. Si la minute a changé pendant la boucle, recommencer depuis une frontière fraîche : le
-   résultat ne serait plus concluant.
+5. Considérer uniquement le résultat `PASS` comme concluant. Un résultat `INVALID` signifie que
+   la fenêtre a tourné : recommencer avec un JWT/UUID frais, au lieu d'interpréter les statuts.
 
 ### 4. Validation et abonnements payants
 

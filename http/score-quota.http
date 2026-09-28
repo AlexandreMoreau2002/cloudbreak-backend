@@ -211,11 +211,11 @@ Authorization: Bearer {{proEmail-jwt}}
 
 
 ### 7.8 — Rate limit invité : requête à exécuter 60 fois, puis une 61e fois
-# Après 7.1 et 7.2, attendre la PROCHAINE frontière de minute UTC avant toute exécution de ce
-# bloc. Ne lancer aucun autre score invité dans cette nouvelle minute. Exécuter alors cette même
-# requête 60 fois, sans changer IP, JWT ni installation : les 60 réponses doivent être 200 ; la
-# 61e, envoyée avant la frontière suivante, retourne 429 RATE_LIMIT_EXCEEDED. Voir le guide pour
-# une boucle terminal reproductible.
+# Après 7.1 et 7.2, le guide attend automatiquement une nouvelle frontière de minute et invalide
+# le test si elle tourne pendant la rafale. Utiliser un JWT anonyme frais et une installation UUID
+# v4 fraîche pour neutraliser les quotas de sommet, puis lancer son script auto-validant : 60x 200
+# sans RATE_LIMIT_EXCEEDED, suivi de 429 RATE_LIMIT_EXCEEDED. Cette requête sert à l'inspection
+# manuelle du 61e corps de réponse.
 GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date={{testDate}}&hour=10
 Authorization: Bearer {{guestFirst-jwt}}
 X-Cloudbreak-Installation-Id: {{otherInstallationId}}

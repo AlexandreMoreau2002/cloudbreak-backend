@@ -48,8 +48,10 @@ quota de l'installation, puis quota du JWT
 ```
 
 Le quota est un ensemble Redis de sommets, pas un compteur d'heures. Une fois un sommet ouvert,
-toutes ses heures restent accessibles jusqu'à minuit UTC. Une nouvelle installation possède son
-propre quota ; le changement de JWT sur la même installation ne le remet pas à zéro.
+toutes ses heures restent accessibles jusqu'à minuit UTC. La date de sa clé est l'heure UTC du
+serveur au moment de l'appel, pas le paramètre `date` demandé pour la prévision. Une nouvelle
+installation possède son propre quota ; le changement de JWT sur la même installation ne le remet
+pas à zéro.
 
 ## Données temporaires dans Redis
 

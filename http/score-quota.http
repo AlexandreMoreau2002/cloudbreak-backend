@@ -15,7 +15,9 @@
 # ─────────────────────────────────────────────────────────────
 
 @baseUrl     = http://localhost:8000/api/v1
-@testDate    = 2026-04-01
+# Remplacer avant chaque campagne par une date proche couverte par Open-Meteo (aujourd'hui ou dans
+# son horizon de prévision). Cette date sert au score ; elle ne détermine PAS la clé de quota.
+@testDate    = 2026-09-29
 @installationId = 550e8400-e29b-41d4-a716-446655440000
 @otherInstallationId = 123e4567-e89b-42d3-a456-426614174000
 
@@ -39,13 +41,13 @@
 GET http://localhost:8000/health
 
 
-### 0.2 — Sans JWT → 403
-# Attendu : 403 Forbidden
+### 0.2 — En-tête Authorization absent → 403
+# Attendu : 403 Forbidden (HTTPBearer refuse l'absence de credentials).
 GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date={{testDate}}&hour=9
 
 
-### 0.3 — Token invalide → 401 ou 403
-# Attendu : 401 ou 403
+### 0.3 — Token invalide → 401
+# Attendu : 401 Unauthorized (un Bearer est fourni mais le JWT ne passe pas la validation).
 GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date={{testDate}}&hour=9
 Authorization: Bearer token.invalide.xxx
 
@@ -146,9 +148,11 @@ Authorization: Bearer {{freemiumEmail-jwt}}
 # Chaque membre du SET est un peak_id déverrouillé pour la journée.
 #
 #   docker exec cloudbreak-redis redis-cli KEYS "quota:*"
-#   docker exec cloudbreak-redis redis-cli SMEMBERS "quota:{user_id}:2026-04-01"
-#   docker exec cloudbreak-redis redis-cli SCARD "quota:{user_id}:2026-04-01"
-#   docker exec cloudbreak-redis redis-cli TTL "quota:{user_id}:2026-04-01"
+#   # La date des clés est la date UTC actuelle du serveur, pas @testDate.
+#   QUOTA_DATE=$(date -u +%F)
+#   docker exec cloudbreak-redis redis-cli SMEMBERS "quota:{user_id}:${QUOTA_DATE}"
+#   docker exec cloudbreak-redis redis-cli SCARD "quota:{user_id}:${QUOTA_DATE}"
+#   docker exec cloudbreak-redis redis-cli TTL "quota:{user_id}:${QUOTA_DATE}"
 #   # Voir bloc 7 pour le reset ciblé d'une installation de test.
 # ═══════════════════════════════════════════════════════════
 
@@ -206,11 +210,12 @@ GET {{baseUrl}}/score?peak_id={{peakBlanc}}&date={{testDate}}&hour=9
 Authorization: Bearer {{proEmail-jwt}}
 
 
-### 7.8 — Rate limit invité : exécuter 61 fois dans la même minute
-# Exécuter cette requête exactement 61 fois, sans changer l'IP ni l'installation.
-# Les appels 1 à 60 retournent 200 (même sommet : aucun quota supplémentaire) ; le
-# 61e retourne 429 + {"detail": {"code": "RATE_LIMIT_EXCEEDED", ...}}.
-# Attendre la minute suivante avant de recommencer (la fenêtre Redis est fixe, 60 s).
+### 7.8 — Rate limit invité : requête à exécuter 60 fois, puis une 61e fois
+# Après 7.1 et 7.2, attendre la PROCHAINE frontière de minute UTC avant toute exécution de ce
+# bloc. Ne lancer aucun autre score invité dans cette nouvelle minute. Exécuter alors cette même
+# requête 60 fois, sans changer IP, JWT ni installation : les 60 réponses doivent être 200 ; la
+# 61e, envoyée avant la frontière suivante, retourne 429 RATE_LIMIT_EXCEEDED. Voir le guide pour
+# une boucle terminal reproductible.
 GET {{baseUrl}}/score?peak_id={{peakVentoux}}&date={{testDate}}&hour=10
 Authorization: Bearer {{guestFirst-jwt}}
 X-Cloudbreak-Installation-Id: {{otherInstallationId}}
@@ -218,12 +223,13 @@ X-Cloudbreak-Installation-Id: {{otherInstallationId}}
 
 ### 7.9 — Reset Redis ciblé pour l'installation de test (terminal, jamais FLUSHDB)
 # INSTALLATION_ID='{{installationId}}'
-# TEST_DATE='{{testDate}}'
+# QUOTA_DATE=$(date -u +%F)  # date UTC actuelle du serveur ; ne pas utiliser @testDate
 # INSTALLATION_HASH=$(printf '%s' "$INSTALLATION_ID" | shasum -a 256 | awk '{print $1}')
-# docker exec cloudbreak-redis redis-cli DEL "quota:installation:${INSTALLATION_HASH}:${TEST_DATE}"
+# docker exec cloudbreak-redis redis-cli DEL "quota:installation:${INSTALLATION_HASH}:${QUOTA_DATE}"
 #
-# Pour le rate limit, attendre le renouvellement de la fenêtre de 60 secondes plutôt
-# que de supprimer des clés partagées. La clé de quota JWT est volontairement séparée.
+# Pour le rate limit, attendre la prochaine frontière de minute plutôt que de supprimer une clé
+# partagée. Si le quota JWT a déjà été consommé, créer un JWT anonyme frais : il est séparé de la
+# clé d'installation.
 
 
 # ═══════════════════════════════════════════════════════════

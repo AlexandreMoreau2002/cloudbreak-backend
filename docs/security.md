@@ -2,6 +2,26 @@
 
 Document de référence sécurité. À mettre à jour à chaque story qui touche auth, réseau, données ou dépendances.
 
+## 2026-09-29 Story 4.3 — Abonnements Apple StoreKit 2
+
+### 🟢 PROTECTIONS EN PLACE
+
+- **JWS Apple** : le backend utilise `app-store-server-library` (plancher `>=3.1.2,<4`) et les certificats racines Apple versionnés comme ressources publiques. Il ne décode jamais un JWS client sans vérification cryptographique préalable.
+- **Périmètre strict** : signature valide ne suffit pas ; bundle ID, environnement App Store et product ID doivent correspondre à Cloudbreak et aux deux produits explicitement autorisés.
+- **Propriété** : l'`appAccountToken` doit correspondre au UUID du JWT du compte permanent. Une lignée `original_transaction_id` déjà liée à un autre compte donne un conflit, jamais un transfert d'entitlement.
+- **Webhook** : `POST /api/v1/webhooks/apple` n'utilise pas de JWT client car Apple ne peut pas en fournir ; la signature V2 est l'authentification. `notificationUUID` rend le traitement idempotent dans la base.
+- **Droits** : le quota exige simultanément plan Premium/ancien Pro, statut `trial` ou `active` et expiration future. Expiration et révocation réappliquent donc le quota côté serveur même si l'app est hors ligne.
+- **Secrets et journaux** : clé IAP et chemin de clé viennent de Dokploy ; ni JWS, ni token, identifiant de transaction, ni UUID Supabase non masqué ne doivent être journalisés. Les erreurs publiques restent catégorisées.
+
+### 🟡 RISQUES À GARDER SOUS CONTRÔLE
+
+- Maintenir les certificats racines Apple et la dépendance de vérification à jour ; suivre les advisories de la bibliothèque Apple avant chaque release.
+- Avant production, réaliser et consigner sur appareil réel le Sandbox purchase/restore et le test App Store Server Notifications V2. Les tests automatisés ne remplacent pas la signature et le réseau Apple réels.
+
+### Verdict
+
+À REVOIR APRÈS TEST SANDBOX — la conception ferme la validation client, le rejeu inter-compte et le webhook non signé ; la preuve opérationnelle Apple reste une condition de release.
+
 ## 2026-09-15 Story 2.2 — Préférences de notifications
 
 ### 🔵 INFO

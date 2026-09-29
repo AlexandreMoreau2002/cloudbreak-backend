@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
+import pytest
 
 from app.api.v1.endpoints.subscription import get_apple_signed_data_verifier
 from app.core.dependencies import get_current_user, get_permanent_user
@@ -10,6 +11,11 @@ from app.db.session import get_db
 from app.main import app
 from app.schemas.subscription import SubscriptionResponse
 from app.services.apple_store import AppleStoreTransactionError, VerifiedAppleTransaction
+from app.services.apple_store import (
+    AppleStoreBundleError,
+    AppleStoreEnvironmentError,
+    AppleStoreProductError,
+)
 from app.services.subscription import SubscriptionOwnershipConflict
 
 
@@ -124,6 +130,36 @@ def test_verify_maps_invalid_signed_transaction() -> None:
 
     assert response.status_code == 400
     assert response.json()["code"] == "APPLE_TRANSACTION_INVALID"
+
+
+@pytest.mark.parametrize(
+    "verification_error",
+    [
+        AppleStoreProductError("unlisted product"),
+        AppleStoreBundleError("wrong bundle"),
+        AppleStoreEnvironmentError("wrong environment"),
+    ],
+)
+def test_verify_maps_unsupported_apple_transaction(verification_error: Exception) -> None:
+    verifier = MagicMock()
+    verifier.verify_transaction.side_effect = verification_error
+    app.dependency_overrides[get_permanent_user] = lambda: {
+        "id": str(uuid4()),
+        "is_anonymous": False,
+    }
+    app.dependency_overrides[get_db] = _override_db
+    app.dependency_overrides[get_apple_signed_data_verifier] = lambda: verifier
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v1/user/subscription/verify",
+                json={"signed_transaction": "not-a-real-jws-but-long-enough"},
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "APPLE_TRANSACTION_UNSUPPORTED"
 
 
 def test_verify_rejects_account_token_mismatch() -> None:

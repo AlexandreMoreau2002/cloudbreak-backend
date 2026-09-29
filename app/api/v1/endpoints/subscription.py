@@ -1,8 +1,8 @@
 """Authenticated StoreKit 2 entitlement read and verification routes."""
 
-from uuid import UUID
 from datetime import datetime
 from typing import cast
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession

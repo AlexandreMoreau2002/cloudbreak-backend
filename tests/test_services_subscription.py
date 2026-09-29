@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.models.subscription import Subscription
 from app.services.apple_store import VerifiedAppleTransaction
@@ -92,6 +93,66 @@ async def test_apply_verified_transaction_rejects_foreign_original_transaction()
 
     with pytest.raises(SubscriptionOwnershipConflict):
         await apply_verified_transaction("attacker-456", _transaction(), db)
+
+
+def _nested_transaction(db: MagicMock) -> None:
+    nested = MagicMock()
+    nested.__aenter__ = AsyncMock(return_value=None)
+    nested.__aexit__ = AsyncMock(return_value=False)
+    db.begin_nested.return_value = nested
+
+
+@pytest.mark.asyncio
+async def test_apply_verified_transaction_rereads_same_owner_after_insert_race() -> None:
+    empty = MagicMock()
+    empty.scalar_one_or_none.return_value = None
+    persisted = Subscription(
+        user_id="user-123",
+        plan="premium",
+        status="trial",
+        original_transaction_id="original-123",
+        latest_transaction_id="transaction-123",
+        expires_at=datetime.now(UTC) + timedelta(days=30),
+    )
+    reread = MagicMock()
+    reread.scalar_one_or_none.return_value = persisted
+    db = MagicMock()
+    db.execute = AsyncMock(side_effect=[empty, empty, reread])
+    db.flush = AsyncMock(
+        side_effect=IntegrityError("insert", {}, Exception("duplicate original transaction"))
+    )
+    _nested_transaction(db)
+
+    result = await apply_verified_transaction("user-123", _transaction(), db)
+
+    assert result is persisted
+    assert db.execute.await_count == 3
+    db.rollback.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_apply_verified_transaction_rejects_foreign_owner_after_insert_race() -> None:
+    empty = MagicMock()
+    empty.scalar_one_or_none.return_value = None
+    persisted = Subscription(
+        user_id="owner-456",
+        plan="premium",
+        original_transaction_id="original-123",
+    )
+    reread = MagicMock()
+    reread.scalar_one_or_none.return_value = persisted
+    db = MagicMock()
+    db.execute = AsyncMock(side_effect=[empty, empty, reread])
+    db.flush = AsyncMock(
+        side_effect=IntegrityError("insert", {}, Exception("duplicate original transaction"))
+    )
+    _nested_transaction(db)
+
+    with pytest.raises(SubscriptionOwnershipConflict):
+        await apply_verified_transaction("attacker-789", _transaction(), db)
+
+    assert db.execute.await_count == 3
+    db.rollback.assert_not_called()
 
 
 @pytest.mark.asyncio

@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, cast
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.subscription import Subscription
@@ -13,6 +14,18 @@ from app.services.apple_store import VerifiedAppleTransaction
 
 class SubscriptionOwnershipConflict(Exception):
     """An Apple subscription lineage is already bound to another account."""
+
+
+async def _get_transaction_owner(
+    original_transaction_id: str,
+    db: AsyncSession,
+) -> Subscription | None:
+    result = await db.execute(
+        select(Subscription)
+        .where(Subscription.original_transaction_id == original_transaction_id)
+        .with_for_update()
+    )
+    return result.scalar_one_or_none()
 
 
 async def get_subscription_response(user_id: str, db: AsyncSession) -> SubscriptionResponse:
@@ -41,12 +54,7 @@ async def apply_verified_transaction(
     db: AsyncSession,
 ) -> Subscription:
     """Bind a verified Apple entitlement to exactly one Cloudbreak account."""
-    lineage_result = await db.execute(
-        select(Subscription)
-        .where(Subscription.original_transaction_id == transaction.original_transaction_id)
-        .with_for_update()
-    )
-    subscription = lineage_result.scalar_one_or_none()
+    subscription = await _get_transaction_owner(transaction.original_transaction_id, db)
 
     if subscription is not None and subscription.user_id != user_id:
         raise SubscriptionOwnershipConflict()
@@ -57,9 +65,9 @@ async def apply_verified_transaction(
         )
         subscription = user_result.scalar_one_or_none()
 
+    created = subscription is None
     if subscription is None:
         subscription = Subscription(user_id=user_id)
-        db.add(subscription)
 
     if subscription.original_transaction_id not in (None, transaction.original_transaction_id):
         raise SubscriptionOwnershipConflict()
@@ -68,12 +76,20 @@ async def apply_verified_transaction(
     if stored_expiry is not None and stored_expiry > transaction.expires_at:
         return subscription
 
-    subscription_values = cast(Any, subscription)
-    subscription_values.plan = "premium"
-    subscription_values.status = transaction.status
-    subscription_values.expires_at = transaction.expires_at
-    subscription_values.original_transaction_id = transaction.original_transaction_id
-    subscription_values.latest_transaction_id = transaction.transaction_id
-    subscription_values.apple_environment = transaction.environment
-    await db.flush()
+    try:
+        async with db.begin_nested():
+            if created:
+                db.add(subscription)
+            subscription_values = cast(Any, subscription)
+            subscription_values.plan = "premium"
+            subscription_values.status = transaction.status
+            subscription_values.expires_at = transaction.expires_at
+            subscription_values.original_transaction_id = transaction.original_transaction_id
+            subscription_values.latest_transaction_id = transaction.transaction_id
+            subscription_values.apple_environment = transaction.environment
+            await db.flush()
+    except IntegrityError:
+        subscription = await _get_transaction_owner(transaction.original_transaction_id, db)
+        if subscription is None or subscription.user_id != user_id:
+            raise SubscriptionOwnershipConflict() from None
     return subscription

@@ -12,6 +12,7 @@ from app.services.apple_store import (
     AppleStoreRevokedError,
     AppleStoreTransactionError,
 )
+from appstoreserverlibrary.models.NotificationTypeV2 import NotificationTypeV2
 
 MONTHLY_PRODUCT_ID = "com.alexandremoreau.cloudbreak.premium.monthly"
 ANNUAL_PRODUCT_ID = "com.alexandremoreau.cloudbreak.premium.annual"
@@ -22,6 +23,11 @@ class FakeSignedDataVerifier:
         self.payload = payload
 
     def verify_and_decode_signed_transaction(self, _: str) -> object:
+        if isinstance(self.payload, Exception):
+            raise self.payload
+        return self.payload
+
+    def verify_and_decode_notification(self, _: str) -> object:
         if isinstance(self.payload, Exception):
             raise self.payload
         return self.payload
@@ -112,3 +118,16 @@ def test_verify_transaction_maps_inactive_lifecycle_event_when_explicitly_allowe
 def test_verify_transaction_wraps_malformed_jws() -> None:
     with pytest.raises(AppleStoreTransactionError, match="signature"):
         verifier(ValueError("invalid signature")).verify_transaction("malformed-jws" * 2)
+
+
+def test_verify_notification_normalizes_library_notification_type_enum() -> None:
+    decoded_notification = SimpleNamespace(
+        notificationType=NotificationTypeV2.DID_RENEW,
+        notificationUUID="notification-123",
+        signedDate=int(datetime.now(UTC).timestamp() * 1000),
+        data=SimpleNamespace(signedTransactionInfo="transaction-jws"),
+    )
+
+    notification = verifier(decoded_notification).verify_notification("notification-jws")
+
+    assert notification.notification_type == "DID_RENEW"

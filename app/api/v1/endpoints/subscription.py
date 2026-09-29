@@ -31,6 +31,8 @@ from app.services.subscription import (
     apply_apple_notification,
     apply_verified_transaction,
     get_subscription_response,
+    is_entitlement_notification,
+    record_apple_notification,
 )
 
 router = APIRouter(prefix="/api/v1/user/subscription", tags=["subscription"])
@@ -124,13 +126,17 @@ async def apple_webhook(
     """Process an App Store Server Notification V2 after signature verification."""
     try:
         notification = verifier.verify_notification(payload.signed_payload)
-        if notification.signed_transaction is None:
-            raise AppleNotificationInvalid("Apple notification transaction is missing")
-        transaction = verifier.verify_transaction(
-            notification.signed_transaction,
-            allow_inactive=True,
-        )
-        await apply_apple_notification(notification, transaction, db)
+        if (
+            is_entitlement_notification(notification.notification_type)
+            and notification.signed_transaction
+        ):
+            transaction = verifier.verify_transaction(
+                notification.signed_transaction,
+                allow_inactive=True,
+            )
+            await apply_apple_notification(notification, transaction, db)
+        else:
+            await record_apple_notification(notification, db)
         await db.commit()
     except (
         AppleNotificationInvalid,

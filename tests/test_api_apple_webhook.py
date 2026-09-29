@@ -87,3 +87,36 @@ def test_apple_webhook_projects_verified_notification_and_returns_no_content() -
         allow_inactive=True,
     )
     db.commit.assert_awaited_once()
+
+
+def test_apple_webhook_acknowledges_verified_test_notification_without_entitlement() -> None:
+    verifier = MagicMock()
+    notification = _notification()
+    notification = VerifiedAppleNotification(
+        notification_uuid=notification.notification_uuid,
+        notification_type="TEST",
+        subtype=None,
+        signed_date=notification.signed_date,
+        signed_transaction=None,
+        signed_renewal_info=None,
+    )
+    verifier.verify_notification.return_value = notification
+    db = AsyncMock()
+    app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[get_apple_signed_data_verifier] = lambda: verifier
+    with patch(
+        "app.api.v1.endpoints.subscription.record_apple_notification",
+        new_callable=AsyncMock,
+    ):
+        try:
+            with TestClient(app) as client:
+                response = client.post(
+                    "/api/v1/webhooks/apple",
+                    json={"signedPayload": "signed-apple-notification"},
+                )
+        finally:
+            app.dependency_overrides.clear()
+
+    assert response.status_code == 204
+    verifier.verify_transaction.assert_not_called()
+    db.commit.assert_awaited_once()

@@ -45,6 +45,49 @@ async def _get_processed_event(
     return result.scalar_one_or_none()
 
 
+async def _get_latest_event_signed_date(
+    original_transaction_id: str,
+    db: AsyncSession,
+) -> datetime | None:
+    result = await db.execute(
+        select(AppleSubscriptionEvent.signed_date)
+        .where(AppleSubscriptionEvent.original_transaction_id == original_transaction_id)
+        .order_by(AppleSubscriptionEvent.signed_date.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+async def record_apple_notification(
+    notification: VerifiedAppleNotification,
+    db: AsyncSession,
+) -> bool:
+    """Store a verified notification which has no entitlement effect.
+
+    Apple sends signed operational events such as `TEST`; acknowledging them prevents
+    needless retries while keeping no client-controlled data in the ledger.
+    """
+    if not notification.notification_uuid:
+        raise AppleNotificationInvalid("Apple notification UUID is missing")
+    if await _get_processed_event(notification.notification_uuid, db) is not None:
+        return False
+
+    event = AppleSubscriptionEvent(
+        notification_uuid=notification.notification_uuid,
+        notification_type=notification.notification_type,
+        signed_date=notification.signed_date,
+    )
+    try:
+        async with db.begin_nested():
+            db.add(event)
+            await db.flush()
+    except IntegrityError:
+        if await _get_processed_event(notification.notification_uuid, db) is not None:
+            return False
+        raise
+    return True
+
+
 async def get_subscription_response(user_id: str, db: AsyncSession) -> SubscriptionResponse:
     """Return a safe, free entitlement when no current subscription exists."""
     result = await db.execute(select(Subscription).where(Subscription.user_id == user_id))
@@ -120,6 +163,11 @@ _NOTIFICATION_STATUSES: dict[str, Literal["trial", "active", "expired", "revoked
 }
 
 
+def is_entitlement_notification(notification_type: str) -> bool:
+    """Whether a verified Apple notification can change a current entitlement."""
+    return notification_type in _NOTIFICATION_STATUSES
+
+
 async def apply_apple_notification(
     notification: VerifiedAppleNotification,
     transaction: VerifiedAppleTransaction,
@@ -136,7 +184,7 @@ async def apply_apple_notification(
     if await _get_processed_event(notification.notification_uuid, db) is not None:
         return None
 
-    if notification.notification_type not in _NOTIFICATION_STATUSES:
+    if not is_entitlement_notification(notification.notification_type):
         raise AppleNotificationInvalid("Unsupported Apple notification type")
     target_status = _NOTIFICATION_STATUSES[notification.notification_type] or transaction.status
 
@@ -166,6 +214,24 @@ async def apply_apple_notification(
     else:
         effective_expiry = transaction.expires_at
 
+    should_project = True
+    if not created:
+        latest_signed_date = await _get_latest_event_signed_date(
+            transaction.original_transaction_id,
+            db,
+        )
+        stored_expiry = cast(datetime | None, subscription.expires_at)
+        if notification.signed_date is None:
+            should_project = False
+        elif latest_signed_date is not None and notification.signed_date <= latest_signed_date:
+            should_project = False
+        elif (
+            target_status == "expired"
+            and stored_expiry is not None
+            and effective_expiry < stored_expiry
+        ):
+            should_project = False
+
     event = AppleSubscriptionEvent(
         notification_uuid=notification.notification_uuid,
         notification_type=notification.notification_type,
@@ -177,13 +243,14 @@ async def apply_apple_notification(
             db.add(event)
             if created:
                 db.add(subscription)
-            subscription_values = cast(Any, subscription)
-            subscription_values.plan = "premium"
-            subscription_values.status = target_status
-            subscription_values.expires_at = effective_expiry
-            subscription_values.original_transaction_id = transaction.original_transaction_id
-            subscription_values.latest_transaction_id = transaction.transaction_id
-            subscription_values.apple_environment = transaction.environment
+            if should_project:
+                subscription_values = cast(Any, subscription)
+                subscription_values.plan = "premium"
+                subscription_values.status = target_status
+                subscription_values.expires_at = effective_expiry
+                subscription_values.original_transaction_id = transaction.original_transaction_id
+                subscription_values.latest_transaction_id = transaction.transaction_id
+                subscription_values.apple_environment = transaction.environment
             await db.flush()
     except IntegrityError:
         if await _get_processed_event(notification.notification_uuid, db) is not None:

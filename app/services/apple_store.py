@@ -185,7 +185,7 @@ class AppleSignedDataVerifier:
 
         data = self._value(payload, "data")
         return VerifiedAppleNotification(
-            notification_type=str(self._value(payload, "notificationType") or ""),
+            notification_type=str(self._enum_value(self._value(payload, "notificationType")) or ""),
             subtype=self._optional_string(self._value(payload, "subtype")),
             notification_uuid=str(self._value(payload, "notificationUUID") or ""),
             signed_date=self._timestamp(self._value(payload, "signedDate")),

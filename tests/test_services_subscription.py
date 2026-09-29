@@ -10,6 +10,7 @@ from app.services.subscription import (
     apply_apple_notification,
     apply_verified_transaction,
     get_subscription_response,
+    record_apple_notification,
 )
 from app.models.subscription import Subscription
 from app.models.apple_subscription_event import AppleSubscriptionEvent
@@ -267,3 +268,112 @@ async def test_apply_apple_notification_is_a_no_op_for_duplicate_notification_uu
 
     assert subscription is None
     db.add.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_delayed_expired_notification_does_not_regress_newer_renewal() -> None:
+    transaction = _transaction(
+        expires_at=datetime.now(UTC) - timedelta(days=1),
+        transaction_id="transaction-expired-old",
+        status="expired",
+    )
+    subscription = Subscription(
+        user_id=str(transaction.app_account_token),
+        plan="premium",
+        status="active",
+        original_transaction_id="original-123",
+        latest_transaction_id="transaction-renewed",
+        expires_at=datetime.now(UTC) + timedelta(days=60),
+    )
+    empty = MagicMock()
+    empty.scalar_one_or_none.return_value = None
+    owner = MagicMock()
+    owner.scalar_one_or_none.return_value = subscription
+    newer_event = MagicMock()
+    newer_event.scalar_one_or_none.return_value = datetime.now(UTC)
+    db = MagicMock()
+    db.execute = AsyncMock(side_effect=[empty, owner, newer_event])
+    db.flush = AsyncMock()
+    delayed_notification = VerifiedAppleNotification(
+        notification_uuid="notification-expired-old",
+        notification_type="EXPIRED",
+        subtype=None,
+        signed_date=datetime.now(UTC) - timedelta(days=1),
+        signed_transaction="expired-transaction-jws",
+        signed_renewal_info=None,
+    )
+
+    result = await apply_apple_notification(
+        delayed_notification,
+        transaction,
+        db,
+    )
+
+    assert result is subscription
+    assert subscription.status == "active"
+    assert subscription.latest_transaction_id == "transaction-renewed"
+    assert any(isinstance(call.args[0], AppleSubscriptionEvent) for call in db.add.call_args_list)
+
+
+@pytest.mark.asyncio
+async def test_delayed_refund_notification_does_not_revoke_newer_renewal() -> None:
+    transaction = _transaction(
+        expires_at=datetime.now(UTC) + timedelta(days=30),
+        transaction_id="transaction-refund-old",
+        revoked_at=datetime.now(UTC) - timedelta(days=1),
+        status="revoked",
+    )
+    subscription = Subscription(
+        user_id=str(transaction.app_account_token),
+        plan="premium",
+        status="active",
+        original_transaction_id="original-123",
+        latest_transaction_id="transaction-renewed",
+        expires_at=datetime.now(UTC) + timedelta(days=60),
+    )
+    empty = MagicMock()
+    empty.scalar_one_or_none.return_value = None
+    owner = MagicMock()
+    owner.scalar_one_or_none.return_value = subscription
+    newer_event = MagicMock()
+    newer_event.scalar_one_or_none.return_value = datetime.now(UTC)
+    db = MagicMock()
+    db.execute = AsyncMock(side_effect=[empty, owner, newer_event])
+    db.flush = AsyncMock()
+    delayed_notification = VerifiedAppleNotification(
+        notification_uuid="notification-refund-old",
+        notification_type="REFUND",
+        subtype=None,
+        signed_date=datetime.now(UTC) - timedelta(days=1),
+        signed_transaction="refund-transaction-jws",
+        signed_renewal_info=None,
+    )
+
+    result = await apply_apple_notification(delayed_notification, transaction, db)
+
+    assert result is subscription
+    assert subscription.status == "active"
+    assert subscription.latest_transaction_id == "transaction-renewed"
+    assert any(isinstance(call.args[0], AppleSubscriptionEvent) for call in db.add.call_args_list)
+
+
+@pytest.mark.asyncio
+async def test_record_apple_notification_keeps_irrelevant_verified_event_as_no_op() -> None:
+    empty = MagicMock()
+    empty.scalar_one_or_none.return_value = None
+    db = MagicMock()
+    db.execute = AsyncMock(return_value=empty)
+    db.flush = AsyncMock()
+    notification = VerifiedAppleNotification(
+        notification_uuid="notification-test-123",
+        notification_type="TEST",
+        subtype=None,
+        signed_date=datetime.now(UTC),
+        signed_transaction=None,
+        signed_renewal_info=None,
+    )
+
+    created = await record_apple_notification(notification, db)
+
+    assert created is True
+    assert isinstance(db.add.call_args.args[0], AppleSubscriptionEvent)

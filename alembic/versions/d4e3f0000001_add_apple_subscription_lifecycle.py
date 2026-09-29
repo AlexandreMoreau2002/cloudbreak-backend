@@ -20,6 +20,7 @@ def upgrade() -> None:
     op.add_column("subscriptions", sa.Column("original_transaction_id", sa.String(length=255)))
     op.add_column("subscriptions", sa.Column("latest_transaction_id", sa.String(length=255)))
     op.add_column("subscriptions", sa.Column("apple_environment", sa.String(length=50)))
+    op.execute("UPDATE subscriptions SET status = 'active' WHERE plan IN ('premium', 'pro')")
     op.create_unique_constraint(
         "uq_subscriptions_original_transaction_id", "subscriptions", ["original_transaction_id"]
     )

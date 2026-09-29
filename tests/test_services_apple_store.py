@@ -87,9 +87,7 @@ def test_verify_transaction_rejects_revoked_entitlement() -> None:
         transaction_verifier = verifier(
             payload(revocation_date=int(datetime.now(UTC).timestamp() * 1000))
         )
-        transaction_verifier.verify_transaction(
-            "valid-jws" * 3
-        )
+        transaction_verifier.verify_transaction("valid-jws" * 3)
 
 
 def test_verify_transaction_rejects_expired_entitlement() -> None:
@@ -97,6 +95,18 @@ def test_verify_transaction_rejects_expired_entitlement() -> None:
 
     with pytest.raises(AppleStoreTransactionError, match="expired"):
         verifier(payload(expires_date=expired)).verify_transaction("valid-jws" * 3)
+
+
+def test_verify_transaction_maps_inactive_lifecycle_event_when_explicitly_allowed() -> None:
+    revoked_at = int(datetime.now(UTC).timestamp() * 1000)
+
+    transaction = verifier(payload(revocation_date=revoked_at)).verify_transaction(
+        "valid-jws" * 3,
+        allow_inactive=True,
+    )
+
+    assert transaction.status == "revoked"
+    assert transaction.revoked_at == datetime.fromtimestamp(revoked_at / 1000, tz=UTC)
 
 
 def test_verify_transaction_wraps_malformed_jws() -> None:

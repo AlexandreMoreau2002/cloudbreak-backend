@@ -7,11 +7,13 @@ from sqlalchemy.exc import IntegrityError
 
 from app.services.subscription import (
     SubscriptionOwnershipConflict,
+    apply_apple_notification,
     apply_verified_transaction,
     get_subscription_response,
 )
 from app.models.subscription import Subscription
-from app.services.apple_store import VerifiedAppleTransaction
+from app.models.apple_subscription_event import AppleSubscriptionEvent
+from app.services.apple_store import VerifiedAppleNotification, VerifiedAppleTransaction
 
 
 def _transaction(
@@ -19,6 +21,8 @@ def _transaction(
     expires_at: datetime | None = None,
     original_transaction_id: str = "original-123",
     transaction_id: str = "transaction-123",
+    revoked_at: datetime | None = None,
+    status: str = "trial",
 ) -> VerifiedAppleTransaction:
     return VerifiedAppleTransaction(
         transaction_id=transaction_id,
@@ -26,9 +30,20 @@ def _transaction(
         product_id="com.alexandremoreau.cloudbreak.premium.monthly",
         app_account_token=uuid4(),
         expires_at=expires_at or datetime.now(UTC) + timedelta(days=30),
-        revoked_at=None,
+        revoked_at=revoked_at,
         environment="Sandbox",
-        status="trial",
+        status=status,  # type: ignore[arg-type]
+    )
+
+
+def _notification(notification_type: str) -> VerifiedAppleNotification:
+    return VerifiedAppleNotification(
+        notification_uuid="notification-123",
+        notification_type=notification_type,
+        subtype=None,
+        signed_date=datetime.now(UTC),
+        signed_transaction="verified-transaction-jws",
+        signed_renewal_info=None,
     )
 
 
@@ -195,3 +210,60 @@ async def test_get_subscription_response_returns_free_none_for_unknown_user() ->
     assert response.plan == "free"
     assert response.status == "none"
     assert response.expires_at is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("notification_type", "transaction_status"),
+    [
+        ("SUBSCRIBED", "trial"),
+        ("DID_RENEW", "active"),
+        ("EXPIRED", "expired"),
+        ("REFUND", "revoked"),
+    ],
+)
+async def test_apply_apple_notification_projects_lifecycle_status(
+    notification_type: str,
+    transaction_status: str,
+) -> None:
+    empty = MagicMock()
+    empty.scalar_one_or_none.return_value = None
+    db = MagicMock()
+    db.execute = AsyncMock(side_effect=[empty, empty, empty])
+    db.flush = AsyncMock()
+
+    transaction = _transaction(
+        expires_at=datetime.now(UTC) + timedelta(days=30),
+        transaction_id=f"transaction-{notification_type}",
+        revoked_at=datetime.now(UTC) if notification_type == "REFUND" else None,
+        status=transaction_status,
+    )
+    subscription = await apply_apple_notification(_notification(notification_type), transaction, db)
+
+    assert subscription is not None
+    assert subscription.plan == "premium"
+    assert subscription.status == transaction_status
+    if notification_type == "REFUND":
+        assert subscription.expires_at == transaction.revoked_at
+    assert any(isinstance(call.args[0], AppleSubscriptionEvent) for call in db.add.call_args_list)
+
+
+@pytest.mark.asyncio
+async def test_apply_apple_notification_is_a_no_op_for_duplicate_notification_uuid() -> None:
+    event = AppleSubscriptionEvent(
+        notification_uuid="notification-123",
+        notification_type="DID_RENEW",
+    )
+    found = MagicMock()
+    found.scalar_one_or_none.return_value = event
+    db = MagicMock()
+    db.execute = AsyncMock(return_value=found)
+
+    subscription = await apply_apple_notification(
+        _notification("DID_RENEW"),
+        _transaction(),
+        db,
+    )
+
+    assert subscription is None
+    db.add.assert_not_called()

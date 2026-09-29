@@ -2,10 +2,27 @@
 @baseUrl = http://localhost:8000
 @token = {{$dotenv CLOUDBREAK_JWT}}
 @placeholderJws = NOT_A_REAL_APPLE_JWS__REPLACE_WITH_SANDBOX_TRANSACTION
+@placeholderNotificationJws = NOT_A_REAL_APPLE_NOTIFICATION_JWS__REPLACE_WITH_SANDBOX_EVENT
 
 ### Current entitlement — free/no subscription is { plan: free, status: none }.
 GET {{baseUrl}}/api/v1/user/subscription
 Authorization: Bearer {{token}}
+
+### Apple Server Notifications V2. Public endpoint; replace only locally with a signed Sandbox payload.
+POST {{baseUrl}}/api/v1/webhooks/apple
+Content-Type: application/json
+
+{
+  "signedPayload": "{{placeholderNotificationJws}}"
+}
+
+### Invalid notification — expected 400 APPLE_TRANSACTION_INVALID and no entitlement change.
+POST {{baseUrl}}/api/v1/webhooks/apple
+Content-Type: application/json
+
+{
+  "signedPayload": "malformed-but-long-enough-to-reach-the-verifier"
+}
 
 ### Nominal Sandbox verification. Replace placeholder locally; never commit a real JWS.
 POST {{baseUrl}}/api/v1/user/subscription/verify

@@ -10,7 +10,7 @@ Cas testés:
   6. Pas de record subscription → freemium
 """
 
-from datetime import UTC
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -19,6 +19,7 @@ from httpx import ASGITransport, AsyncClient
 from app.main import app
 from app.db.session import get_db
 from app.core.dependencies import get_redis
+from app.core.dependencies import check_quota
 from app.domain.weather_types import PressureLevelData, WeatherData
 
 
@@ -27,6 +28,49 @@ def _make_mock_redis() -> AsyncMock:
     mock_redis = AsyncMock()
     mock_redis.eval.return_value = 1
     return mock_redis
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("plan", "subscription_status", "expires_at", "expects_bypass"),
+    [
+        ("premium", "trial", datetime.now(UTC) + timedelta(days=1), True),
+        ("premium", "active", datetime.now(UTC) + timedelta(days=1), True),
+        ("pro", "active", datetime.now(UTC) + timedelta(days=1), True),
+        ("premium", "expired", datetime.now(UTC) + timedelta(days=1), False),
+        ("premium", "revoked", datetime.now(UTC) + timedelta(days=1), False),
+        ("premium", "active", datetime.now(UTC) - timedelta(days=1), False),
+    ],
+)
+async def test_quota_uses_only_live_entitlement_statuses(
+    plan: str,
+    subscription_status: str,
+    expires_at: datetime,
+    expects_bypass: bool,
+) -> None:
+    """Only live Apple states, plus legacy Pro, skip the Redis freemium counter."""
+    subscription = MagicMock(plan=plan, status=subscription_status, expires_at=expires_at)
+    request = MagicMock()
+    request.query_params = {"peak_id": "peak-1"}
+    redis = _make_mock_redis()
+
+    with patch(
+        "app.core.dependencies.get_user_subscription",
+        new_callable=AsyncMock,
+        return_value=subscription,
+    ):
+        result = await check_quota(
+            request=request,
+            user={"id": "user-123"},
+            redis=redis,
+            db=AsyncMock(),
+        )
+
+    assert result["plan"] == (plan if expects_bypass else "free")
+    if expects_bypass:
+        redis.eval.assert_not_awaited()
+    else:
+        redis.eval.assert_awaited_once()
 
 
 class _StatefulRedis:
@@ -311,6 +355,7 @@ async def test_quota_premium_user_unlimited_calls(auth_premium: object) -> None:
     # Mock subscription avec plan "premium" et expiry future
     mock_subscription = MagicMock()
     mock_subscription.plan = "premium"
+    mock_subscription.status = "active"
     mock_subscription.expires_at = datetime(2099, 1, 1, tzinfo=UTC)  # Loin dans le futur
 
     # Patch get_user_subscription au niveau du module dependencies
@@ -376,6 +421,7 @@ async def test_quota_pro_user_unlimited_calls(auth_pro: object) -> None:
     # Mock subscription avec plan "pro" et expiry future
     mock_subscription = MagicMock()
     mock_subscription.plan = "pro"
+    mock_subscription.status = "active"
     mock_subscription.expires_at = datetime(2099, 1, 1, tzinfo=UTC)  # Loin dans le futur
 
     # Patch get_user_subscription au niveau du module dependencies
@@ -431,6 +477,7 @@ async def test_quota_expired_subscription_falls_back_to_freemium(
     # Mock subscription expiré
     mock_subscription = MagicMock()
     mock_subscription.plan = "premium"
+    mock_subscription.status = "expired"
     mock_subscription.expires_at = datetime(2026, 1, 1, tzinfo=UTC)  # Déjà expiré
 
     patch_subscription = patch(

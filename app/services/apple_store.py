@@ -61,6 +61,8 @@ class VerifiedAppleTransaction:
 class VerifiedAppleNotification:
     notification_type: str
     subtype: str | None
+    notification_uuid: str
+    signed_date: datetime | None
     signed_transaction: str | None
     signed_renewal_info: str | None
 
@@ -108,8 +110,13 @@ class AppleSignedDataVerifier:
             app_apple_id,
         )
 
-    def verify_transaction(self, signed_transaction: str) -> VerifiedAppleTransaction:
-        """Verify a StoreKit JWS and return only a live Cloudbreak entitlement."""
+    def verify_transaction(
+        self,
+        signed_transaction: str,
+        *,
+        allow_inactive: bool = False,
+    ) -> VerifiedAppleTransaction:
+        """Verify a StoreKit JWS and return a configured Cloudbreak entitlement."""
         try:
             payload = self._signed_data_verifier.verify_and_decode_signed_transaction(
                 signed_transaction
@@ -134,9 +141,9 @@ class AppleSignedDataVerifier:
             raise AppleStoreTransactionError("Apple subscription transaction has no expiration")
 
         revoked_at = self._timestamp(self._value(payload, "revocationDate", "revocation_date"))
-        if revoked_at is not None:
+        if revoked_at is not None and not allow_inactive:
             raise AppleStoreRevokedError("Apple transaction has been revoked")
-        if expires_at <= datetime.now(UTC):
+        if expires_at <= datetime.now(UTC) and not allow_inactive:
             raise AppleStoreTransactionError("Apple transaction is expired")
 
         transaction_id = self._value(payload, "transactionId", "transaction_id")
@@ -147,6 +154,15 @@ class AppleSignedDataVerifier:
             raise AppleStoreTransactionError("Apple transaction identifiers are missing")
 
         offer_type = self._enum_value(self._value(payload, "offerType", "offer_type"))
+        transaction_status: Literal["trial", "active", "expired", "revoked"]
+        if revoked_at is not None:
+            transaction_status = "revoked"
+        elif expires_at <= datetime.now(UTC):
+            transaction_status = "expired"
+        elif offer_type == 1:
+            transaction_status = "trial"
+        else:
+            transaction_status = "active"
         return VerifiedAppleTransaction(
             transaction_id=str(transaction_id),
             original_transaction_id=str(original_transaction_id),
@@ -157,7 +173,7 @@ class AppleSignedDataVerifier:
             expires_at=expires_at,
             revoked_at=revoked_at,
             environment=environment,
-            status="trial" if offer_type == 1 else "active",
+            status=transaction_status,
         )
 
     def verify_notification(self, signed_payload: str) -> VerifiedAppleNotification:
@@ -171,6 +187,8 @@ class AppleSignedDataVerifier:
         return VerifiedAppleNotification(
             notification_type=str(self._value(payload, "notificationType") or ""),
             subtype=self._optional_string(self._value(payload, "subtype")),
+            notification_uuid=str(self._value(payload, "notificationUUID") or ""),
+            signed_date=self._timestamp(self._value(payload, "signedDate")),
             signed_transaction=self._optional_string(
                 self._value(data, "signedTransactionInfo") if data else None
             ),

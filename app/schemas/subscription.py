@@ -13,6 +13,12 @@ class SubscriptionVerifyRequest(BaseModel):
     signed_transaction: str = Field(min_length=20, max_length=20_000)
 
 
+class AppleWebhookRequest(BaseModel):
+    """Signed App Store Server Notifications V2 envelope."""
+
+    signed_payload: str = Field(alias="signedPayload", min_length=20, max_length=20_000)
+
+
 class SubscriptionResponse(BaseModel):
     """Current subscription entitlement returned to the mobile client."""
 

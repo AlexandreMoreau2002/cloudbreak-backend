@@ -1,15 +1,19 @@
 """Authenticated StoreKit 2 entitlement read and verification routes."""
 
-from uuid import UUID
-from typing import cast
 from datetime import datetime
+from typing import cast
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
 from app.core.config import settings
+from app.core.errors import ApiError, ErrorCode
+from app.core.dependencies import get_current_user, get_permanent_user
+from app.db.session import get_db
 from app.schemas.subscription import (
+    AppleWebhookRequest,
     SubscriptionResponse,
     SubscriptionStatus,
     SubscriptionVerifyRequest,
@@ -22,14 +26,15 @@ from app.services.apple_store import (
     AppleStoreTransactionError,
 )
 from app.services.subscription import (
+    AppleNotificationInvalid,
     SubscriptionOwnershipConflict,
+    apply_apple_notification,
     apply_verified_transaction,
     get_subscription_response,
 )
-from app.core.errors import ApiError, ErrorCode
-from app.core.dependencies import get_current_user, get_permanent_user
 
 router = APIRouter(prefix="/api/v1/user/subscription", tags=["subscription"])
+webhook_router = APIRouter(prefix="/api/v1/webhooks", tags=["apple-webhooks"])
 
 
 def get_apple_signed_data_verifier() -> AppleSignedDataVerifier:
@@ -108,3 +113,38 @@ async def verify_subscription(
         status=cast(SubscriptionStatus, subscription.status),
         expires_at=cast(datetime | None, subscription.expires_at),
     )
+
+
+@webhook_router.post("/apple", status_code=status.HTTP_204_NO_CONTENT)
+async def apple_webhook(
+    payload: AppleWebhookRequest,
+    db: AsyncSession = Depends(get_db),
+    verifier: AppleSignedDataVerifier = Depends(get_apple_signed_data_verifier),
+) -> Response:
+    """Process an App Store Server Notification V2 after signature verification."""
+    try:
+        notification = verifier.verify_notification(payload.signed_payload)
+        if notification.signed_transaction is None:
+            raise AppleNotificationInvalid("Apple notification transaction is missing")
+        transaction = verifier.verify_transaction(
+            notification.signed_transaction,
+            allow_inactive=True,
+        )
+        await apply_apple_notification(notification, transaction, db)
+        await db.commit()
+    except (
+        AppleNotificationInvalid,
+        AppleStoreBundleError,
+        AppleStoreEnvironmentError,
+        AppleStoreProductError,
+        AppleStoreTransactionError,
+        SubscriptionOwnershipConflict,
+    ):
+        await db.rollback()
+        raise ApiError(
+            status.HTTP_400_BAD_REQUEST,
+            "Notification Apple invalide",
+            ErrorCode.APPLE_TRANSACTION_INVALID,
+        ) from None
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

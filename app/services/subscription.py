@@ -1,19 +1,24 @@
-"""Persistence rules for the current Apple subscription entitlement."""
+"""Persistence rules for current Apple subscription entitlements and lifecycle events."""
 
-from typing import Any, cast
 from datetime import datetime
+from typing import Any, Literal, cast
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.apple_subscription_event import AppleSubscriptionEvent
 from app.models.subscription import Subscription
-from app.services.apple_store import VerifiedAppleTransaction
 from app.schemas.subscription import SubscriptionPlan, SubscriptionResponse, SubscriptionStatus
+from app.services.apple_store import VerifiedAppleNotification, VerifiedAppleTransaction
 
 
 class SubscriptionOwnershipConflict(Exception):
     """An Apple subscription lineage is already bound to another account."""
+
+
+class AppleNotificationInvalid(Exception):
+    """A cryptographically verified notification lacks safe entitlement data."""
 
 
 async def _get_transaction_owner(
@@ -23,6 +28,18 @@ async def _get_transaction_owner(
     result = await db.execute(
         select(Subscription)
         .where(Subscription.original_transaction_id == original_transaction_id)
+        .with_for_update()
+    )
+    return result.scalar_one_or_none()
+
+
+async def _get_processed_event(
+    notification_uuid: str,
+    db: AsyncSession,
+) -> AppleSubscriptionEvent | None:
+    result = await db.execute(
+        select(AppleSubscriptionEvent)
+        .where(AppleSubscriptionEvent.notification_uuid == notification_uuid)
         .with_for_update()
     )
     return result.scalar_one_or_none()
@@ -92,4 +109,84 @@ async def apply_verified_transaction(
         subscription = await _get_transaction_owner(transaction.original_transaction_id, db)
         if subscription is None or subscription.user_id != user_id:
             raise SubscriptionOwnershipConflict() from None
+    return subscription
+
+
+_NOTIFICATION_STATUSES: dict[str, Literal["trial", "active", "expired", "revoked"] | None] = {
+    "SUBSCRIBED": None,
+    "DID_RENEW": None,
+    "EXPIRED": "expired",
+    "REFUND": "revoked",
+}
+
+
+async def apply_apple_notification(
+    notification: VerifiedAppleNotification,
+    transaction: VerifiedAppleTransaction,
+    db: AsyncSession,
+) -> Subscription | None:
+    """Atomically record one Apple lifecycle event and update its owned entitlement.
+
+    The caller must have verified the outer notification JWS and the nested transaction JWS.
+    Duplicate notification UUIDs are explicitly harmless.
+    """
+    if not notification.notification_uuid:
+        raise AppleNotificationInvalid("Apple notification UUID is missing")
+
+    if await _get_processed_event(notification.notification_uuid, db) is not None:
+        return None
+
+    if notification.notification_type not in _NOTIFICATION_STATUSES:
+        raise AppleNotificationInvalid("Unsupported Apple notification type")
+    target_status = _NOTIFICATION_STATUSES[notification.notification_type] or transaction.status
+
+    subscription = await _get_transaction_owner(transaction.original_transaction_id, db)
+    if subscription is None:
+        if transaction.app_account_token is None:
+            raise AppleNotificationInvalid("Apple notification account token is missing")
+        user_id = str(transaction.app_account_token)
+        user_result = await db.execute(
+            select(Subscription).where(Subscription.user_id == user_id).with_for_update()
+        )
+        subscription = user_result.scalar_one_or_none()
+    else:
+        user_id = str(subscription.user_id)
+
+    if transaction.app_account_token is not None and str(transaction.app_account_token) != user_id:
+        raise SubscriptionOwnershipConflict()
+
+    created = subscription is None
+    if subscription is None:
+        subscription = Subscription(user_id=user_id)
+
+    if target_status == "revoked":
+        if transaction.revoked_at is None:
+            raise AppleNotificationInvalid("Refund notification has no revocation date")
+        effective_expiry = transaction.revoked_at
+    else:
+        effective_expiry = transaction.expires_at
+
+    event = AppleSubscriptionEvent(
+        notification_uuid=notification.notification_uuid,
+        notification_type=notification.notification_type,
+        original_transaction_id=transaction.original_transaction_id,
+        signed_date=notification.signed_date,
+    )
+    try:
+        async with db.begin_nested():
+            db.add(event)
+            if created:
+                db.add(subscription)
+            subscription_values = cast(Any, subscription)
+            subscription_values.plan = "premium"
+            subscription_values.status = target_status
+            subscription_values.expires_at = effective_expiry
+            subscription_values.original_transaction_id = transaction.original_transaction_id
+            subscription_values.latest_transaction_id = transaction.transaction_id
+            subscription_values.apple_environment = transaction.environment
+            await db.flush()
+    except IntegrityError:
+        if await _get_processed_event(notification.notification_uuid, db) is not None:
+            return None
+        raise
     return subscription

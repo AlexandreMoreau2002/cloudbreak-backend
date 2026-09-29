@@ -1,17 +1,17 @@
+from uuid import uuid4
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
 
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.models.subscription import Subscription
-from app.services.apple_store import VerifiedAppleTransaction
 from app.services.subscription import (
     SubscriptionOwnershipConflict,
     apply_verified_transaction,
     get_subscription_response,
 )
+from app.models.subscription import Subscription
+from app.services.apple_store import VerifiedAppleTransaction
 
 
 def _transaction(

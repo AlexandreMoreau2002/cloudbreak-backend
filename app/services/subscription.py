@@ -1,15 +1,15 @@
 """Persistence rules for the current Apple subscription entitlement."""
 
-from datetime import datetime
 from typing import Any, cast
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.subscription import Subscription
-from app.schemas.subscription import SubscriptionPlan, SubscriptionResponse, SubscriptionStatus
 from app.services.apple_store import VerifiedAppleTransaction
+from app.schemas.subscription import SubscriptionPlan, SubscriptionResponse, SubscriptionStatus
 
 
 class SubscriptionOwnershipConflict(Exception):

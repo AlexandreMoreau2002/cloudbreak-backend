@@ -1,8 +1,10 @@
 """Subscription — Modèle utilisateur Premium/Pro."""
 
-from app.db.session import Base
 from datetime import UTC, datetime
+
 from sqlalchemy import Column, DateTime, String
+
+from app.db.session import Base
 
 
 class Subscription(Base):

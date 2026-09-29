@@ -1,16 +1,14 @@
 """Authenticated StoreKit 2 entitlement read and verification routes."""
 
-from datetime import datetime
-from typing import cast
 from uuid import UUID
+from typing import cast
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.core.dependencies import get_current_user, get_permanent_user
-from app.core.errors import ApiError, ErrorCode
 from app.db.session import get_db
+from app.core.config import settings
 from app.schemas.subscription import (
     SubscriptionResponse,
     SubscriptionStatus,
@@ -28,6 +26,8 @@ from app.services.subscription import (
     apply_verified_transaction,
     get_subscription_response,
 )
+from app.core.errors import ApiError, ErrorCode
+from app.core.dependencies import get_current_user, get_permanent_user
 
 router = APIRouter(prefix="/api/v1/user/subscription", tags=["subscription"])
 

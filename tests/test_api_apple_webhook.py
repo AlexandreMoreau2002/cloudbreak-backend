@@ -89,6 +89,53 @@ def test_apple_webhook_projects_verified_notification_and_returns_no_content() -
     db.commit.assert_awaited_once()
 
 
+def test_apple_webhook_projects_verified_revoke_notification() -> None:
+    verifier = MagicMock()
+    notification = VerifiedAppleNotification(
+        notification_uuid="notification-revoke-123",
+        notification_type="REVOKE",
+        subtype=None,
+        signed_date=datetime.now(UTC),
+        signed_transaction="verified-revoke-transaction-jws",
+        signed_renewal_info=None,
+    )
+    transaction = VerifiedAppleTransaction(
+        transaction_id="transaction-revoke-123",
+        original_transaction_id="original-123",
+        product_id="com.alexandremoreau.cloudbreak.premium.monthly",
+        app_account_token=uuid4(),
+        expires_at=datetime.now(UTC) + timedelta(days=30),
+        revoked_at=datetime.now(UTC),
+        environment="Sandbox",
+        status="revoked",
+    )
+    verifier.verify_notification.return_value = notification
+    verifier.verify_transaction.return_value = transaction
+    db = AsyncMock()
+    app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[get_apple_signed_data_verifier] = lambda: verifier
+    with patch(
+        "app.api.v1.endpoints.subscription.apply_apple_notification",
+        new_callable=AsyncMock,
+    ) as apply_notification:
+        try:
+            with TestClient(app) as client:
+                response = client.post(
+                    "/api/v1/webhooks/apple",
+                    json={"signedPayload": "signed-apple-revoke-notification"},
+                )
+        finally:
+            app.dependency_overrides.clear()
+
+    assert response.status_code == 204
+    verifier.verify_transaction.assert_called_once_with(
+        "verified-revoke-transaction-jws",
+        allow_inactive=True,
+    )
+    apply_notification.assert_awaited_once_with(notification, transaction, db)
+    db.commit.assert_awaited_once()
+
+
 def test_apple_webhook_acknowledges_verified_test_notification_without_entitlement() -> None:
     verifier = MagicMock()
     notification = _notification()

@@ -160,6 +160,9 @@ _NOTIFICATION_STATUSES: dict[str, Literal["trial", "active", "expired", "revoked
     "DID_RENEW": None,
     "EXPIRED": "expired",
     "REFUND": "revoked",
+    "REVOKE": "revoked",
+    "REFUND_REVERSED": None,
+    "RENEWAL_EXTENDED": None,
 }
 
 
@@ -209,7 +212,7 @@ async def apply_apple_notification(
 
     if target_status == "revoked":
         if transaction.revoked_at is None:
-            raise AppleNotificationInvalid("Refund notification has no revocation date")
+            raise AppleNotificationInvalid("Revocation notification has no revocation date")
         effective_expiry = transaction.revoked_at
     else:
         effective_expiry = transaction.expires_at

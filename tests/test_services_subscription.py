@@ -221,6 +221,9 @@ async def test_get_subscription_response_returns_free_none_for_unknown_user() ->
         ("DID_RENEW", "active"),
         ("EXPIRED", "expired"),
         ("REFUND", "revoked"),
+        ("REVOKE", "revoked"),
+        ("REFUND_REVERSED", "active"),
+        ("RENEWAL_EXTENDED", "active"),
     ],
 )
 async def test_apply_apple_notification_projects_lifecycle_status(
@@ -236,7 +239,7 @@ async def test_apply_apple_notification_projects_lifecycle_status(
     transaction = _transaction(
         expires_at=datetime.now(UTC) + timedelta(days=30),
         transaction_id=f"transaction-{notification_type}",
-        revoked_at=datetime.now(UTC) if notification_type == "REFUND" else None,
+        revoked_at=datetime.now(UTC) if notification_type in {"REFUND", "REVOKE"} else None,
         status=transaction_status,
     )
     subscription = await apply_apple_notification(_notification(notification_type), transaction, db)
@@ -244,7 +247,7 @@ async def test_apply_apple_notification_projects_lifecycle_status(
     assert subscription is not None
     assert subscription.plan == "premium"
     assert subscription.status == transaction_status
-    if notification_type == "REFUND":
+    if notification_type in {"REFUND", "REVOKE"}:
         assert subscription.expires_at == transaction.revoked_at
     assert any(isinstance(call.args[0], AppleSubscriptionEvent) for call in db.add.call_args_list)
 

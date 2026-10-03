@@ -39,7 +39,8 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 
 | Recherche sommets (`GET /api/v1/peaks/search` + `GET /api/v1/peaks/{slug}`) | ✅ ILIKE, limit 20 — **publics depuis story 7.1** (onboarding pré-login, aucun JWT requis) |
 | Favoris (`POST/DELETE/GET /api/v1/user/favorites`) | ✅ Avec peak info jointe |
-| Quota freemium Redis — 1 sommet unique/jour, bypass Premium/Pro, reset minuit UTC | ✅ Story 4.1 |
+| Quota freemium Redis — 1 sommet unique/jour, bypass Premium/ancien Pro uniquement si `trial`/`active` non expiré, reset minuit UTC | ✅ Story 4.1 + 4.3 |
+| Abonnements Premium StoreKit 2 — mensuel/annuel, essai Apple 7 jours conditionnel, validation JWS serveur, restauration et notifications V2 | 🟡 Implémenté sur branche story 4.3 ; Sandbox réel / PR à valider |
 | Invités score — UUID v4 d'installation haché, quota conservé après rotation du JWT, 60 requêtes/IP/minute | ✅ Quota invité + rate limit |
 | `make seed-test` / `make unseed-test` — users de test Supabase (freemium, pro) | ✅ Story 4.1 |
 | `make clean-subscriptions` / `make reset-db` — maintenance DB dev | ✅ Story 4.1 |
@@ -56,7 +57,7 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 
 ### Ce qui n'existe pas encore
 
-- Gestion des abonnements StoreKit 2 (vérification reçus, table `subscriptions`) — story 4.3
+- Test réel App Store Connect/Sandbox des abonnements StoreKit 2 — story 4.3
 - Photo optionnelle sur validation terrain + calcul du taux de précision — story 6.2
 - Notifications push
 - Déploiement VPS (infra prod)

@@ -2,6 +2,101 @@
 
 Document de référence sécurité. À mettre à jour à chaque story qui touche auth, réseau, données ou dépendances.
 
+## 2026-09-29 Story 4.3 — Abonnements Apple StoreKit 2
+
+### 🟢 PROTECTIONS EN PLACE
+
+- **JWS Apple** : le backend utilise `app-store-server-library` (plancher `>=3.1.2,<4`) et les certificats racines Apple versionnés comme ressources publiques. Il ne décode jamais un JWS client sans vérification cryptographique préalable.
+- **Périmètre strict** : signature valide ne suffit pas ; bundle ID, environnement App Store et product ID doivent correspondre à Cloudbreak et aux deux produits explicitement autorisés.
+- **Propriété** : l'`appAccountToken` doit correspondre au UUID du JWT du compte permanent. Une lignée `original_transaction_id` déjà liée à un autre compte donne un conflit, jamais un transfert d'entitlement.
+- **Webhook** : `POST /api/v1/webhooks/apple` n'utilise pas de JWT client car Apple ne peut pas en fournir ; la signature V2 est l'authentification. `notificationUUID` rend le traitement idempotent dans la base.
+- **Droits** : le quota exige simultanément plan Premium/ancien Pro, statut `trial` ou `active` et expiration future. Expiration et révocation réappliquent donc le quota côté serveur même si l'app est hors ligne.
+- **Secrets et journaux** : clé IAP et chemin de clé viennent de Dokploy ; ni JWS, ni token, identifiant de transaction, ni UUID Supabase non masqué ne doivent être journalisés. Les erreurs publiques restent catégorisées.
+
+### 🟡 RISQUES À GARDER SOUS CONTRÔLE
+
+- Maintenir les certificats racines Apple et la dépendance de vérification à jour ; suivre les advisories de la bibliothèque Apple avant chaque release.
+- Avant production, réaliser et consigner sur appareil réel le Sandbox purchase/restore et le test App Store Server Notifications V2. Les tests automatisés ne remplacent pas la signature et le réseau Apple réels.
+
+### Verdict
+
+À REVOIR APRÈS TEST SANDBOX — la conception ferme la validation client, le rejeu inter-compte et le webhook non signé ; la preuve opérationnelle Apple reste une condition de release.
+
+---
+
+## 2026-09-29 Story 4.3 — Audit final complémentaire StoreKit 2
+
+### 🔴 CRITIQUE
+
+- **[app/services/subscription.py:_NOTIFICATION_STATUSES]** Le type V2 Apple `REVOKE`
+  (perte du droit reçu par Partage familial) n'est pas projeté vers l'état `revoked`. Il est
+  vérifié puis seulement écrit dans le ledger via `record_apple_notification`, tandis que la
+  souscription conserve `active` et son expiration future ; l'ancien membre de la famille garde
+  alors le bypass Premium jusqu'à expiration. → Ajouter `"REVOKE": "revoked"`, exiger la
+  `revocationDate` déjà contrôlée par `apply_apple_notification`, et couvrir ce cas par test
+  API/service avant merge. Apple documente explicitement `REVOKE` comme perte d'accès Family
+  Sharing pour les abonnements auto-renouvelables.
+
+### 🟡 WARNING
+
+- **[app/services/subscription.py:_NOTIFICATION_STATUSES]** `REFUND_REVERSED` et
+  `RENEWAL_EXTENDED` sont eux aussi seulement acquittés dans le ledger. Après une contestation
+  favorable ou une extension Apple, le droit en DB peut rester révoqué ou expirer avant le droit
+  Apple réel. → Projeter le `signedTransactionInfo` vérifié lorsque présent, avec les mêmes
+  protections d'ordre/idempotence ; ajouter les scénarios de tests correspondants.
+- **[app/api/v1/endpoints/subscription.py:apple_webhook]** L'endpoint public doit vérifier une
+  signature JWS avant de rejeter un payload. La limite Pydantic à 20 ko réduit la surface, mais
+  une rafale de JWS invalides peut encore consommer CPU/IO de vérification. → Mettre une limite
+  de débit/WAF ciblée au reverse proxy, calibrée pour les plages Apple, avant exposition prod.
+
+### 🔵 INFO
+
+- **[app/api/v1/endpoints/subscription.py; app/services/apple_store.py]** La vérification
+  cryptographique serveur précède toute mutation ; `bundleId`, environnement et produits sont
+  contrôlés, et `appAccountToken` est lié au `sub` JWT d'un compte non anonyme. Aucun client ne
+  peut s'accorder Premium par un état local ou un JWS arbitraire.
+- **[app/services/subscription.py]** Les contraintes uniques sur la lignée d'achat et le ledger
+  `notificationUUID`, complétées par les verrous SQL, empêchent le rejeu inter-compte et les
+  doublons de webhooks concurrents.
+
+### Verdict
+
+CORRECTIONS REQUISES AVANT MERGE — traiter `REVOKE` au minimum. Les deux warnings de
+réconciliation Apple doivent être décidés et tracés avant la release App Store.
+
+---
+
+## 2026-09-30 Story 4.3 — Ré-audit après réconciliation des événements Apple
+
+### 🔵 INFO
+
+- **[app/services/subscription.py:_NOTIFICATION_STATUSES]** `REVOKE` est désormais projeté vers
+  `revoked`. `apply_apple_notification` exige une `revocationDate` vérifiée, l'utilise comme
+  expiration effective et conserve le ledger idempotent ; un ancien membre de Partage familial
+  perd donc immédiatement le bypass Premium.
+- **[app/services/subscription.py:_NOTIFICATION_STATUSES]** `REFUND_REVERSED` et
+  `RENEWAL_EXTENDED` projettent maintenant le `signedTransactionInfo` vérifié (statut et date
+  d'expiration Apple), avec le même contrôle d'ordre par `signedDate` que les autres événements.
+  Un ancien webhook ne peut pas régresser un entitlement plus récent.
+- **[tests/test_services_subscription.py; tests/test_api_apple_webhook.py]** Les tests couvrent
+  les projections `REVOKE`, `REFUND_REVERSED` et `RENEWAL_EXTENDED`, ainsi que le passage du
+  webhook `REVOKE` par la vérification de transaction avec `allow_inactive=True`.
+
+### 🟡 WARNING
+
+- **[app/api/v1/endpoints/subscription.py:apple_webhook]** Le corps est limité à 20 Ko et la
+  signature est vérifiée avant toute mutation, mais une rafale de JWS invalides peut toujours
+  consommer le CPU de vérification. **Action infra obligatoire avant exposition production :**
+  configurer dans Traefik/Dokploy une limite de débit et, si disponible, une protection WAF
+  ciblées sur `POST /api/v1/webhooks/apple`, sans filtrage IP exclusif (les adresses Apple peuvent
+  évoluer). Cette action n'est pas implémentable dans ce dépôt backend.
+
+### Verdict
+
+SECURE POUR LA PR — aucun risque CRITIQUE ni WARNING applicatif restant sur le diff ré-audité.
+Le rate-limit Traefik documenté ci-dessus reste un prérequis d'infrastructure avant mise en
+production publique ; le test Sandbox réel reste un prérequis de release.
+
 ## 2026-09-15 Story 2.2 — Préférences de notifications
 
 ### 🔵 INFO

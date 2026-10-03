@@ -155,12 +155,14 @@ async def check_quota(
 
     # Vérifier si Premium/Pro
     subscription = await get_user_subscription(user_id, db)
-    if (
-        subscription
-        and subscription.plan in ("premium", "pro")
+    is_premium = (
+        subscription is not None
+        and subscription.plan in {"premium", "pro"}
+        and subscription.status in {"trial", "active"}
         and subscription.expires_at is not None
         and subscription.expires_at > datetime.now(UTC)
-    ):
+    )
+    if is_premium and subscription is not None:
         logger.debug(
             "quota_bypassed",
             extra={

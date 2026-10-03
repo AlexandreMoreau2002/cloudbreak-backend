@@ -1,18 +1,23 @@
 import logging
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.exc import OperationalError
 
-from app.core.config import settings
 from app.core.errors import ApiError
+from app.core.config import settings
 from app.api.v1.endpoints.user import router as user_router
 from app.api.v1.endpoints.peaks import router as peaks_router
 from app.api.v1.endpoints.score import router as score_router
 from app.api.v1.endpoints.health import router as health_router
 from app.api.v1.endpoints.favorites import router as favorites_router
 from app.api.v1.endpoints.validations import router as validations_router
+from app.api.v1.endpoints.subscription import (
+    router as subscription_router,
+    webhook_router as apple_webhook_router,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,6 +37,8 @@ app.include_router(score_router)
 app.include_router(health_router)
 app.include_router(favorites_router)
 app.include_router(validations_router)
+app.include_router(subscription_router)
+app.include_router(apple_webhook_router)
 
 
 @app.exception_handler(ApiError)

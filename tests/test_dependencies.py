@@ -208,7 +208,11 @@ async def test_check_quota_bypass_appelle_track_quota_bypassed() -> None:
     from app.core.dependencies import check_quota
     from datetime import UTC, datetime, timedelta
 
-    subscription = MagicMock(plan="premium", expires_at=datetime.now(UTC) + timedelta(days=10))
+    subscription = MagicMock(
+        plan="premium",
+        status="active",
+        expires_at=datetime.now(UTC) + timedelta(days=10),
+    )
     db = AsyncMock()
     request = MagicMock()
     request.query_params = {"peak_id": "peak-1"}

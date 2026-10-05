@@ -64,6 +64,10 @@ make migrate      # appliquer les migrations
 make migration    # créer une nouvelle migration (demande une description)
 ```
 
+En déploiement (Dokploy), l'image lance `alembic upgrade head` à chaque démarrage avant `uvicorn` :
+plus de migration manuelle. Si une migration échoue, le conteneur ne démarre pas — lire
+`docker service logs <service>`. Écrire les migrations rétro-compatibles (ajouter avant de supprimer).
+
 ## Donnees peaks
 
 Workflow safe pour enrichir ou regenerer les donnees sommets :

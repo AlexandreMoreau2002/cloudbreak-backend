@@ -9,4 +9,6 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=10.0.1.0/24"]
+# Migrations appliquées à chaque démarrage : si elles échouent, le conteneur ne démarre pas
+# (l'ancienne version reste servie pendant la mise à jour Swarm). `exec` garde uvicorn en PID 1.
+CMD ["sh", "-c", "PYTHONPATH=. alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=10.0.1.0/24"]

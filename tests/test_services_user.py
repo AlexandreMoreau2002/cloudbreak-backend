@@ -302,3 +302,88 @@ async def test_update_user_survey_records_first_skip() -> None:
     assert actual.survey_completed_at is None
     assert actual.acquisition_source is None
     db.flush.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_absent_profile_stores_email_from_token() -> None:
+    profile = User(supabase_user_id="user-123", auth_provider="email")
+    first_result = MagicMock()
+    first_result.scalar_one_or_none.return_value = None
+    second_result = MagicMock()
+    second_result.scalar_one.return_value = profile
+    db = AsyncMock()
+    db.execute.side_effect = [first_result, MagicMock(), second_result]
+
+    await get_or_create_user("user-123", "email", db, email="alex@example.com")
+
+    insert_statement = db.execute.await_args_list[1].args[0]
+    assert insert_statement.compile().params["email"] == "alex@example.com"
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_existing_profile_backfills_missing_email() -> None:
+    profile = User(supabase_user_id="user-123", auth_provider="email")
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = profile
+    db = AsyncMock()
+    db.execute.return_value = result
+
+    actual = await get_or_create_user("user-123", "email", db, email="alex@example.com")
+
+    assert actual.email == "alex@example.com"
+    db.flush.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_existing_profile_follows_email_change() -> None:
+    profile = User(supabase_user_id="user-123", auth_provider="email", email="old@example.com")
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = profile
+    db = AsyncMock()
+    db.execute.return_value = result
+
+    actual = await get_or_create_user("user-123", "email", db, email="new@example.com")
+
+    assert actual.email == "new@example.com"
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_existing_profile_keeps_email_when_token_has_none() -> None:
+    profile = User(supabase_user_id="user-123", auth_provider="email", email="alex@example.com")
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = profile
+    db = AsyncMock()
+    db.execute.return_value = result
+
+    actual = await get_or_create_user("user-123", "email", db)
+
+    assert actual.email == "alex@example.com"
+    db.flush.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_provision_user_passes_token_email() -> None:
+    profile = User(supabase_user_id="user-123", auth_provider="email")
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = profile
+    db = AsyncMock()
+    db.execute.return_value = result
+
+    actual = await provision_user(
+        {"id": "user-123", "auth_provider": "email", "email": "alex@example.com"}, db
+    )
+
+    assert actual.email == "alex@example.com"
+
+
+@pytest.mark.asyncio
+async def test_provision_user_ignores_non_string_email() -> None:
+    profile = User(supabase_user_id="user-123", auth_provider="email")
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = profile
+    db = AsyncMock()
+    db.execute.return_value = result
+
+    actual = await provision_user({"id": "user-123", "email": 42}, db)
+
+    assert actual.email is None

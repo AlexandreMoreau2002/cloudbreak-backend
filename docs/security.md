@@ -2,6 +2,24 @@
 
 Document de référence sécurité. À mettre à jour à chaque story qui touche auth, réseau, données ou dépendances.
 
+## 2026-10-05 — Colonne `users.email` (pont Supabase ↔ base applicative)
+
+### 🟡 WARNING
+
+- **Nouvelle donnée personnelle stockée** : l'email du compte est copié depuis le claim `email` du JWT
+  Supabase (déjà validé localement) dans `users.email`, pour pouvoir relier une ligne (UUID) à un compte
+  lisible. Aucun appel Supabase supplémentaire. Colonne nullable (comptes anonymes sans email) ; remplie
+  au premier appel `provision` / `survey` / `preferences` / `notifications`, puis mise à jour si l'email change.
+- **Non exposée par l'API** : absente de `UserProfile` et de `GET /user/me`.
+- **Jamais loggée** (ni dans `extra`, ni dans les messages).
+- **RGPD** : supprimée avec le compte (`DELETE /api/v1/user` supprime la ligne `users`) ; elle figure dans
+  les sauvegardes Postgres (rétention 14 j). La politique de confidentialité (`ops/src/content/`) doit
+  mentionner que l'email est conservé par le backend en plus de Supabase.
+
+### Verdict
+
+Acceptable, à condition de mettre à jour la politique de confidentialité avant la 1.0.0.
+
 ## 2026-09-29 Story 4.3 — Abonnements Apple StoreKit 2
 
 ### 🟢 PROTECTIONS EN PLACE

@@ -135,3 +135,20 @@ def test_module_main_guard_invokes_main(monkeypatch: pytest.MonkeyPatch) -> None
     run.assert_called_once()
     assert inspect.iscoroutine(run.call_args.args[0])
     run.call_args.args[0].close()
+
+
+def test_seeded_premium_accounts_are_really_entitled() -> None:
+    from app.domain.entitlement import is_entitlement_active
+
+    for name in ("pro", "test"):
+        user = seed_test_users.TEST_USERS[name]
+        assert user["plan"] == "premium"
+        assert is_entitlement_active(
+            str(user["plan"]),
+            str(user["status"]),
+            user["expires_at"],  # type: ignore[arg-type]
+        )
+
+    freemium = seed_test_users.TEST_USERS["freemium"]
+    assert freemium["plan"] == "free"
+    assert freemium["status"] == "none"

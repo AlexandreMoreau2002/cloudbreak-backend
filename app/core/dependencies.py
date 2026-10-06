@@ -1,6 +1,6 @@
 import logging
 from uuid import UUID
-from typing import Any
+from typing import Any, cast
 from hashlib import sha256
 from datetime import UTC, datetime
 
@@ -16,6 +16,7 @@ from app.core.errors import ApiError, ErrorCode
 from app.services.analytics import track
 from app.models.subscription import Subscription
 from app.core.security import decode_supabase_jwt
+from app.domain.entitlement import is_entitlement_active
 from app.services.quota import QuotaService, QuotaExceededException
 from app.services.rate_limit import RateLimitService, RateLimitExceededException
 
@@ -155,12 +156,10 @@ async def check_quota(
 
     # Vérifier si Premium/Pro
     subscription = await get_user_subscription(user_id, db)
-    is_premium = (
-        subscription is not None
-        and subscription.plan in {"premium", "pro"}
-        and subscription.status in {"trial", "active"}
-        and subscription.expires_at is not None
-        and subscription.expires_at > datetime.now(UTC)
+    is_premium = subscription is not None and is_entitlement_active(
+        cast(str | None, subscription.plan),
+        cast(str | None, subscription.status),
+        cast(datetime | None, subscription.expires_at),
     )
     if is_premium and subscription is not None:
         logger.debug(

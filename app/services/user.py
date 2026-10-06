@@ -43,17 +43,30 @@ async def delete_user_data(user_id: str, db: AsyncSession) -> None:
     )
 
 
-async def get_or_create_user(user_id: str, auth_provider: str, db: AsyncSession) -> User:
+def _token_email(user: dict[str, object]) -> str | None:
+    """Email du claim JWT, ou None (compte anonyme, claim absent ou invalide)."""
+    email = user.get("email")
+    return email if isinstance(email, str) and email else None
+
+
+async def get_or_create_user(
+    user_id: str, auth_provider: str, db: AsyncSession, email: str | None = None
+) -> User:
     result = await db.execute(select(User).where(User.supabase_user_id == user_id))
     user = result.scalar_one_or_none()
     if user is None:
         await db.execute(
             insert(User)
-            .values(supabase_user_id=user_id, auth_provider=auth_provider)
+            .values(supabase_user_id=user_id, auth_provider=auth_provider, email=email)
             .on_conflict_do_nothing(index_elements=[User.supabase_user_id])
         )
         result = await db.execute(select(User).where(User.supabase_user_id == user_id))
         user = result.scalar_one()
+    elif email is not None and user.email != email:
+        # Rattrape les lignes antérieures à la colonne et suit un changement d'email Supabase.
+        # L'email n'est volontairement pas loggué (donnée personnelle).
+        user.email = email  # type: ignore[assignment]
+        await db.flush()
     return user
 
 
@@ -63,13 +76,17 @@ async def get_user_profile(user_id: str, db: AsyncSession) -> User | None:
 
 
 async def provision_user(user: dict[str, object], db: AsyncSession) -> User:
-    return await get_or_create_user(str(user["id"]), str(user.get("auth_provider", "email")), db)
+    return await get_or_create_user(
+        str(user["id"]), str(user.get("auth_provider", "email")), db, _token_email(user)
+    )
 
 
 async def update_user_survey(
     user: dict[str, object], survey: SurveyUpdate, db: AsyncSession
 ) -> User:
-    profile = await get_or_create_user(str(user["id"]), str(user.get("auth_provider", "email")), db)
+    profile = await get_or_create_user(
+        str(user["id"]), str(user.get("auth_provider", "email")), db, _token_email(user)
+    )
     if profile.survey_completed_at is not None or profile.survey_skipped_at is not None:
         return profile
     if survey.skipped:
@@ -93,7 +110,9 @@ async def update_user_preferences(
     Contrairement au sondage (`update_user_survey`), il n'y a pas de champ terminal :
     l'utilisateur peut retirer son consentement à tout moment (RGPD art. 7-3).
     """
-    profile = await get_or_create_user(str(user["id"]), str(user.get("auth_provider", "email")), db)
+    profile = await get_or_create_user(
+        str(user["id"]), str(user.get("auth_provider", "email")), db, _token_email(user)
+    )
     # mypy voit la colonne comme `Column[bool]` sur une affectation d'un `bool` nu
     # (friction stubs SQLAlchemy, cf. `favorites.py` / `validations.py`).
     profile.newsletter_opt_in = prefs.newsletter_opt_in  # type: ignore[assignment]
@@ -110,7 +129,9 @@ async def update_user_notification_preferences(
     préférences ne sont pas touchées) — contrairement à `update_user_preferences` qui
     n'a qu'un seul champ toujours requis.
     """
-    profile = await get_or_create_user(str(user["id"]), str(user.get("auth_provider", "email")), db)
+    profile = await get_or_create_user(
+        str(user["id"]), str(user.get("auth_provider", "email")), db, _token_email(user)
+    )
     for field, value in prefs.model_dump(exclude_unset=True).items():
         setattr(profile, field, value)
     await db.flush()

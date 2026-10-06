@@ -1,7 +1,9 @@
 """
 Seed — Users de test pour development.
 
-Crée des comptes de test avec différents plans (freemium, pro, premium).
+Crée des comptes de test : freemium (gratuit) et deux comptes Premium actifs
+(plan=premium, status=active).
+Le quota n'est levé que si status ∈ {trial, active} ET expires_at est dans le futur.
 Chaque compte correspond à un user Supabase réel (UUIDs Supabase cloud).
 
 Usage:
@@ -31,18 +33,21 @@ TEST_USERS: dict[str, dict[str, str | datetime | None]] = {
         "user_id": "ddce4acf-4588-4916-bb8e-8e47de082e7b",
         "email": "freemium@cloudbreak.app",
         "plan": "free",
+        "status": "none",
         "expires_at": None,  # Pas d'expiration (free)
     },
     "pro": {
         "user_id": "d19f15c6-ab8c-4eee-89a2-cc3c2342a3a5",
         "email": "pro@cloudbreak.app",
-        "plan": "pro",
+        "plan": "premium",
+        "status": "active",
         "expires_at": datetime.now(UTC) + timedelta(days=365),
     },
     "test": {
         "user_id": "6f12c6e6-5478-4301-8494-83ab039c53aa",
         "email": "test@cloudbreak.app",
-        "plan": "pro",
+        "plan": "premium",
+        "status": "active",
         "expires_at": datetime.now(UTC) + timedelta(days=365),
     },
 }
@@ -63,6 +68,7 @@ async def seed_test_users() -> None:
             subscription = Subscription(
                 user_id=str(user_data["user_id"]),
                 plan=str(user_data["plan"]),
+                status=str(user_data["status"]),
                 expires_at=user_data["expires_at"],
             )
             session.add(subscription)

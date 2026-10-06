@@ -774,3 +774,53 @@ async def test_non_entitlement_lifecycle_events_are_ledger_only(notification_typ
             found_subscription.expires_at,
             found_subscription.latest_transaction_id,
         ) == subscription_state
+
+
+def _stored_subscription(plan: str, status: str, expires_at: datetime | None) -> MagicMock:
+    subscription = MagicMock()
+    subscription.plan = plan
+    subscription.status = status
+    subscription.expires_at = expires_at
+    return subscription
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("plan", "status", "expires_delta", "expected_plan", "expected_status"),
+    [
+        ("premium", "active", timedelta(days=30), "premium", "active"),
+        ("premium", "trial", timedelta(days=3), "premium", "trial"),
+        ("pro", "active", timedelta(days=30), "premium", "active"),
+        ("pro", "none", timedelta(days=365), "free", "none"),
+        ("premium", "expired", timedelta(days=-1), "free", "expired"),
+        ("premium", "revoked", timedelta(days=-1), "free", "revoked"),
+        ("premium", "active", timedelta(days=-1), "free", "active"),
+        ("premium", "weird", timedelta(days=30), "free", "none"),
+    ],
+)
+async def test_get_subscription_response_reports_effective_plan(
+    plan: str,
+    status: str,
+    expires_delta: timedelta,
+    expected_plan: str,
+    expected_status: str,
+) -> None:
+    stored = _stored_subscription(plan, status, datetime.now(UTC) + expires_delta)
+    found = MagicMock()
+    found.scalar_one_or_none.return_value = stored
+    db = MagicMock()
+    db.execute = AsyncMock(return_value=found)
+
+    response = await get_subscription_response("user-1", db)
+
+    assert response.plan == expected_plan
+    assert response.status == expected_status
+
+
+def test_build_subscription_response_matches_get_response_rules() -> None:
+    from app.services.subscription import build_subscription_response
+
+    expiry = datetime.now(UTC) + timedelta(days=30)
+    response = build_subscription_response(_stored_subscription("premium", "active", expiry))
+
+    assert (response.plan, response.status, response.expires_at) == ("premium", "active", expiry)

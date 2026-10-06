@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.entitlement import effective_plan
 from app.models.apple_subscription_event import AppleSubscriptionEvent
 from app.models.subscription import Subscription
 from app.schemas.subscription import SubscriptionPlan, SubscriptionResponse, SubscriptionStatus
@@ -101,24 +102,27 @@ async def record_apple_notification(
     return True
 
 
+def build_subscription_response(subscription: Subscription) -> SubscriptionResponse:
+    """Réponse API : `plan` reflète l'entitlement réel (actif, non expiré), pas la colonne brute."""
+    known_statuses = {"trial", "active", "expired", "revoked"}
+    stored_status = cast(str | None, subscription.status)
+    expires_at = cast(datetime | None, subscription.expires_at)
+    status: SubscriptionStatus = (
+        cast(SubscriptionStatus, stored_status) if stored_status in known_statuses else "none"
+    )
+    plan: SubscriptionPlan = effective_plan(
+        cast(str | None, subscription.plan), stored_status, expires_at
+    )
+    return SubscriptionResponse(plan=plan, status=status, expires_at=expires_at)
+
+
 async def get_subscription_response(user_id: str, db: AsyncSession) -> SubscriptionResponse:
     """Return a safe, free entitlement when no current subscription exists."""
     result = await db.execute(select(Subscription).where(Subscription.user_id == user_id))
     subscription = result.scalar_one_or_none()
     if subscription is None:
         return SubscriptionResponse(plan="free", status="none", expires_at=None)
-
-    plan: SubscriptionPlan = "premium" if subscription.plan in {"premium", "pro"} else "free"
-    known_statuses = {"trial", "active", "expired", "revoked"}
-    stored_status = cast(str | None, subscription.status)
-    status: SubscriptionStatus = (
-        cast(SubscriptionStatus, stored_status) if stored_status in known_statuses else "none"
-    )
-    return SubscriptionResponse(
-        plan=plan,
-        status=status,
-        expires_at=cast(datetime | None, subscription.expires_at),
-    )
+    return build_subscription_response(subscription)
 
 
 async def apply_verified_transaction(

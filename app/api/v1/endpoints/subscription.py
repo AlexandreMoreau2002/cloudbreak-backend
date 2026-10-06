@@ -1,7 +1,5 @@
 """Authenticated StoreKit 2 entitlement read and verification routes."""
 
-from datetime import datetime
-from typing import cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
@@ -15,7 +13,6 @@ from app.db.session import get_db
 from app.schemas.subscription import (
     AppleWebhookRequest,
     SubscriptionResponse,
-    SubscriptionStatus,
     SubscriptionVerifyRequest,
 )
 from app.services.apple_store import (
@@ -30,6 +27,7 @@ from app.services.subscription import (
     SubscriptionOwnershipConflict,
     apply_apple_notification,
     apply_verified_transaction,
+    build_subscription_response,
     get_subscription_response,
     is_entitlement_notification,
     record_apple_notification,
@@ -110,11 +108,7 @@ async def verify_subscription(
             ErrorCode.SUBSCRIPTION_OWNERSHIP_CONFLICT,
         ) from None
 
-    return SubscriptionResponse(
-        plan="premium" if subscription.plan in {"premium", "pro"} else "free",
-        status=cast(SubscriptionStatus, subscription.status),
-        expires_at=cast(datetime | None, subscription.expires_at),
-    )
+    return build_subscription_response(subscription)
 
 
 @webhook_router.post("/apple", status_code=status.HTTP_204_NO_CONTENT)

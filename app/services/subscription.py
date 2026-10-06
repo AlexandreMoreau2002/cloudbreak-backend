@@ -217,13 +217,16 @@ async def apply_apple_notification(
     else:
         effective_expiry = transaction.expires_at
 
-    should_project = True
+    stale_revocation = False
     if not created:
         if (
             target_status == "revoked"
             and transaction.transaction_id != subscription.latest_transaction_id
         ):
-            should_project = False
+            stale_revocation = True
+
+    should_project = not stale_revocation
+    if not created:
         latest_signed_date = await _get_latest_event_signed_date(
             transaction.original_transaction_id,
             db,
@@ -244,7 +247,7 @@ async def apply_apple_notification(
         notification_uuid=notification.notification_uuid,
         notification_type=notification.notification_type,
         original_transaction_id=transaction.original_transaction_id,
-        signed_date=notification.signed_date,
+        signed_date=None if stale_revocation else notification.signed_date,
     )
     try:
         async with db.begin_nested():

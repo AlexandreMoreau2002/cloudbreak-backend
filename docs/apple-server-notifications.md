@@ -22,7 +22,9 @@ Les paramètres non secrets à vérifier avant chaque essai sont `ENVIRONMENT`, 
 | `SUBSCRIBED`, `DID_RENEW`, `EXPIRED` | Vérification de la transaction imbriquée, ledger et projection | Statut et expiration mis à jour selon l'événement et la transaction |
 | `REFUND`, `REVOKE`, `REFUND_REVERSED`, `RENEWAL_EXTENDED` | Vérification de la transaction imbriquée, ledger et projection | Révocation ou rétablissement/extension selon l'événement vérifié |
 
-Un événement de droit sans transaction imbriquée passe dans le ledger sans projection. Les doublons sont sans effet supplémentaire. Un événement ancien ne doit pas remplacer une projection plus récente. Le backend conserve `plan=premium`, le statut et l'expiration ; il ne stocke pas la périodicité mensuelle ou annuelle.
+Un événement de droit sans transaction imbriquée passe dans le ledger sans projection. Les doublons sont sans effet supplémentaire. Le backend conserve `plan=premium`, le statut et deux dates distinctes : `expires_at` est la fin effective du droit (ramenée à `revocationDate` après remboursement/révocation), tandis que `apple_period_expires_at` garde la fin de la période payée vérifiée dans la transaction Apple. Une transaction d'une période strictement plus ancienne reste dans le ledger sans modifier le droit. Pour une même période, la date de signature du webhook empêche un renouvellement retardé d'annuler une révocation plus récente ; une vérification client ne peut pas non plus réactiver une période révoquée. Le backend ne stocke pas la périodicité mensuelle ou annuelle.
+
+La migration ajoutant `apple_period_expires_at` est **en attente de déploiement** ; elle crée une colonne nullable sans reprise des lignes existantes. Pour une ancienne ligne non révoquée, le service emploie `expires_at` comme repère de période jusqu'à la prochaine transaction vérifiée. Une ancienne ligne révoquée ne déduit jamais la fin de période de sa date de révocation.
 
 ## Preuves opérationnelles distinctes
 

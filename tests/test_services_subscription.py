@@ -385,6 +385,7 @@ async def test_stale_refund_does_not_suppress_later_delivery_of_current_revocati
         _transaction(
             original_transaction_id=current_transaction.original_transaction_id,
             transaction_id="transaction-A",
+            expires_at=now + timedelta(days=15),
             revoked_at=now - timedelta(days=1),
             status="revoked",
         ),
@@ -474,7 +475,7 @@ async def test_stale_refund_does_not_suppress_later_delivery_of_current_revocati
     )
     older_transaction_snapshot = replace(
         current_transaction,
-        expires_at=now + timedelta(days=60),
+        expires_at=current_transaction.expires_at,
         revoked_at=None,
         status="active",
     )
@@ -551,6 +552,160 @@ async def test_refund_for_current_transaction_revokes_subscription() -> None:
     assert subscription.expires_at == transaction.revoked_at
     assert subscription.latest_transaction_id == transaction.transaction_id
     assert any(isinstance(call.args[0], AppleSubscriptionEvent) for call in db.add.call_args_list)
+
+
+@pytest.mark.asyncio
+async def test_newer_refund_remains_revoked_after_earlier_signed_renewal_arrives() -> None:
+    now = datetime.now(UTC)
+    period_a = now + timedelta(days=30)
+    period_b = now + timedelta(days=60)
+    refund = _transaction(
+        transaction_id="transaction-B",
+        expires_at=period_b,
+        revoked_at=now,
+        status="revoked",
+    )
+    subscription = Subscription(
+        user_id=str(refund.app_account_token),
+        plan="premium",
+        status="active",
+        original_transaction_id=refund.original_transaction_id,
+        latest_transaction_id="transaction-A",
+        expires_at=period_a,
+    )
+    renewal = replace(refund, revoked_at=None, status="active")
+    empty = MagicMock()
+    empty.scalar_one_or_none.return_value = None
+    owner = MagicMock()
+    owner.scalar_one_or_none.return_value = subscription
+    previous_date = MagicMock()
+    previous_date.scalar_one_or_none.return_value = now - timedelta(days=1)
+    refund_date = MagicMock()
+    refund_date.scalar_one_or_none.return_value = now
+    db = MagicMock()
+    db.execute = AsyncMock(side_effect=[empty, owner, previous_date, empty, owner, refund_date])
+    db.flush = AsyncMock()
+    refund_notification = replace(
+        _notification("REFUND"), notification_uuid="refund-B", signed_date=now
+    )
+    renewal_notification = replace(
+        _notification("DID_RENEW"),
+        notification_uuid="renewal-B",
+        signed_date=now - timedelta(hours=1),
+    )
+
+    await apply_apple_notification(refund_notification, refund, db)
+    assert subscription.status == "revoked"
+    assert subscription.expires_at == now
+    assert subscription.apple_period_expires_at == period_b
+
+    await apply_apple_notification(renewal_notification, renewal, db)
+    assert subscription.status == "revoked"
+    assert subscription.expires_at == now
+    assert subscription.apple_period_expires_at == period_b
+
+
+@pytest.mark.asyncio
+async def test_older_refund_after_newer_renewal_is_ledger_only() -> None:
+    now = datetime.now(UTC)
+    period_a = now + timedelta(days=30)
+    period_b = now + timedelta(days=60)
+    refund = _transaction(
+        transaction_id="transaction-A",
+        expires_at=period_a,
+        revoked_at=now,
+        status="revoked",
+    )
+    subscription = Subscription(
+        user_id=str(refund.app_account_token),
+        plan="premium",
+        status="active",
+        original_transaction_id=refund.original_transaction_id,
+        latest_transaction_id="transaction-B",
+        expires_at=period_b,
+        apple_period_expires_at=period_b,
+    )
+    empty = MagicMock()
+    empty.scalar_one_or_none.return_value = None
+    owner = MagicMock()
+    owner.scalar_one_or_none.return_value = subscription
+    previous_date = MagicMock()
+    previous_date.scalar_one_or_none.return_value = now - timedelta(days=1)
+    db = MagicMock()
+    db.execute = AsyncMock(side_effect=[empty, owner, previous_date])
+    db.flush = AsyncMock()
+    notification = replace(_notification("REFUND"), signed_date=now)
+
+    await apply_apple_notification(notification, refund, db)
+
+    assert subscription.status == "active"
+    assert subscription.expires_at == period_b
+    assert subscription.apple_period_expires_at == period_b
+    assert subscription.latest_transaction_id == "transaction-B"
+    event = next(
+        call.args[0]
+        for call in db.add.call_args_list
+        if isinstance(call.args[0], AppleSubscriptionEvent)
+    )
+    assert event.signed_date is None
+
+
+@pytest.mark.asyncio
+async def test_client_verification_cannot_restore_revoked_current_period() -> None:
+    now = datetime.now(UTC)
+    period_b = now + timedelta(days=60)
+    transaction = _transaction(transaction_id="transaction-B", expires_at=period_b, status="active")
+    subscription = Subscription(
+        user_id=str(transaction.app_account_token),
+        plan="premium",
+        status="revoked",
+        original_transaction_id=transaction.original_transaction_id,
+        latest_transaction_id=transaction.transaction_id,
+        expires_at=now,
+        apple_period_expires_at=period_b,
+    )
+    owner = MagicMock()
+    owner.scalar_one_or_none.return_value = subscription
+    db = MagicMock()
+    db.execute = AsyncMock(return_value=owner)
+    db.flush = AsyncMock()
+
+    result = await apply_verified_transaction(str(transaction.app_account_token), transaction, db)
+
+    assert result is subscription
+    assert subscription.status == "revoked"
+    assert subscription.expires_at == now
+    assert subscription.apple_period_expires_at == period_b
+    db.flush.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_client_verification_can_project_strictly_newer_verified_period() -> None:
+    now = datetime.now(UTC)
+    period_b = now + timedelta(days=30)
+    period_c = now + timedelta(days=60)
+    transaction = _transaction(transaction_id="transaction-B", expires_at=period_c, status="active")
+    subscription = Subscription(
+        user_id=str(transaction.app_account_token),
+        plan="premium",
+        status="revoked",
+        original_transaction_id=transaction.original_transaction_id,
+        latest_transaction_id=transaction.transaction_id,
+        expires_at=now,
+        apple_period_expires_at=period_b,
+    )
+    owner = MagicMock()
+    owner.scalar_one_or_none.return_value = subscription
+    db = MagicMock()
+    db.execute = AsyncMock(return_value=owner)
+    db.flush = AsyncMock()
+
+    result = await apply_verified_transaction(str(transaction.app_account_token), transaction, db)
+
+    assert result is subscription
+    assert subscription.status == "active"
+    assert subscription.expires_at == period_c
+    assert subscription.apple_period_expires_at == period_c
 
 
 @pytest.mark.asyncio

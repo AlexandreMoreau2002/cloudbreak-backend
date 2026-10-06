@@ -4,9 +4,15 @@ Document de référence sécurité. À mettre à jour à chaque story qui touche
 
 ## 2026-10-06 Story 4.3 — Ré-audit des notifications serveur Apple
 
-### 🟡 WARNING
+### Correctif de classement des périodes — en attente de déploiement
 
-- **[app/services/subscription.py:apply_apple_notification]** Un `REFUND` ou `REVOKE` signé pour une ancienne transaction de la même lignée peut arriver après un renouvellement plus récent. Le garde-fou actuel compare la date de signature aux événements du ledger, mais ne compare pas la transaction révoquée à `latest_transaction_id` ni sa période à l'expiration courante. Si Apple signe le remboursement après le renouvellement, il peut remplacer un droit actif récent par `revoked`. → Consigner l'événement sans projeter la révocation lorsqu'il concerne une période déjà dépassée par la transaction courante ; ajouter un test où l'ancienne transaction est remboursée après `DID_RENEW` et où le droit Premium actuel reste actif.
+- La nouvelle colonne nullable `apple_period_expires_at` garde la fin de la période payée issue de la transaction Apple vérifiée. `expires_at` reste la fin effective du droit et prend `revocationDate` lors d'une révocation. La migration ne modifie aucune ligne existante et n'a pas encore été appliquée en environnement déployé.
+- Le service compare les fins de période pour écarter du droit un remboursement d'une ancienne période, même s'il est signé après le renouvellement. Une révocation d'une période plus récente est projetée même si son identifiant de transaction diffère du courant. Le contrôle de `signedDate` protège ensuite cette même période contre un renouvellement livré en retard ; la vérification client ne rétablit pas une période courante révoquée.
+- Les anciennes lignes non révoquées utilisent temporairement leur `expires_at` comme repère. Pour une ancienne ligne révoquée sans repère, la date effective de révocation n'est pas interprétée comme fin de période payée.
+
+### Constats initiaux, résolus dans la branche
+
+- **[app/services/subscription.py:apply_apple_notification]** Le ré-audit initial a trouvé qu'un `REFUND` ou `REVOKE` signé pour une ancienne transaction pouvait arriver après un renouvellement récent. Le service compare désormais les fins de périodes Apple vérifiées ; un remboursement de période antérieure reste dans le ledger sans modifier le droit actif.
 
 ### 🔵 INFO
 
@@ -14,9 +20,9 @@ Document de référence sécurité. À mettre à jour à chaque story qui touche
 
 ### Verdict
 
-WARNING à corriger avant release. Le scénario de remboursement tardif contredit la garantie générale selon laquelle aucun événement ancien ne peut régresser un droit récent ; les tests existants ne couvrent que le cas où `signed_date` est antérieur au dernier événement du ledger.
+Le défaut applicatif de classement des périodes est corrigé dans cette branche, avec migration encore à déployer. Le scénario de remboursement tardif et la révocation d'une nouvelle période sont couverts par les tests ciblés.
 
-Résolution : seuls un `REFUND` ou `REVOKE` pour la transaction courante projettent la révocation. Un remboursement ancien reste dans le ledger avec `signed_date=None`; la requête du dernier `signed_date` filtre les valeurs nulles avant le tri descendant. L'événement ancien est ainsi exclu du curseur d'ordre. Les tests couvrent un remboursement ancien signé après un renouvellement, puis une révocation courante livrée avec une date antérieure, ainsi qu'un événement courant plus ancien qui ne doit pas régresser l'état.
+Un remboursement ancien reste dans le ledger avec `signed_date=None`; la requête du dernier `signed_date` filtre les valeurs nulles avant le tri descendant. L'événement ancien est ainsi exclu du curseur d'ordre. Une révocation d'une période plus récente projette même si son ID de transaction est nouveau. Les tests couvrent aussi un renouvellement retardé de cette même période et une vérification client d'une période déjà révoquée.
 
 ---
 

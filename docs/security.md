@@ -2,6 +2,24 @@
 
 Document de référence sécurité. À mettre à jour à chaque story qui touche auth, réseau, données ou dépendances.
 
+## 2026-10-06 Story 4.3 — Ré-audit des notifications serveur Apple
+
+### 🟡 WARNING
+
+- **[app/services/subscription.py:apply_apple_notification]** Un `REFUND` ou `REVOKE` signé pour une ancienne transaction de la même lignée peut arriver après un renouvellement plus récent. Le garde-fou actuel compare la date de signature aux événements du ledger, mais ne compare pas la transaction révoquée à `latest_transaction_id` ni sa période à l'expiration courante. Si Apple signe le remboursement après le renouvellement, il peut remplacer un droit actif récent par `revoked`. → Consigner l'événement sans projeter la révocation lorsqu'il concerne une période déjà dépassée par la transaction courante ; ajouter un test où l'ancienne transaction est remboursée après `DID_RENEW` et où le droit Premium actuel reste actif.
+
+### 🔵 INFO
+
+- **[docs/apple-server-notifications.md ; docs/apple-server-notifications/guide-test.md]** La livraison réelle V2, le callback 204 et une projection d'abonnement ne sont pas présentés comme observés. La configuration et le `GET /health` sont distingués de ces preuves manquantes.
+
+### Verdict
+
+WARNING à corriger avant release. Le scénario de remboursement tardif contredit la garantie générale selon laquelle aucun événement ancien ne peut régresser un droit récent ; les tests existants ne couvrent que le cas où `signed_date` est antérieur au dernier événement du ledger.
+
+Résolution round 1 : `REFUND` et `REVOKE` dont le `transaction_id` ne correspond pas à la transaction courante sont maintenant conservés dans le ledger sans projection. Un test avec un `signedDate` postérieur confirme que le droit actif, l'expiration et la dernière transaction restent inchangés ; un remboursement de la transaction courante continue d'être projeté.
+
+---
+
 ## 2026-10-06 — Notifications serveur Apple, état DEV / Sandbox
 
 ### Protections vérifiées dans le code

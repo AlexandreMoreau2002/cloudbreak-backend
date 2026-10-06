@@ -219,6 +219,11 @@ async def apply_apple_notification(
 
     should_project = True
     if not created:
+        if (
+            target_status == "revoked"
+            and transaction.transaction_id != subscription.latest_transaction_id
+        ):
+            should_project = False
         latest_signed_date = await _get_latest_event_signed_date(
             transaction.original_transaction_id,
             db,

@@ -138,11 +138,17 @@ def test_apple_webhook_projects_verified_revoke_notification() -> None:
 
 
 @pytest.mark.parametrize(
-    "notification_type",
-    ["DID_CHANGE_RENEWAL_PREF", "DID_FAIL_TO_RENEW", "GRACE_PERIOD_EXPIRED"],
+    ("notification_type", "signed_transaction"),
+    [
+        ("DID_CHANGE_RENEWAL_PREF", "verified-transaction-jws"),
+        ("DID_FAIL_TO_RENEW", "verified-transaction-jws"),
+        ("GRACE_PERIOD_EXPIRED", "verified-transaction-jws"),
+        ("TEST", None),
+    ],
 )
 def test_apple_webhook_acknowledges_policy_events_without_entitlement(
     notification_type: str,
+    signed_transaction: str | None,
 ) -> None:
     verifier = MagicMock()
     notification = VerifiedAppleNotification(
@@ -150,7 +156,7 @@ def test_apple_webhook_acknowledges_policy_events_without_entitlement(
         notification_type=notification_type,
         subtype=None,
         signed_date=datetime.now(UTC),
-        signed_transaction=None,
+        signed_transaction=signed_transaction,
         signed_renewal_info=None,
     )
     verifier.verify_notification.return_value = notification
@@ -161,16 +167,21 @@ def test_apple_webhook_acknowledges_policy_events_without_entitlement(
         "app.api.v1.endpoints.subscription.record_apple_notification",
         new_callable=AsyncMock,
     ) as record_notification:
-        try:
-            with TestClient(app) as client:
-                response = client.post(
-                    "/api/v1/webhooks/apple",
-                    json={"signedPayload": "signed-apple-notification"},
-                )
-        finally:
-            app.dependency_overrides.clear()
+        with patch(
+            "app.api.v1.endpoints.subscription.apply_apple_notification",
+            new_callable=AsyncMock,
+        ) as apply_notification:
+            try:
+                with TestClient(app) as client:
+                    response = client.post(
+                        "/api/v1/webhooks/apple",
+                        json={"signedPayload": "signed-apple-notification"},
+                    )
+            finally:
+                app.dependency_overrides.clear()
 
     assert response.status_code == 204
     verifier.verify_transaction.assert_not_called()
+    apply_notification.assert_not_awaited()
     record_notification.assert_awaited_once_with(notification, db)
     db.commit.assert_awaited_once()

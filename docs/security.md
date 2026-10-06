@@ -16,7 +16,7 @@ Document de référence sécurité. À mettre à jour à chaque story qui touche
 
 WARNING à corriger avant release. Le scénario de remboursement tardif contredit la garantie générale selon laquelle aucun événement ancien ne peut régresser un droit récent ; les tests existants ne couvrent que le cas où `signed_date` est antérieur au dernier événement du ledger.
 
-Résolution : seuls un `REFUND` ou `REVOKE` pour la transaction courante projettent la révocation. Un remboursement ancien reste dans le ledger avec `signed_date=None` : il ne projette pas l'état courant et n'avance pas le curseur d'ordre des événements. Les tests couvrent le remboursement ancien signé après un renouvellement et une révocation courante livrée ensuite avec une date de signature antérieure.
+Résolution : seuls un `REFUND` ou `REVOKE` pour la transaction courante projettent la révocation. Un remboursement ancien reste dans le ledger avec `signed_date=None`; la requête du dernier `signed_date` filtre les valeurs nulles avant le tri descendant. L'événement ancien est ainsi exclu du curseur d'ordre. Les tests couvrent un remboursement ancien signé après un renouvellement, puis une révocation courante livrée avec une date antérieure, ainsi qu'un événement courant plus ancien qui ne doit pas régresser l'état.
 
 ---
 

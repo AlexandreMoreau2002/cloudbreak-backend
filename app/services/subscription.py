@@ -51,7 +51,10 @@ async def _get_latest_event_signed_date(
 ) -> datetime | None:
     result = await db.execute(
         select(AppleSubscriptionEvent.signed_date)
-        .where(AppleSubscriptionEvent.original_transaction_id == original_transaction_id)
+        .where(
+            AppleSubscriptionEvent.original_transaction_id == original_transaction_id,
+            AppleSubscriptionEvent.signed_date.is_not(None),
+        )
         .order_by(AppleSubscriptionEvent.signed_date.desc())
         .limit(1)
     )

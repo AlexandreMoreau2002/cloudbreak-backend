@@ -7,7 +7,7 @@ import sqlalchemy as sa
 
 
 revision: str = "e5f4a0000002"
-down_revision: str | None = "d4e3f0000001"
+down_revision: str | None = "c8d1e5f2a7b3"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

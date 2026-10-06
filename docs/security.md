@@ -2,6 +2,49 @@
 
 Document de référence sécurité. À mettre à jour à chaque story qui touche auth, réseau, données ou dépendances.
 
+## 2026-10-06 Story 4.3 — Ré-audit des notifications serveur Apple
+
+### Correctif de classement des périodes — en attente de déploiement
+
+- La nouvelle colonne nullable `apple_period_expires_at` garde la fin de la période payée issue de la transaction Apple vérifiée. `expires_at` reste la fin effective du droit et prend `revocationDate` lors d'une révocation. La migration ne modifie aucune ligne existante et n'a pas encore été appliquée en environnement déployé.
+- Le service compare les fins de période pour écarter du droit un remboursement d'une ancienne période, même s'il est signé après le renouvellement. Une révocation d'une période plus récente est projetée même si son identifiant de transaction diffère du courant. Le contrôle de `signedDate` protège ensuite cette même période contre un renouvellement livré en retard ; la vérification client ne rétablit pas une période courante révoquée.
+- Les anciennes lignes non révoquées utilisent temporairement leur `expires_at` comme repère. Pour une ancienne ligne révoquée sans repère, la date effective de révocation n'est pas interprétée comme fin de période payée.
+
+### Constats initiaux, résolus dans la branche
+
+- **[app/services/subscription.py:apply_apple_notification]** Le ré-audit initial a trouvé qu'un `REFUND` ou `REVOKE` signé pour une ancienne transaction pouvait arriver après un renouvellement récent. Le service compare désormais les fins de périodes Apple vérifiées ; un remboursement de période antérieure reste dans le ledger sans modifier le droit actif.
+
+### 🔵 INFO
+
+- **[docs/apple-server-notifications.md ; docs/apple-server-notifications/guide-test.md]** La livraison réelle V2, le callback 204 et une projection d'abonnement ne sont pas présentés comme observés. La configuration et le `GET /health` sont distingués de ces preuves manquantes.
+
+### Verdict
+
+Le défaut applicatif de classement des périodes est corrigé dans cette branche, avec migration encore à déployer. Le scénario de remboursement tardif et la révocation d'une nouvelle période sont couverts par les tests ciblés.
+
+Un remboursement ancien reste dans le ledger avec `signed_date=None`; la requête du dernier `signed_date` filtre les valeurs nulles avant le tri descendant. L'événement ancien est ainsi exclu du curseur d'ordre. Une révocation d'une période plus récente projette même si son ID de transaction est nouveau. Les tests couvrent aussi un renouvellement retardé de cette même période et une vérification client d'une période déjà révoquée.
+
+---
+
+## 2026-10-06 — Notifications serveur Apple, état DEV / Sandbox
+
+### Protections vérifiées dans le code
+
+- Le webhook public `POST /api/v1/webhooks/apple` vérifie le JWS extérieur avec les racines publiques Apple incluses, puis vérifie séparément la transaction signée avant toute projection de droit. Le vérificateur contraint bundle, environnement Sandbox et produit autorisé.
+- Le ledger `apple_subscription_events` utilise `notificationUUID` pour rendre les doublons sans effet. La lignée d'achat reste liée à un seul compte par `appAccountToken` et les événements anciens ne doivent pas régresser l'état courant.
+- `DID_CHANGE_RENEWAL_PREF`, `DID_FAIL_TO_RENEW` et `GRACE_PERIOD_EXPIRED` sont consignés uniquement dans le ledger et acquittés en 204 selon le code ; ils ne changent pas immédiatement `subscriptions`. Le backend ne stocke pas la cadence mensuelle/annuelle.
+
+### Preuve opérationnelle et décision
+
+- Configuration DEV/Sandbox contrôlée ; URL Sandbox enregistrée et relue dans App Store Connect : `https://dev-api.cloudbreak-app.com/api/v1/webhooks/apple`. Le `GET /health` DEV a répondu 200, avec service à 1/1 réplique. Production est restée sans URL.
+- La sélection **Version 2** dans App Store Connect est **non prouvée** : le dialogue consulté n'exposait pas ce contrôle.
+- **Notification de test acquittée en 204 : non prouvé.** Aucune fonction d'envoi n'était disponible dans l'interface consultée ; aucun callback de test Apple n'a été observé.
+- **Événement modifiant `subscriptions` rejoué et ligne observée en lecture seule : non prouvé.** Aucun rejeu Sandbox n'a été effectué et aucune interrogation DB n'a été exécutée.
+
+Verdict : le backend DEV est disponible et l'URL Sandbox est enregistrée, mais la livraison réelle V2 et la projection d'un droit restent à valider. Avant release, exécuter sur iPhone réel les scénarios achat, renouvellement, expiration, remboursement et restauration du [guide manuel](apple-server-notifications/guide-test.md). Conserver le prérequis de limitation de débit Traefik/Dokploy avant exposition Production indiqué dans le ré-audit du 2026-09-30.
+
+---
+
 ## 2026-10-05 — Colonne `users.email` (pont Supabase ↔ base applicative)
 
 ### 🟡 WARNING

@@ -22,6 +22,16 @@ class AppleNotificationInvalid(Exception):
     """A cryptographically verified notification lacks safe entitlement data."""
 
 
+def _current_apple_period_end(subscription: Subscription) -> datetime | None:
+    """Use the paid-period watermark, with a safe fallback for pre-migration rows."""
+    period_end = cast(datetime | None, subscription.apple_period_expires_at)
+    if period_end is not None:
+        return period_end
+    if subscription.status != "revoked":
+        return cast(datetime | None, subscription.expires_at)
+    return None
+
+
 async def _get_transaction_owner(
     original_transaction_id: str,
     db: AsyncSession,
@@ -52,7 +62,10 @@ async def _get_latest_event_signed_date(
 ) -> datetime | None:
     result = await db.execute(
         select(AppleSubscriptionEvent.signed_date)
-        .where(AppleSubscriptionEvent.original_transaction_id == original_transaction_id)
+        .where(
+            AppleSubscriptionEvent.original_transaction_id == original_transaction_id,
+            AppleSubscriptionEvent.signed_date.is_not(None),
+        )
         .order_by(AppleSubscriptionEvent.signed_date.desc())
         .limit(1)
     )
@@ -136,8 +149,16 @@ async def apply_verified_transaction(
     if subscription.original_transaction_id not in (None, transaction.original_transaction_id):
         raise SubscriptionOwnershipConflict()
 
-    stored_expiry = subscription.expires_at
-    if stored_expiry is not None and stored_expiry > transaction.expires_at:
+    stored_period_end = _current_apple_period_end(subscription)
+    if stored_period_end is not None and stored_period_end > transaction.expires_at:
+        return subscription
+    if subscription.status == "revoked" and (
+        stored_period_end == transaction.expires_at
+        or (
+            stored_period_end is None
+            and subscription.latest_transaction_id == transaction.transaction_id
+        )
+    ):
         return subscription
 
     try:
@@ -148,6 +169,7 @@ async def apply_verified_transaction(
             subscription_values.plan = "premium"
             subscription_values.status = transaction.status
             subscription_values.expires_at = transaction.expires_at
+            subscription_values.apple_period_expires_at = transaction.expires_at
             subscription_values.original_transaction_id = transaction.original_transaction_id
             subscription_values.latest_transaction_id = transaction.transaction_id
             subscription_values.apple_environment = transaction.environment
@@ -221,21 +243,27 @@ async def apply_apple_notification(
     else:
         effective_expiry = transaction.expires_at
 
-    should_project = True
+    stored_period_end = None if created else _current_apple_period_end(subscription)
+    older_period = stored_period_end is not None and transaction.expires_at < stored_period_end
+    newer_period = stored_period_end is not None and transaction.expires_at > stored_period_end
+    should_project = not older_period
     if not created:
         latest_signed_date = await _get_latest_event_signed_date(
             transaction.original_transaction_id,
             db,
         )
-        stored_expiry = cast(datetime | None, subscription.expires_at)
         if notification.signed_date is None:
             should_project = False
-        elif latest_signed_date is not None and notification.signed_date <= latest_signed_date:
+        elif (
+            not newer_period
+            and latest_signed_date is not None
+            and notification.signed_date <= latest_signed_date
+        ):
             should_project = False
         elif (
             target_status == "expired"
-            and stored_expiry is not None
-            and effective_expiry < stored_expiry
+            and stored_period_end is not None
+            and transaction.expires_at < stored_period_end
         ):
             should_project = False
 
@@ -243,7 +271,7 @@ async def apply_apple_notification(
         notification_uuid=notification.notification_uuid,
         notification_type=notification.notification_type,
         original_transaction_id=transaction.original_transaction_id,
-        signed_date=notification.signed_date,
+        signed_date=notification.signed_date if should_project else None,
     )
     try:
         async with db.begin_nested():
@@ -255,6 +283,7 @@ async def apply_apple_notification(
                 subscription_values.plan = "premium"
                 subscription_values.status = target_status
                 subscription_values.expires_at = effective_expiry
+                subscription_values.apple_period_expires_at = transaction.expires_at
                 subscription_values.original_transaction_id = transaction.original_transaction_id
                 subscription_values.latest_transaction_id = transaction.transaction_id
                 subscription_values.apple_environment = transaction.environment

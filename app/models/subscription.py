@@ -16,6 +16,7 @@ class Subscription(Base):
     plan = Column(String(50), default="free")  # free | premium | pro
     status = Column(String(50), default="none")  # none | trial | active | expired | revoked
     expires_at = Column(DateTime(timezone=True), nullable=True)
+    apple_period_expires_at = Column(DateTime(timezone=True), nullable=True)
     original_transaction_id = Column(String(255), nullable=True, unique=True)
     latest_transaction_id = Column(String(255), nullable=True, unique=True)
     apple_environment = Column(String(50), nullable=True)

@@ -25,6 +25,20 @@ def test_settings_defaults_are_defined() -> None:
     assert settings.redis_url.startswith("redis://")
 
 
+def test_development_sandbox_requires_no_private_apple_api_credentials() -> None:
+    settings = Settings(
+        _env_file=None,
+        environment="development",
+        apple_bundle_id="com.alexandremoreau.cloudbreak",
+        apple_environment="Sandbox",
+    )
+
+    assert settings.apple_app_id is None
+    assert settings.apple_key_id == ""
+    assert settings.apple_issuer_id == ""
+    assert settings.apple_private_key_path is None
+
+
 def test_production_requires_explicit_production_apple_environment() -> None:
     with pytest.raises(ValidationError, match="APPLE_ENVIRONMENT=Production"):
         Settings(_env_file=None, environment="production")

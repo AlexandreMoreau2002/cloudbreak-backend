@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.api.v1.endpoints.subscription import get_apple_signed_data_verifier
@@ -136,14 +137,19 @@ def test_apple_webhook_projects_verified_revoke_notification() -> None:
     db.commit.assert_awaited_once()
 
 
-def test_apple_webhook_acknowledges_verified_test_notification_without_entitlement() -> None:
+@pytest.mark.parametrize(
+    "notification_type",
+    ["DID_CHANGE_RENEWAL_PREF", "DID_FAIL_TO_RENEW", "GRACE_PERIOD_EXPIRED"],
+)
+def test_apple_webhook_acknowledges_policy_events_without_entitlement(
+    notification_type: str,
+) -> None:
     verifier = MagicMock()
-    notification = _notification()
     notification = VerifiedAppleNotification(
-        notification_uuid=notification.notification_uuid,
-        notification_type="TEST",
+        notification_uuid=f"notification-{notification_type}",
+        notification_type=notification_type,
         subtype=None,
-        signed_date=notification.signed_date,
+        signed_date=datetime.now(UTC),
         signed_transaction=None,
         signed_renewal_info=None,
     )
@@ -154,7 +160,7 @@ def test_apple_webhook_acknowledges_verified_test_notification_without_entitleme
     with patch(
         "app.api.v1.endpoints.subscription.record_apple_notification",
         new_callable=AsyncMock,
-    ):
+    ) as record_notification:
         try:
             with TestClient(app) as client:
                 response = client.post(
@@ -166,4 +172,5 @@ def test_apple_webhook_acknowledges_verified_test_notification_without_entitleme
 
     assert response.status_code == 204
     verifier.verify_transaction.assert_not_called()
+    record_notification.assert_awaited_once_with(notification, db)
     db.commit.assert_awaited_once()

@@ -10,6 +10,7 @@ from app.services.subscription import (
     apply_apple_notification,
     apply_verified_transaction,
     get_subscription_response,
+    is_entitlement_notification,
     record_apple_notification,
 )
 from app.models.subscription import Subscription
@@ -380,3 +381,23 @@ async def test_record_apple_notification_keeps_irrelevant_verified_event_as_no_o
 
     assert created is True
     assert isinstance(db.add.call_args.args[0], AppleSubscriptionEvent)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "notification_type",
+    ["DID_CHANGE_RENEWAL_PREF", "DID_FAIL_TO_RENEW", "GRACE_PERIOD_EXPIRED"],
+)
+async def test_non_entitlement_lifecycle_events_are_ledger_only(notification_type: str) -> None:
+    empty = MagicMock()
+    empty.scalar_one_or_none.return_value = None
+    db = MagicMock()
+    db.execute = AsyncMock(return_value=empty)
+    db.flush = AsyncMock()
+
+    assert is_entitlement_notification(notification_type) is False
+    created = await record_apple_notification(_notification(notification_type), db)
+
+    assert created is True
+    assert isinstance(db.add.call_args.args[0], AppleSubscriptionEvent)
+    assert not any(isinstance(call.args[0], Subscription) for call in db.add.call_args_list)

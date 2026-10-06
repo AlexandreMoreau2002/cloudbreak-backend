@@ -2,6 +2,25 @@
 
 Document de référence sécurité. À mettre à jour à chaque story qui touche auth, réseau, données ou dépendances.
 
+## 2026-10-06 — Notifications serveur Apple, état DEV / Sandbox
+
+### Protections vérifiées dans le code
+
+- Le webhook public `POST /api/v1/webhooks/apple` vérifie le JWS extérieur avec les racines publiques Apple incluses, puis vérifie séparément la transaction signée avant toute projection de droit. Le vérificateur contraint bundle, environnement Sandbox et produit autorisé.
+- Le ledger `apple_subscription_events` utilise `notificationUUID` pour rendre les doublons sans effet. La lignée d'achat reste liée à un seul compte par `appAccountToken` et les événements anciens ne doivent pas régresser l'état courant.
+- `DID_CHANGE_RENEWAL_PREF`, `DID_FAIL_TO_RENEW` et `GRACE_PERIOD_EXPIRED` sont consignés uniquement dans le ledger et acquittés en 204 selon le code ; ils ne changent pas immédiatement `subscriptions`. Le backend ne stocke pas la cadence mensuelle/annuelle.
+
+### Preuve opérationnelle et décision
+
+- Configuration DEV/Sandbox contrôlée ; URL Sandbox enregistrée et relue dans App Store Connect : `https://dev-api.cloudbreak-app.com/api/v1/webhooks/apple`. Le `GET /health` DEV a répondu 200, avec service à 1/1 réplique. Production est restée sans URL.
+- La sélection **Version 2** dans App Store Connect est **non prouvée** : le dialogue consulté n'exposait pas ce contrôle.
+- **Notification de test acquittée en 204 : non prouvé.** Aucune fonction d'envoi n'était disponible dans l'interface consultée ; aucun callback de test Apple n'a été observé.
+- **Événement modifiant `subscriptions` rejoué et ligne observée en lecture seule : non prouvé.** Aucun rejeu Sandbox n'a été effectué et aucune interrogation DB n'a été exécutée.
+
+Verdict : le backend DEV est disponible et l'URL Sandbox est enregistrée, mais la livraison réelle V2 et la projection d'un droit restent à valider. Avant release, exécuter sur iPhone réel les scénarios achat, renouvellement, expiration, remboursement et restauration du [guide manuel](apple-server-notifications/guide-test.md). Conserver le prérequis de limitation de débit Traefik/Dokploy avant exposition Production indiqué dans le ré-audit du 2026-09-30.
+
+---
+
 ## 2026-10-05 — Colonne `users.email` (pont Supabase ↔ base applicative)
 
 ### 🟡 WARNING

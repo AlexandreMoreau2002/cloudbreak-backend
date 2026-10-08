@@ -32,12 +32,12 @@ from app.services.user import (
 )
 
 
-@pytest.mark.parametrize("value", ["A" * 24, "A" * 25, "  Alex  "])
+@pytest.mark.parametrize("value", ["A" * 24, "  " + "A" * 24 + "  ", "  Alex  "])
 def test_display_name_accepts_trimmed_values(value: str) -> None:
     assert DisplayNameUpdate(display_name=value).display_name == value.strip()
 
 
-@pytest.mark.parametrize("value", ["", "   ", "A" * 26])
+@pytest.mark.parametrize("value", ["", "   ", "A" * 25, "A" * 26])
 def test_display_name_rejects_empty_or_too_long_values(value: str) -> None:
     with pytest.raises(ValidationError):
         DisplayNameUpdate(display_name=value)
@@ -46,7 +46,7 @@ def test_display_name_rejects_empty_or_too_long_values(value: str) -> None:
 def test_display_name_nullable_model_column_and_profile() -> None:
     column = User.__table__.c.display_name
     assert isinstance(column.type, String)
-    assert column.type.length == 25
+    assert column.type.length == 24
     assert column.nullable is True
 
     user = User(supabase_user_id="user-123", auth_provider="email", display_name="Alex")

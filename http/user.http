@@ -110,13 +110,23 @@ Content-Type: application/json
 }
 
 ###
-# Nom d'usage : 26 caractères -> 422
+# Nom d'usage : limite de 24 caractères -> 200
 PATCH {{baseUrl}}/api/v1/user/display-name
 Authorization: Bearer {{testEmail-jwt}}
 Content-Type: application/json
 
 {
-  "display_name": "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  "display_name": "ABCDEFGHIJKLMNOPQRSTUVWX"
+}
+
+###
+# Nom d'usage : 25 caractères -> 422
+PATCH {{baseUrl}}/api/v1/user/display-name
+Authorization: Bearer {{testEmail-jwt}}
+Content-Type: application/json
+
+{
+  "display_name": "ABCDEFGHIJKLMNOPQRSTUVWXY"
 }
 
 ###

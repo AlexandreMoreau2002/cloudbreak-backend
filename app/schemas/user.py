@@ -49,8 +49,8 @@ class DisplayNameUpdate(BaseModel):
         if value is None:
             return None
         normalized = value.strip()
-        if not 1 <= len(normalized) <= 25:
-            raise ValueError("Display name must contain 1 to 25 characters")
+        if not 1 <= len(normalized) <= 24:
+            raise ValueError("Display name must contain 1 to 24 characters")
         return normalized
 
 

@@ -343,8 +343,13 @@ def _display_name_profile(value: str | None) -> dict[str, object]:
     }
 
 
-@pytest.mark.parametrize("value", ["Alex", None])
-def test_display_name_update_returns_profile_and_commits(value: str | None) -> None:
+@pytest.mark.parametrize(
+    ("raw_value", "value"),
+    [("Alex", "Alex"), (None, None), ("A" * 24, "A" * 24), ("  " + "A" * 24 + "  ", "A" * 24)],
+)
+def test_display_name_update_returns_profile_and_commits(
+    raw_value: str | None, value: str | None
+) -> None:
     db = AsyncMock()
     app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
     app.dependency_overrides[get_db] = lambda: db
@@ -355,10 +360,16 @@ def test_display_name_update_returns_profile_and_commits(value: str | None) -> N
         ) as mock_update:
             mock_update.return_value = _display_name_profile(value)
             with TestClient(app) as client:
-                response = client.patch("/api/v1/user/display-name", json={"display_name": value})
+                response = client.patch(
+                    "/api/v1/user/display-name", json={"display_name": raw_value}
+                )
             assert response.status_code == 200
             assert response.json()["display_name"] == value
             mock_update.assert_awaited_once()
+            user, payload, session = mock_update.await_args.args
+            assert user == _FAKE_USER
+            assert payload.display_name == value
+            assert session is db
             db.commit.assert_awaited_once_with()
     finally:
         app.dependency_overrides.clear()
@@ -382,6 +393,22 @@ def test_display_name_requires_token() -> None:
     with TestClient(app) as client:
         response = client.patch("/api/v1/user/display-name", json={"display_name": "Alex"})
     assert response.status_code == 403
+
+
+@patch("app.api.v1.endpoints.user.update_user_display_name", new_callable=AsyncMock)
+def test_display_name_rejects_25_characters(mock_update: AsyncMock) -> None:
+    mock_update.return_value = _display_name_profile("A" * 25)
+    db = AsyncMock()
+    app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+    app.dependency_overrides[get_db] = lambda: db
+    try:
+        with TestClient(app) as client:
+            response = client.patch("/api/v1/user/display-name", json={"display_name": "A" * 25})
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 422
+    mock_update.assert_not_awaited()
+    db.commit.assert_not_awaited()
 
 
 def test_anonymous_cannot_update_display_name() -> None:

@@ -120,6 +120,26 @@ Content-Type: application/json
 }
 
 ###
+# Nom d'usage : espaces seuls -> 200 et display_name null (effacement)
+PATCH {{baseUrl}}/api/v1/user/display-name
+Authorization: Bearer {{testEmail-jwt}}
+Content-Type: application/json
+
+{
+  "display_name": "   "
+}
+
+###
+# Nom d'usage : chaîne vide -> 200 et display_name null (effacement)
+PATCH {{baseUrl}}/api/v1/user/display-name
+Authorization: Bearer {{testEmail-jwt}}
+Content-Type: application/json
+
+{
+  "display_name": ""
+}
+
+###
 # Nom d'usage : 25 caractères -> 422
 PATCH {{baseUrl}}/api/v1/user/display-name
 Authorization: Bearer {{testEmail-jwt}}

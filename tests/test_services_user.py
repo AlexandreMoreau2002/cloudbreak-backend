@@ -37,10 +37,15 @@ def test_display_name_accepts_trimmed_values(value: str) -> None:
     assert DisplayNameUpdate(display_name=value).display_name == value.strip()
 
 
-@pytest.mark.parametrize("value", ["", "   ", "A" * 25, "A" * 26])
-def test_display_name_rejects_empty_or_too_long_values(value: str) -> None:
+@pytest.mark.parametrize("value", ["A" * 25, "A" * 26])
+def test_display_name_rejects_too_long_values(value: str) -> None:
     with pytest.raises(ValidationError):
         DisplayNameUpdate(display_name=value)
+
+
+@pytest.mark.parametrize("value", ["", "   ", "\t\n"])
+def test_display_name_normalizes_empty_values_to_null(value: str) -> None:
+    assert DisplayNameUpdate(display_name=value).display_name is None
 
 
 def test_display_name_nullable_model_column_and_profile() -> None:
@@ -443,7 +448,8 @@ async def test_update_user_display_name_persists_normalized_value() -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_user_display_name_erases_value_with_none() -> None:
+@pytest.mark.parametrize("value", [None, "", "   "])
+async def test_update_user_display_name_erases_value(value: str | None) -> None:
     profile = User(supabase_user_id="user-123", auth_provider="email", display_name="Alex")
     result = MagicMock()
     result.scalar_one_or_none.return_value = profile
@@ -452,7 +458,7 @@ async def test_update_user_display_name_erases_value_with_none() -> None:
 
     actual = await user_service.update_user_display_name(
         {"id": "user-123", "auth_provider": "email"},
-        DisplayNameUpdate(display_name=None),
+        DisplayNameUpdate(display_name=value),
         db,
     )
 

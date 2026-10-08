@@ -15,7 +15,8 @@ iPhone Profil → PATCH authentifié → validation FastAPI → PostgreSQL displ
 ```
 
 `PATCH /api/v1/user/display-name` reçoit `display_name`, une chaîne de 1 à 24 caractères,
-ou `null` pour effacer le nom. Le serveur retire les espaces au début et à la fin, refuse les
+ou `null` pour effacer le nom. Une chaîne vide ou composée uniquement d'espaces est aussi
+normalisée en `null` pour effacer le nom. Le serveur retire les espaces au début et à la fin, refuse les
 champs supplémentaires et n’accepte que les comptes permanents authentifiés. La réponse est le
 profil actualisé. `GET /api/v1/user/me` expose aussi le nom ; pour un compte anonyme, le nom est
 `null`.

@@ -1,27 +1,17 @@
+import pytest
+from sqlalchemy import String
 from datetime import UTC, datetime
+from pydantic import ValidationError
+from sqlalchemy.sql.dml import Delete
+from sqlalchemy.dialects import postgresql
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-from pydantic import ValidationError
-from sqlalchemy import String
-from sqlalchemy.dialects import postgresql
-from sqlalchemy.sql.dml import Delete
-
-from app.services import user as user_service
+from app.models.user import User
 from app.models.favorite import Favorite
-from app.services.user import (
-    delete_user_data,
-    get_or_create_user,
-    get_user_profile,
-    provision_user,
-    update_user_notification_preferences,
-    update_user_survey,
-    update_user_preferences,
-)
 from app.models.prediction import Prediction
+from app.services import user as user_service
 from app.models.subscription import Subscription
 from app.models.terrain_validation import TerrainValidation
-from app.models.user import User
 from app.schemas.user import (
     AcquisitionSource,
     DisplayNameUpdate,
@@ -30,6 +20,15 @@ from app.schemas.user import (
     Practice,
     SurveyUpdate,
     UserProfile,
+)
+from app.services.user import (
+    delete_user_data,
+    get_or_create_user,
+    get_user_profile,
+    provision_user,
+    update_user_notification_preferences,
+    update_user_survey,
+    update_user_preferences,
 )
 
 

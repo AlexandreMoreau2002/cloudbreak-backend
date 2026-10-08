@@ -2,9 +2,8 @@
 
 import importlib.util
 from pathlib import Path
-from unittest.mock import MagicMock
-
 from sqlalchemy import String
+from unittest.mock import MagicMock
 
 from app.models.user import User
 

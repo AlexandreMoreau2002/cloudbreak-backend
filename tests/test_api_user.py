@@ -2,6 +2,7 @@ import pytest
 from datetime import UTC, datetime
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock, patch
+
 from app.main import app
 from app.db.session import get_db
 from app.core.dependencies import get_current_user

@@ -3,8 +3,9 @@
 import logging
 from datetime import UTC, datetime
 from sqlalchemy import delete, select
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import insert
+
 from app.models.user import User
 from app.models.favorite import Favorite
 from app.models.prediction import Prediction

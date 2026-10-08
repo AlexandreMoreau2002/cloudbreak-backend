@@ -1,6 +1,7 @@
 import logging
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.session import get_db
 from app.core.config import settings
 from app.services.analytics import track

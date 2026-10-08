@@ -38,6 +38,22 @@ class PreferencesUpdate(BaseModel):
     newsletter_opt_in: bool
 
 
+class DisplayNameUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    display_name: str | None
+
+    @field_validator("display_name")
+    @classmethod
+    def normalize_display_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not 1 <= len(normalized) <= 25:
+            raise ValueError("Display name must contain 1 to 25 characters")
+        return normalized
+
+
 class NotificationPreferencesUpdate(BaseModel):
     """Update partiel — chaque préférence est indépendante et optionnelle."""
 
@@ -60,6 +76,7 @@ class UserProfile(BaseModel):
 
     supabase_user_id: str
     auth_provider: str
+    display_name: str | None = None
     created_at: datetime
     converted_at: datetime
     survey_completed_at: datetime | None = None

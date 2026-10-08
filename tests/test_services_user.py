@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pydantic import ValidationError
+from sqlalchemy import String
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.dml import Delete
 
@@ -22,11 +23,45 @@ from app.models.terrain_validation import TerrainValidation
 from app.models.user import User
 from app.schemas.user import (
     AcquisitionSource,
+    DisplayNameUpdate,
     NotificationPreferencesUpdate,
     PreferencesUpdate,
     Practice,
     SurveyUpdate,
+    UserProfile,
 )
+
+
+@pytest.mark.parametrize("value", ["A" * 24, "A" * 25, "  Alex  "])
+def test_display_name_accepts_trimmed_values(value: str) -> None:
+    assert DisplayNameUpdate(display_name=value).display_name == value.strip()
+
+
+@pytest.mark.parametrize("value", ["", "   ", "A" * 26])
+def test_display_name_rejects_empty_or_too_long_values(value: str) -> None:
+    with pytest.raises(ValidationError):
+        DisplayNameUpdate(display_name=value)
+
+
+def test_display_name_nullable_model_column_and_profile() -> None:
+    column = User.__table__.c.display_name
+    assert isinstance(column.type, String)
+    assert column.type.length == 25
+    assert column.nullable is True
+
+    user = User(supabase_user_id="user-123", auth_provider="email", display_name="Alex")
+    user.created_at = datetime.now(UTC)
+    user.converted_at = datetime.now(UTC)
+    user.notif_favorites = True
+    user.notif_regional = True
+    user.notif_terrain = True
+    assert UserProfile.model_validate(user).display_name == "Alex"
+
+
+def test_display_name_accepts_null_and_forbids_extra_fields() -> None:
+    assert DisplayNameUpdate(display_name=None).display_name is None
+    with pytest.raises(ValidationError):
+        DisplayNameUpdate.model_validate({"display_name": "Alex", "unexpected": True})
 
 
 @pytest.mark.asyncio

@@ -226,6 +226,7 @@ def test_notifications_requires_token() -> None:
 @patch("app.api.v1.endpoints.user.update_user_notification_preferences", new_callable=AsyncMock)
 def test_notifications_updates_single_field(mock_update: AsyncMock) -> None:
     profile = MagicMock()
+    profile.display_name = None
     profile.supabase_user_id = "user-123"
     profile.auth_provider = "email"
     profile.created_at = datetime.now(UTC)
@@ -255,6 +256,7 @@ def test_notifications_updates_single_field(mock_update: AsyncMock) -> None:
 @patch("app.api.v1.endpoints.user.update_user_notification_preferences", new_callable=AsyncMock)
 def test_notifications_accepts_empty_payload(mock_update: AsyncMock) -> None:
     profile = MagicMock()
+    profile.display_name = None
     profile.supabase_user_id = "user-123"
     profile.auth_provider = "email"
     profile.created_at = datetime.now(UTC)

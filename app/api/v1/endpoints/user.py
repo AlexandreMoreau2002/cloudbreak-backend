@@ -7,16 +7,18 @@ from app.services.analytics import track
 from app.core.security import delete_supabase_user
 from app.core.dependencies import get_current_user, get_permanent_user
 from app.schemas.user import (
-    SurveyUpdate,
     UserProfile,
+    SurveyUpdate,
+    DisplayNameUpdate,
     PreferencesUpdate,
     NotificationPreferencesUpdate,
 )
 from app.services.user import (
-    delete_user_data,
-    get_user_profile,
     provision_user,
+    get_user_profile,
+    delete_user_data,
     update_user_survey,
+    update_user_display_name,
     update_user_preferences,
     update_user_notification_preferences,
 )
@@ -38,6 +40,7 @@ async def get_me(
         **current_user,
         "is_anonymous": bool(current_user.get("is_anonymous", False)),
         "provisioned": profile is not None,
+        "display_name": profile.display_name if profile else None,
         "survey_completed_at": profile.survey_completed_at if profile else None,
         "survey_skipped_at": profile.survey_skipped_at if profile else None,
         "newsletter_opt_in": profile.newsletter_opt_in if profile else None,
@@ -53,6 +56,17 @@ async def provision(
     db: AsyncSession = Depends(get_db),
 ) -> object:
     profile = await provision_user(current_user, db)
+    await db.commit()
+    return profile
+
+
+@router.patch("/display-name", response_model=UserProfile)
+async def display_name(
+    payload: DisplayNameUpdate,
+    current_user: dict[str, object] = Depends(get_permanent_user),
+    db: AsyncSession = Depends(get_db),
+) -> object:
+    profile = await update_user_display_name(current_user, payload, db)
     await db.commit()
     return profile
 

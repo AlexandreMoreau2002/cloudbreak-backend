@@ -7,6 +7,7 @@ from sqlalchemy import String
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.dml import Delete
 
+from app.services import user as user_service
 from app.models.favorite import Favorite
 from app.services.user import (
     delete_user_data,
@@ -422,3 +423,39 @@ async def test_provision_user_ignores_non_string_email() -> None:
     actual = await provision_user({"id": "user-123", "email": 42}, db)
 
     assert actual.email is None
+
+
+@pytest.mark.asyncio
+async def test_update_user_display_name_persists_normalized_value() -> None:
+    profile = User(supabase_user_id="user-123", auth_provider="email")
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = profile
+    db = AsyncMock()
+    db.execute.return_value = result
+
+    actual = await user_service.update_user_display_name(
+        {"id": "user-123", "auth_provider": "email"},
+        DisplayNameUpdate(display_name="  Alex  "),
+        db,
+    )
+
+    assert actual.display_name == "Alex"
+    db.flush.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_update_user_display_name_erases_value_with_none() -> None:
+    profile = User(supabase_user_id="user-123", auth_provider="email", display_name="Alex")
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = profile
+    db = AsyncMock()
+    db.execute.return_value = result
+
+    actual = await user_service.update_user_display_name(
+        {"id": "user-123", "auth_provider": "email"},
+        DisplayNameUpdate(display_name=None),
+        db,
+    )
+
+    assert actual.display_name is None
+    db.flush.assert_awaited_once_with()

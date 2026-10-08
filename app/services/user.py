@@ -3,14 +3,19 @@
 import logging
 from datetime import UTC, datetime
 from sqlalchemy import delete, select
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import User
 from app.models.favorite import Favorite
 from app.models.prediction import Prediction
 from app.models.subscription import Subscription
 from app.models.terrain_validation import TerrainValidation
-from app.schemas.user import NotificationPreferencesUpdate, PreferencesUpdate, SurveyUpdate
+from app.schemas.user import (
+    DisplayNameUpdate,
+    PreferencesUpdate,
+    SurveyUpdate,
+    NotificationPreferencesUpdate,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +84,17 @@ async def provision_user(user: dict[str, object], db: AsyncSession) -> User:
     return await get_or_create_user(
         str(user["id"]), str(user.get("auth_provider", "email")), db, _token_email(user)
     )
+
+
+async def update_user_display_name(
+    user: dict[str, object], payload: DisplayNameUpdate, db: AsyncSession
+) -> User:
+    profile = await get_or_create_user(
+        str(user["id"]), str(user.get("auth_provider", "email")), db, _token_email(user)
+    )
+    profile.display_name = payload.display_name  # type: ignore[assignment]
+    await db.flush()
+    return profile
 
 
 async def update_user_survey(

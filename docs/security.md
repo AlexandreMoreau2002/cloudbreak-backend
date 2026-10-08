@@ -2,6 +2,14 @@
 
 Document de référence sécurité. À mettre à jour à chaque story qui touche auth, réseau, données ou dépendances.
 
+## 2026-10-08 Story 2.9 — Nom d'usage
+
+- `users.display_name` est une donnée personnelle facultative. Seul un compte permanent authentifié peut la modifier via `PATCH /api/v1/user/display-name` ; une session anonyme ou sans JWT reçoit 403.
+- Le nom d'usage est exposé uniquement dans les réponses de l'API utilisateur (`UserProfile` et `GET /api/v1/user/me`). Il n'est ni journalisé ni envoyé à l'analytics.
+- L'effacement explicite envoie `null`. La suppression du compte efface aussi le nom d'usage avec la ligne `users` ; les sauvegardes Postgres restent soumises à leur rétention existante.
+
+---
+
 ## 2026-10-06 Story 4.3 — Ré-audit des notifications serveur Apple
 
 ### Correctif de classement des périodes — en attente de déploiement

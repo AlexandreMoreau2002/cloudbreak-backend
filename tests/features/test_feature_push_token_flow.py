@@ -32,6 +32,10 @@ class _FakeSession:
 
     async def execute(self, statement: object) -> None:
         if isinstance(statement, Update):
+            # Hypothèse : SQLAlchemy nomme les paramètres liés `<colonne>_<n>` dans l'ordre
+            # d'apparition (`push_token_1` pour le WHERE, `supabase_user_id_1`). Le SET
+            # `push_token=None` est un littéral NULL, pas un paramètre, donc sans collision.
+            # Si une montée de version SQLAlchemy change ce nommage, ce test casse ici.
             params = statement.compile().params
             token = next(v for k, v in params.items() if k.startswith("push_token_"))
             owner = next(v for k, v in params.items() if k.startswith("supabase_user_id_"))

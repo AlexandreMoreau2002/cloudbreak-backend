@@ -1,3 +1,4 @@
+import unicodedata
 from enum import StrEnum
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -38,6 +39,36 @@ class PreferencesUpdate(BaseModel):
     newsletter_opt_in: bool
 
 
+# Caractères de contrôle, séparateurs de ligne/paragraphe, surrogates, usage privé, non assignés
+# et marques bidirectionnelles de surcharge (usurpation visuelle) : tout le reste est permis.
+_FORBIDDEN_CATEGORIES = {"Cc", "Cs", "Co", "Cn", "Zl", "Zp"}
+_BIDI_OVERRIDES = {*map(chr, range(0x202A, 0x202F)), *map(chr, range(0x2066, 0x206A))}
+
+
+def _is_allowed_display_name_char(char: str) -> bool:
+    return unicodedata.category(char) not in _FORBIDDEN_CATEGORIES and char not in _BIDI_OVERRIDES
+
+
+class DisplayNameUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    display_name: str | None
+
+    @field_validator("display_name")
+    @classmethod
+    def normalize_display_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            return None
+        if not 1 <= len(normalized) <= 24:
+            raise ValueError("Display name must contain 1 to 24 characters")
+        if not all(_is_allowed_display_name_char(char) for char in normalized):
+            raise ValueError("Display name contains forbidden control characters")
+        return normalized
+
+
 class NotificationPreferencesUpdate(BaseModel):
     """Update partiel — chaque préférence est indépendante et optionnelle."""
 
@@ -60,6 +91,7 @@ class UserProfile(BaseModel):
 
     supabase_user_id: str
     auth_provider: str
+    display_name: str | None = None
     created_at: datetime
     converted_at: datetime
     survey_completed_at: datetime | None = None

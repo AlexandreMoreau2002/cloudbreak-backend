@@ -15,6 +15,7 @@ class User(Base):
     # Copie de l'email Supabase (claim du JWT) pour relier une ligne à un compte lisible.
     # Null pour les comptes sans email et les lignes antérieures, rempli au prochain appel.
     email = Column(String(320), nullable=True)
+    display_name = Column(String(24), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
     converted_at = Column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)

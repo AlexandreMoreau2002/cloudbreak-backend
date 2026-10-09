@@ -1,6 +1,8 @@
+import pytest
 from datetime import UTC, datetime
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock, patch
+
 from app.main import app
 from app.db.session import get_db
 from app.core.dependencies import get_current_user
@@ -34,6 +36,7 @@ def test_get_me_returns_current_user(mock_profile: AsyncMock) -> None:
 
 def test_get_me_surfaces_newsletter_consent_for_provisioned_profile() -> None:
     profile = MagicMock()
+    profile.display_name = "Alex"
     profile.survey_completed_at = None
     profile.survey_skipped_at = None
     profile.newsletter_opt_in = True
@@ -57,6 +60,7 @@ def test_get_me_surfaces_newsletter_consent_for_provisioned_profile() -> None:
     body = response.json()
     assert body["provisioned"] is True
     assert body["newsletter_opt_in"] is True
+    assert body["display_name"] == "Alex"
 
 
 def test_anonymous_cannot_provision() -> None:
@@ -226,6 +230,7 @@ def test_notifications_requires_token() -> None:
 @patch("app.api.v1.endpoints.user.update_user_notification_preferences", new_callable=AsyncMock)
 def test_notifications_updates_single_field(mock_update: AsyncMock) -> None:
     profile = MagicMock()
+    profile.display_name = None
     profile.supabase_user_id = "user-123"
     profile.auth_provider = "email"
     profile.created_at = datetime.now(UTC)
@@ -255,6 +260,7 @@ def test_notifications_updates_single_field(mock_update: AsyncMock) -> None:
 @patch("app.api.v1.endpoints.user.update_user_notification_preferences", new_callable=AsyncMock)
 def test_notifications_accepts_empty_payload(mock_update: AsyncMock) -> None:
     profile = MagicMock()
+    profile.display_name = None
     profile.supabase_user_id = "user-123"
     profile.auth_provider = "email"
     profile.created_at = datetime.now(UTC)
@@ -321,6 +327,122 @@ def test_get_me_defaults_notification_preferences_when_not_provisioned() -> None
     assert body["notif_favorites"] is True
     assert body["notif_regional"] is True
     assert body["notif_terrain"] is True
+    assert body["display_name"] is None
+
+
+def _display_name_profile(value: str | None) -> dict[str, object]:
+    return {
+        "supabase_user_id": "user-123",
+        "auth_provider": "email",
+        "display_name": value,
+        "created_at": datetime.now(UTC),
+        "converted_at": datetime.now(UTC),
+        "notif_favorites": True,
+        "notif_regional": True,
+        "notif_terrain": True,
+    }
+
+
+@pytest.mark.parametrize(
+    ("raw_value", "value"),
+    [
+        ("Alex", "Alex"),
+        (None, None),
+        ("", None),
+        ("   ", None),
+        ("A" * 24, "A" * 24),
+        ("  " + "A" * 24 + "  ", "A" * 24),
+        ("Jean-Pierre", "Jean-Pierre"),
+        ("Élodie 75", "Élodie 75"),
+        ("O'Brien", "O'Brien"),
+        ("xX_Alex-42*$Xx", "xX_Alex-42*$Xx"),
+        ("Alex 🏔🌄", "Alex 🏔🌄"),
+        ("👨‍👩‍👧", "👨‍👩‍👧"),
+        ("<b>Alex</b>", "<b>Alex</b>"),
+    ],
+)
+def test_display_name_update_returns_profile_and_commits(
+    raw_value: str | None, value: str | None
+) -> None:
+    db = AsyncMock()
+    app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+    app.dependency_overrides[get_db] = lambda: db
+    try:
+        with patch(
+            "app.api.v1.endpoints.user.update_user_display_name",
+            new_callable=AsyncMock,
+        ) as mock_update:
+            mock_update.return_value = _display_name_profile(value)
+            with TestClient(app) as client:
+                response = client.patch(
+                    "/api/v1/user/display-name", json={"display_name": raw_value}
+                )
+            assert response.status_code == 200
+            assert response.json()["display_name"] == value
+            mock_update.assert_awaited_once()
+            user, payload, session = mock_update.await_args.args
+            assert user == _FAKE_USER
+            assert payload.display_name == value
+            assert session is db
+            db.commit.assert_awaited_once_with()
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"display_name": "A" * 26},
+        {"display_name": "Alex", "unknown": True},
+        {"display_name": "Al\nex"},
+        {"display_name": "Al\tex"},
+        {"display_name": "Al\x00ex"},
+        {"display_name": "Alex\u202eevil"},
+        {"display_name": "Al\u2028ex"},
+        {"display_name": "🏔" * 25},
+    ],
+)
+def test_display_name_rejects_invalid_payload(payload: dict[str, object]) -> None:
+    app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+    try:
+        with TestClient(app) as client:
+            response = client.patch("/api/v1/user/display-name", json=payload)
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 422
+
+
+def test_display_name_requires_token() -> None:
+    with TestClient(app) as client:
+        response = client.patch("/api/v1/user/display-name", json={"display_name": "Alex"})
+    assert response.status_code == 403
+
+
+@patch("app.api.v1.endpoints.user.update_user_display_name", new_callable=AsyncMock)
+def test_display_name_rejects_25_characters(mock_update: AsyncMock) -> None:
+    mock_update.return_value = _display_name_profile("A" * 25)
+    db = AsyncMock()
+    app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+    app.dependency_overrides[get_db] = lambda: db
+    try:
+        with TestClient(app) as client:
+            response = client.patch("/api/v1/user/display-name", json={"display_name": "A" * 25})
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 422
+    mock_update.assert_not_awaited()
+    db.commit.assert_not_awaited()
+
+
+def test_anonymous_cannot_update_display_name() -> None:
+    app.dependency_overrides[get_current_user] = lambda: {"id": "anon-123", "is_anonymous": True}
+    try:
+        with TestClient(app) as client:
+            response = client.patch("/api/v1/user/display-name", json={"display_name": "Alex"})
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "ACCOUNT_REQUIRED"
 
 
 @patch("app.api.v1.endpoints.user.update_user_preferences", new_callable=AsyncMock)

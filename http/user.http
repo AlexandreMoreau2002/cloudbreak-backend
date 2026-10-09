@@ -88,3 +88,93 @@ Authorization: Bearer {{testEmail-jwt}}
 ###
 # Sans JWT -> 403
 DELETE {{baseUrl}}/api/v1/user/favorites/0728f7c7-a0c9-5fb0-b87d-d9edc8696840
+
+###
+# Nom d'usage : mise à jour -> 200 (compte permanent)
+PATCH {{baseUrl}}/api/v1/user/display-name
+Authorization: Bearer {{testEmail-jwt}}
+Content-Type: application/json
+
+{
+  "display_name": "Alex"
+}
+
+###
+# Nom d'usage : effacement -> 200 et display_name null
+PATCH {{baseUrl}}/api/v1/user/display-name
+Authorization: Bearer {{testEmail-jwt}}
+Content-Type: application/json
+
+{
+  "display_name": null
+}
+
+###
+# Nom d'usage : limite de 24 caractères -> 200
+PATCH {{baseUrl}}/api/v1/user/display-name
+Authorization: Bearer {{testEmail-jwt}}
+Content-Type: application/json
+
+{
+  "display_name": "ABCDEFGHIJKLMNOPQRSTUVWX"
+}
+
+###
+# Nom d'usage : espaces seuls -> 200 et display_name null (effacement)
+PATCH {{baseUrl}}/api/v1/user/display-name
+Authorization: Bearer {{testEmail-jwt}}
+Content-Type: application/json
+
+{
+  "display_name": "   "
+}
+
+###
+# Nom d'usage : chaîne vide -> 200 et display_name null (effacement)
+PATCH {{baseUrl}}/api/v1/user/display-name
+Authorization: Bearer {{testEmail-jwt}}
+Content-Type: application/json
+
+{
+  "display_name": ""
+}
+
+###
+# Nom d'usage : caractère de contrôle (retour à la ligne) -> 422
+PATCH {{baseUrl}}/api/v1/user/display-name
+Authorization: Bearer {{testEmail-jwt}}
+Content-Type: application/json
+
+{
+  "display_name": "Alex\nevil"
+}
+
+###
+# Nom d'usage : 25 caractères -> 422
+PATCH {{baseUrl}}/api/v1/user/display-name
+Authorization: Bearer {{testEmail-jwt}}
+Content-Type: application/json
+
+{
+  "display_name": "ABCDEFGHIJKLMNOPQRSTUVWXY"
+}
+
+###
+# Nom d'usage : champ inconnu -> 422
+PATCH {{baseUrl}}/api/v1/user/display-name
+Authorization: Bearer {{testEmail-jwt}}
+Content-Type: application/json
+
+{
+  "display_name": "Alex",
+  "unknown": true
+}
+
+###
+# Nom d'usage : sans token -> 403
+PATCH {{baseUrl}}/api/v1/user/display-name
+Content-Type: application/json
+
+{
+  "display_name": "Alex"
+}

@@ -1,12 +1,26 @@
+import pytest
+from sqlalchemy import String
 from datetime import UTC, datetime
+from pydantic import ValidationError
+from sqlalchemy.sql.dml import Delete
+from sqlalchemy.dialects import postgresql
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-from pydantic import ValidationError
-from sqlalchemy.dialects import postgresql
-from sqlalchemy.sql.dml import Delete
-
+from app.models.user import User
 from app.models.favorite import Favorite
+from app.models.prediction import Prediction
+from app.services import user as user_service
+from app.models.subscription import Subscription
+from app.models.terrain_validation import TerrainValidation
+from app.schemas.user import (
+    AcquisitionSource,
+    DisplayNameUpdate,
+    NotificationPreferencesUpdate,
+    PreferencesUpdate,
+    Practice,
+    SurveyUpdate,
+    UserProfile,
+)
 from app.services.user import (
     delete_user_data,
     get_or_create_user,
@@ -16,17 +30,43 @@ from app.services.user import (
     update_user_survey,
     update_user_preferences,
 )
-from app.models.prediction import Prediction
-from app.models.subscription import Subscription
-from app.models.terrain_validation import TerrainValidation
-from app.models.user import User
-from app.schemas.user import (
-    AcquisitionSource,
-    NotificationPreferencesUpdate,
-    PreferencesUpdate,
-    Practice,
-    SurveyUpdate,
-)
+
+
+@pytest.mark.parametrize("value", ["A" * 24, "  " + "A" * 24 + "  ", "  Alex  "])
+def test_display_name_accepts_trimmed_values(value: str) -> None:
+    assert DisplayNameUpdate(display_name=value).display_name == value.strip()
+
+
+@pytest.mark.parametrize("value", ["A" * 25, "A" * 26])
+def test_display_name_rejects_too_long_values(value: str) -> None:
+    with pytest.raises(ValidationError):
+        DisplayNameUpdate(display_name=value)
+
+
+@pytest.mark.parametrize("value", ["", "   ", "\t\n"])
+def test_display_name_normalizes_empty_values_to_null(value: str) -> None:
+    assert DisplayNameUpdate(display_name=value).display_name is None
+
+
+def test_display_name_nullable_model_column_and_profile() -> None:
+    column = User.__table__.c.display_name
+    assert isinstance(column.type, String)
+    assert column.type.length == 24
+    assert column.nullable is True
+
+    user = User(supabase_user_id="user-123", auth_provider="email", display_name="Alex")
+    user.created_at = datetime.now(UTC)
+    user.converted_at = datetime.now(UTC)
+    user.notif_favorites = True
+    user.notif_regional = True
+    user.notif_terrain = True
+    assert UserProfile.model_validate(user).display_name == "Alex"
+
+
+def test_display_name_accepts_null_and_forbids_extra_fields() -> None:
+    assert DisplayNameUpdate(display_name=None).display_name is None
+    with pytest.raises(ValidationError):
+        DisplayNameUpdate.model_validate({"display_name": "Alex", "unexpected": True})
 
 
 @pytest.mark.asyncio
@@ -387,3 +427,40 @@ async def test_provision_user_ignores_non_string_email() -> None:
     actual = await provision_user({"id": "user-123", "email": 42}, db)
 
     assert actual.email is None
+
+
+@pytest.mark.asyncio
+async def test_update_user_display_name_persists_normalized_value() -> None:
+    profile = User(supabase_user_id="user-123", auth_provider="email")
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = profile
+    db = AsyncMock()
+    db.execute.return_value = result
+
+    actual = await user_service.update_user_display_name(
+        {"id": "user-123", "auth_provider": "email"},
+        DisplayNameUpdate(display_name="  Alex  "),
+        db,
+    )
+
+    assert actual.display_name == "Alex"
+    db.flush.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("value", [None, "", "   "])
+async def test_update_user_display_name_erases_value(value: str | None) -> None:
+    profile = User(supabase_user_id="user-123", auth_provider="email", display_name="Alex")
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = profile
+    db = AsyncMock()
+    db.execute.return_value = result
+
+    actual = await user_service.update_user_display_name(
+        {"id": "user-123", "auth_provider": "email"},
+        DisplayNameUpdate(display_name=value),
+        db,
+    )
+
+    assert actual.display_name is None
+    db.flush.assert_awaited_once_with()

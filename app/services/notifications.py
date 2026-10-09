@@ -10,8 +10,8 @@ from typing import Any
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.models.user import User
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 

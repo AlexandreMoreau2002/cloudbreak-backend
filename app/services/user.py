@@ -177,8 +177,7 @@ async def set_push_token(user: dict[str, object], token: str, db: AsyncSession) 
 
 
 async def clear_push_token(user: dict[str, object], db: AsyncSession) -> None:
-    profile = await get_or_create_user(
-        str(user["id"]), str(user.get("auth_provider", "email")), db, _token_email(user)
+    """Retire le token de l'appelant. UPDATE seul : ne crée jamais de profil."""
+    await db.execute(
+        update(User).where(User.supabase_user_id == str(user["id"])).values(push_token=None)
     )
-    profile.push_token = None  # type: ignore[assignment]
-    await db.flush()

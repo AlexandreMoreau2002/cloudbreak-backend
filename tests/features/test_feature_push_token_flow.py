@@ -37,10 +37,13 @@ class _FakeSession:
             # `push_token=None` est un littéral NULL, pas un paramètre, donc sans collision.
             # Si une montée de version SQLAlchemy change ce nommage, ce test casse ici.
             params = statement.compile().params
-            token = next(v for k, v in params.items() if k.startswith("push_token_"))
             owner = next(v for k, v in params.items() if k.startswith("supabase_user_id_"))
+            token = next((v for k, v in params.items() if k.startswith("push_token_")), None)
             for profile in self._store.values():
-                if profile.push_token == token and profile.supabase_user_id != owner:
+                if token is None:  # clear_push_token : met à NULL le token de l'appelant
+                    if profile.supabase_user_id == owner:
+                        profile.push_token = None
+                elif profile.push_token == token and profile.supabase_user_id != owner:
                     profile.push_token = None
 
 
@@ -109,6 +112,15 @@ def test_delete_clears_token(store: dict[str, SimpleNamespace]) -> None:
 
     assert response.status_code == 204
     assert store["user-a"].push_token is None
+
+
+def test_delete_without_profile_does_not_create_one(store: dict[str, SimpleNamespace]) -> None:
+    _as(USER_A)
+    with TestClient(app) as client:
+        response = client.delete("/api/v1/user/push-token")
+
+    assert response.status_code == 204
+    assert store == {}
 
 
 def test_account_deletion_removes_profile_and_token(store: dict[str, SimpleNamespace]) -> None:

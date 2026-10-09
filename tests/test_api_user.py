@@ -625,3 +625,21 @@ def test_push_token_deleted_returns_204(mock_clear: AsyncMock) -> None:
         app.dependency_overrides.clear()
     assert response.status_code == 204
     mock_clear.assert_awaited_once()
+
+
+def test_anonymous_cannot_delete_push_token() -> None:
+    app.dependency_overrides[get_current_user] = lambda: {"id": "anon-123", "is_anonymous": True}
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        with TestClient(app) as client:
+            response = client.delete("/api/v1/user/push-token")
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "ACCOUNT_REQUIRED"
+
+
+def test_delete_push_token_requires_authorization_returns_403() -> None:
+    with TestClient(app) as client:
+        response = client.delete("/api/v1/user/push-token")
+    assert response.status_code == 403

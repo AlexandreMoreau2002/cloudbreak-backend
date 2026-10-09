@@ -477,15 +477,26 @@ async def test_set_push_token_stores_token_and_marks_valid() -> None:
         await set_push_token({"id": "u1", "auth_provider": "email"}, "ExponentPushToken[a]", db)
     assert profile.push_token == "ExponentPushToken[a]"
     assert profile.push_token_valid is True
-    db.execute.assert_awaited()  # purge du même token chez les autres comptes
     db.flush.assert_awaited()
+
+    # Purge du même token chez les autres comptes uniquement.
+    statement = db.execute.await_args.args[0]
+    compiled = statement.compile()
+    sql = str(compiled)
+    assert sql.startswith("UPDATE users SET push_token=")
+    assert "users.push_token = " in sql
+    assert "users.supabase_user_id != " in sql
+    assert "ExponentPushToken[a]" in compiled.params.values()
+    assert "u1" in compiled.params.values()
 
 
 @pytest.mark.asyncio
-async def test_clear_push_token_nulls_token() -> None:
-    profile = SimpleNamespace(push_token="ExponentPushToken[a]", push_token_valid=True)
+async def test_clear_push_token_updates_only_the_caller_without_creating_profile() -> None:
     db = AsyncMock()
-    with patch("app.services.user.get_or_create_user", AsyncMock(return_value=profile)):
-        await clear_push_token({"id": "u1", "auth_provider": "email"}, db)
-    assert profile.push_token is None
-    db.flush.assert_awaited()
+    with patch("app.services.user.get_or_create_user", AsyncMock()) as get_or_create:
+        await clear_push_token({"id": "u1"}, db)
+    get_or_create.assert_not_awaited()
+    compiled = db.execute.await_args.args[0].compile()
+    assert str(compiled).startswith("UPDATE users SET push_token=")
+    assert "users.supabase_user_id = " in str(compiled)
+    assert "u1" in compiled.params.values()

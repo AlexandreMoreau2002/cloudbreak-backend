@@ -1,10 +1,11 @@
 import pytest
+from types import SimpleNamespace
 from sqlalchemy import String
 from datetime import UTC, datetime
 from pydantic import ValidationError
 from sqlalchemy.sql.dml import Delete
 from sqlalchemy.dialects import postgresql
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.models.user import User
 from app.models.favorite import Favorite
@@ -22,10 +23,12 @@ from app.schemas.user import (
     UserProfile,
 )
 from app.services.user import (
+    clear_push_token,
     delete_user_data,
     get_or_create_user,
     get_user_profile,
     provision_user,
+    set_push_token,
     update_user_notification_preferences,
     update_user_survey,
     update_user_preferences,
@@ -464,3 +467,25 @@ async def test_update_user_display_name_erases_value(value: str | None) -> None:
 
     assert actual.display_name is None
     db.flush.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_set_push_token_stores_token_and_marks_valid() -> None:
+    profile = SimpleNamespace(supabase_user_id="u1", push_token=None, push_token_valid=False)
+    db = AsyncMock()
+    with patch("app.services.user.get_or_create_user", AsyncMock(return_value=profile)):
+        await set_push_token({"id": "u1", "auth_provider": "email"}, "ExponentPushToken[a]", db)
+    assert profile.push_token == "ExponentPushToken[a]"
+    assert profile.push_token_valid is True
+    db.execute.assert_awaited()  # purge du même token chez les autres comptes
+    db.flush.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_clear_push_token_nulls_token() -> None:
+    profile = SimpleNamespace(push_token="ExponentPushToken[a]", push_token_valid=True)
+    db = AsyncMock()
+    with patch("app.services.user.get_or_create_user", AsyncMock(return_value=profile)):
+        await clear_push_token({"id": "u1", "auth_provider": "email"}, db)
+    assert profile.push_token is None
+    db.flush.assert_awaited()

@@ -86,6 +86,27 @@ class NotificationPreferencesUpdate(BaseModel):
         return value
 
 
+_EXPO_TOKEN_PREFIXES = ("ExponentPushToken[", "ExpoPushToken[")
+
+
+class PushTokenUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    push_token: str
+
+    @field_validator("push_token")
+    @classmethod
+    def validate_expo_format(cls, value: str) -> str:
+        if (
+            len(value) > 255
+            or not value.endswith("]")
+            or not value.startswith(_EXPO_TOKEN_PREFIXES)
+            or value in _EXPO_TOKEN_PREFIXES
+        ):
+            raise ValueError("Invalid Expo push token")
+        return value
+
+
 class UserProfile(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

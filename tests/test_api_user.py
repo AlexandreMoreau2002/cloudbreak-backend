@@ -564,3 +564,64 @@ def test_delete_user_appelle_track_account_deleted(
         app.dependency_overrides.clear()
 
     mock_track.assert_called_once_with("account_deleted", "user-123")  # type: ignore[attr-defined]
+
+
+def test_anonymous_cannot_register_push_token() -> None:
+    app.dependency_overrides[get_current_user] = lambda: {"id": "anon-123", "is_anonymous": True}
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v1/user/push-token", json={"push_token": "ExponentPushToken[a]"}
+            )
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "ACCOUNT_REQUIRED"
+
+
+def test_push_token_requires_authorization_returns_403() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/user/push-token", json={"push_token": "ExponentPushToken[a]"}
+        )
+    assert response.status_code == 403
+
+
+def test_push_token_invalid_payload_returns_422() -> None:
+    app.dependency_overrides[get_current_user] = lambda: {"id": "u1", "is_anonymous": False}
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        with TestClient(app) as client:
+            response = client.post("/api/v1/user/push-token", json={"push_token": "nope"})
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 422
+
+
+@patch("app.api.v1.endpoints.user.set_push_token", new_callable=AsyncMock)
+def test_push_token_registered_returns_204(mock_set: AsyncMock) -> None:
+    app.dependency_overrides[get_current_user] = lambda: {"id": "u1", "is_anonymous": False}
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v1/user/push-token", json={"push_token": "ExponentPushToken[a]"}
+            )
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 204
+    mock_set.assert_awaited_once()
+
+
+@patch("app.api.v1.endpoints.user.clear_push_token", new_callable=AsyncMock)
+def test_push_token_deleted_returns_204(mock_clear: AsyncMock) -> None:
+    app.dependency_overrides[get_current_user] = lambda: {"id": "u1", "is_anonymous": False}
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        with TestClient(app) as client:
+            response = client.delete("/api/v1/user/push-token")
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 204
+    mock_clear.assert_awaited_once()

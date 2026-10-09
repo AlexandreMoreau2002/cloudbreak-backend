@@ -13,9 +13,12 @@ from app.schemas.user import (
     DisplayNameUpdate,
     PreferencesUpdate,
     NotificationPreferencesUpdate,
+    PushTokenUpdate,
 )
 from app.services.user import (
     provision_user,
+    set_push_token,
+    clear_push_token,
     get_user_profile,
     delete_user_data,
     update_user_survey,
@@ -105,6 +108,29 @@ async def notifications(
     profile = await update_user_notification_preferences(current_user, payload, db)
     await db.commit()
     return profile
+
+
+@router.post("/push-token", status_code=204)
+async def register_push_token(
+    payload: PushTokenUpdate,
+    current_user: dict[str, object] = Depends(get_permanent_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Enregistre le token Expo Push de l'appareil (jamais loggué)."""
+    await set_push_token(current_user, payload.push_token, db)
+    await db.commit()
+    logger.info("push_token_registered", extra={"user_id": str(current_user["id"])})
+
+
+@router.delete("/push-token", status_code=204)
+async def unregister_push_token(
+    current_user: dict[str, object] = Depends(get_permanent_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Retire le token push (déconnexion) pour que l'appareil ne reçoive plus d'alertes."""
+    await clear_push_token(current_user, db)
+    await db.commit()
+    logger.info("push_token_cleared", extra={"user_id": str(current_user["id"])})
 
 
 @router.delete("", status_code=204)

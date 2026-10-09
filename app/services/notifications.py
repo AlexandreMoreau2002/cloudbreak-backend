@@ -26,7 +26,12 @@ async def send_push_to_user(
     body: str,
     data: dict[str, Any] | None = None,
 ) -> bool:
-    """Envoie un push à l'appareil de l'utilisateur. Retourne True si Expo a accepté."""
+    """Envoie un push à l'appareil de l'utilisateur. Retourne True si Expo a accepté.
+
+    Sur `DeviceNotRegistered`, `push_token_valid` passe à false et la session est
+    commitée ici, volontairement : l'invalidation doit survivre même si la transaction
+    de l'appelant est annulée ensuite (sinon on réessaierait un token mort).
+    """
     token = user.push_token
     if not token or not user.push_token_valid:
         return False

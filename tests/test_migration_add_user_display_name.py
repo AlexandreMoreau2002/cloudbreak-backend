@@ -40,24 +40,8 @@ def test_display_name_migration_adds_nullable_string_column() -> None:
     assert table == "users"
     assert column.name == "display_name"
     assert isinstance(column.type, String)
-    assert column.type.length == 25
+    assert column.type.length == 24
     assert column.nullable is True
-
-
-def test_display_name_limit_migration_is_reversible() -> None:
-    filename = "c3d4e5f6a7b8_limit_user_display_name_to_24.py"
-    migration = _load_migration(filename)
-    assert migration.revision == "c3d4e5f6a7b8"
-    assert migration.down_revision == "fb27705a94f7"
-    for direction, previous_length, new_length in [("upgrade", 25, 24), ("downgrade", 24, 25)]:
-        migration_op = _run(direction, filename)
-        migration_op.alter_column.assert_called_once()
-        args, kwargs = migration_op.alter_column.call_args
-        assert args == ("users", "display_name")
-        assert kwargs["existing_type"].length == previous_length
-        assert kwargs["type_"].length == new_length
-        assert kwargs["existing_nullable"] is True
-        assert len(migration_op.mock_calls) == 1
 
 
 def test_display_name_migration_downgrade_drops_only_column() -> None:

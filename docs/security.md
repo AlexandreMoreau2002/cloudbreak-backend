@@ -5,7 +5,7 @@ Document de référence sécurité. À mettre à jour à chaque story qui touche
 ## 2026-10-08 Story 2.9 — Nom d'usage
 
 - `users.display_name` est une donnée personnelle facultative. Seul un compte permanent authentifié peut la modifier via `PATCH /api/v1/user/display-name` ; une session anonyme ou sans JWT reçoit 403.
-- Le serveur retire les espaces aux extrémités puis accepte 1 à 24 caractères ou `null` ; une chaîne vide après nettoyage devient `null` et efface le nom. 25 caractères donnent 422 avant toute écriture. La colonne est limitée à `VARCHAR(24)`. La migration refuse une ancienne valeur trop longue, sans troncature silencieuse.
+- Le serveur retire les espaces aux extrémités puis accepte 1 à 24 caractères ou `null` ; une chaîne vide après nettoyage devient `null` et efface le nom. 25 caractères donnent 422 avant toute écriture. La colonne est limitée à `VARCHAR(24)`. Seuls les lettres (accents compris), chiffres, espaces, tirets et apostrophes sont acceptés.
 - Le nom d'usage est exposé uniquement dans les réponses de l'API utilisateur (`UserProfile` et `GET /api/v1/user/me`). Il n'est ni journalisé ni envoyé à l'analytics.
 - L'effacement explicite envoie `null`. La suppression du compte efface aussi le nom d'usage avec la ligne `users` ; les sauvegardes Postgres restent soumises à leur rétention existante.
 

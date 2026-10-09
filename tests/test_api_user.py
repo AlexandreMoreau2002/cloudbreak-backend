@@ -352,6 +352,9 @@ def _display_name_profile(value: str | None) -> dict[str, object]:
         ("   ", None),
         ("A" * 24, "A" * 24),
         ("  " + "A" * 24 + "  ", "A" * 24),
+        ("Jean-Pierre", "Jean-Pierre"),
+        ("Élodie 75", "Élodie 75"),
+        ("O'Brien", "O'Brien"),
     ],
 )
 def test_display_name_update_returns_profile_and_commits(
@@ -384,7 +387,13 @@ def test_display_name_update_returns_profile_and_commits(
 
 @pytest.mark.parametrize(
     "payload",
-    [{"display_name": "A" * 26}, {"display_name": "Alex", "unknown": True}],
+    [
+        {"display_name": "A" * 26},
+        {"display_name": "Alex", "unknown": True},
+        {"display_name": "Alex 🏔"},
+        {"display_name": "Alex<script>"},
+        {"display_name": "Al\nex"},
+    ],
 )
 def test_display_name_rejects_invalid_payload(payload: dict[str, object]) -> None:
     app.dependency_overrides[get_current_user] = lambda: _FAKE_USER

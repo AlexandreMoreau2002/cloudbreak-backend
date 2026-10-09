@@ -140,6 +140,16 @@ Content-Type: application/json
 }
 
 ###
+# Nom d'usage : caractères interdits (émoji) -> 422
+PATCH {{baseUrl}}/api/v1/user/display-name
+Authorization: Bearer {{testEmail-jwt}}
+Content-Type: application/json
+
+{
+  "display_name": "Alex 🏔"
+}
+
+###
 # Nom d'usage : 25 caractères -> 422
 PATCH {{baseUrl}}/api/v1/user/display-name
 Authorization: Bearer {{testEmail-jwt}}

@@ -22,19 +22,17 @@ profil actualisé. `GET /api/v1/user/me` expose aussi le nom ; pour un compte an
 `null`.
 
 La limite s'applique après nettoyage des espaces : 24 caractères sont acceptés, 25 donnent
-422 sans écriture en base. La colonne PostgreSQL est un `VARCHAR(24)` nullable. La migration
-`c3d4e5f6a7b8` réduit la taille historique de 25 à 24 ; son downgrade restaure 25. Si une
-ancienne ligne contient déjà 25 caractères, PostgreSQL refuse la réduction : il faut faire
-corriger ce nom avant de déployer, sans tronquer silencieusement la donnée personnelle.
+422 sans écriture en base. Seuls sont autorisés les lettres (accents compris), les chiffres 0-9,
+l'espace, le tiret et l'apostrophe : émojis, symboles et caractères de contrôle donnent 422.
+La colonne PostgreSQL est un `VARCHAR(24)` nullable, créée par une seule migration.
 
 La suppression du compte efface la ligne `users` et donc le nom d’usage. Le champ n’est pas
 ajouté aux logs ou aux événements analytics.
 
 ## Fichiers concernés
 
-- `app/models/user.py`, `alembic/versions/fb27705a94f7_add_user_display_name.py` et
-  `alembic/versions/c3d4e5f6a7b8_limit_user_display_name_to_24.py` : colonne nullable,
-  ajout historique puis réduction à 24 caractères.
+- `app/models/user.py` et `alembic/versions/fb27705a94f7_add_user_display_name.py` : colonne
+  nullable de 24 caractères.
 - `app/schemas/user.py` : validation, nettoyage des espaces et contrat de réponse.
 - `app/api/v1/endpoints/user.py` : route authentifiée et retour du profil.
 - `app/services/user.py` : écriture du nom et suppression avec le profil utilisateur.

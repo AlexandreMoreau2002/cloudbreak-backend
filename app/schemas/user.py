@@ -38,6 +38,11 @@ class PreferencesUpdate(BaseModel):
     newsletter_opt_in: bool
 
 
+def _is_allowed_display_name_char(char: str) -> bool:
+    """Lettres (accents compris), chiffres 0-9, espace, tiret et apostrophe."""
+    return char.isalpha() or char in "0123456789 -'’"
+
+
 class DisplayNameUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -53,6 +58,8 @@ class DisplayNameUpdate(BaseModel):
             return None
         if not 1 <= len(normalized) <= 24:
             raise ValueError("Display name must contain 1 to 24 characters")
+        if not all(_is_allowed_display_name_char(char) for char in normalized):
+            raise ValueError("Display name may only contain letters, digits, spaces, - and '")
         return normalized
 
 

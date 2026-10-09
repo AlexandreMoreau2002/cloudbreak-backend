@@ -44,6 +44,27 @@ def test_upgrade_adds_token_and_validity_columns() -> None:
     assert columns["push_token_valid"].nullable is False
 
 
+def test_upgrade_creates_push_token_index() -> None:
+    migration_op = _run("upgrade")
+
+    migration_op.create_index.assert_called_once_with(
+        "ix_users_push_token", "users", ["push_token"]
+    )
+
+
+def test_downgrade_drops_index_before_columns() -> None:
+    migration_op = _run("downgrade")
+
+    names = [call[0] for call in migration_op.mock_calls]
+    assert names.index("drop_index") < names.index("drop_column")
+    migration_op.drop_index.assert_called_once_with("ix_users_push_token", table_name="users")
+
+
+def test_model_index_name_matches_migration() -> None:
+    index_names = {index.name for index in User.__table__.indexes}
+    assert "ix_users_push_token" in index_names
+
+
 def test_downgrade_drops_both_columns() -> None:
     migration_op = _run("downgrade")
 

@@ -24,8 +24,10 @@ def upgrade() -> None:
         "users",
         sa.Column("push_token_valid", sa.Boolean(), nullable=False, server_default=sa.true()),
     )
+    op.create_index("ix_users_push_token", "users", ["push_token"])
 
 
 def downgrade() -> None:
+    op.drop_index("ix_users_push_token", table_name="users")
     op.drop_column("users", "push_token_valid")
     op.drop_column("users", "push_token")

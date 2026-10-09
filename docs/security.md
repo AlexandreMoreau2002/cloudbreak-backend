@@ -15,6 +15,8 @@ Document de référence sécurité. À mettre à jour à chaque story qui touche
 - (a) Rate limiting sur `POST /api/v1/user/push-token` (aucun pour l'instant).
 - (b) Valider `EXPO_ACCESS_TOKEN` en production (validator de config ou log `CRITICAL` s'il est vide).
 - (c) TOCTOU théorique sur le transfert de token (purge puis écriture non atomiques entre deux requêtes concurrentes) : accepté en MVP.
+- (d) Le `DELETE /push-token` du logout peut échouer (hors ligne, JWT expiré) : l'ancien compte garde alors le token jusqu'à ce qu'un autre compte l'enregistre ou qu'Expo réponde `DeviceNotRegistered`. Piste : ignorer les utilisateurs inactifs à l'envoi (story 5.2).
+- (e) L'index sur `push_token` n'est pas unique, choix assumé (un appareil par compte) : course théorique entre deux `POST` simultanés du même token.
 
 ---
 

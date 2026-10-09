@@ -28,3 +28,9 @@ class User(Base):
     notif_favorites = Column(Boolean, nullable=False, server_default=true())
     notif_regional = Column(Boolean, nullable=False, server_default=true())
     notif_terrain = Column(Boolean, nullable=False, server_default=true())
+
+    # Token Expo Push de l'appareil courant (un seul appareil par compte).
+    # Jamais exposé par l'API ni loggué. `push_token_valid` passe à false quand
+    # Expo répond DeviceNotRegistered ; un nouvel enregistrement le remet à true.
+    push_token = Column(String(255), nullable=True)
+    push_token_valid = Column(Boolean, nullable=False, server_default=true())

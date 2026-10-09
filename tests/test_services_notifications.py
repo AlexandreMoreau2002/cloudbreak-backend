@@ -102,3 +102,22 @@ async def test_authorization_header_only_when_access_token_set() -> None:
     ):
         await send_push_to_user(AsyncMock(), _user(), "t", "b")
     assert client.post.await_args.kwargs["headers"]["Authorization"] == "Bearer secret"
+
+
+def _json_response(body: object) -> httpx.Response:
+    return httpx.Response(200, json=body, request=httpx.Request("POST", "http://x"))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("body", [[], {"data": []}, {"data": "x"}, {"data": ["x"]}, "oops"])
+async def test_unexpected_expo_body_never_raises(body: object) -> None:
+    client = _client(_json_response(body))
+    with patch("app.services.notifications.httpx.AsyncClient", return_value=client):
+        assert await send_push_to_user(AsyncMock(), _user(), "t", "b") is False
+
+
+@pytest.mark.asyncio
+async def test_batch_response_uses_first_ticket() -> None:
+    client = _client(_json_response({"data": [{"status": "ok", "id": "x"}]}))
+    with patch("app.services.notifications.httpx.AsyncClient", return_value=client):
+        assert await send_push_to_user(AsyncMock(), _user(), "t", "b") is True

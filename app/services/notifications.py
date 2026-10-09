@@ -19,6 +19,16 @@ EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 EXPO_TIMEOUT_SECONDS = 10.0
 
 
+def _extract_ticket(body: object) -> dict[str, Any]:
+    """Isole le ticket Expo (objet, ou premier élément d'une réponse batch)."""
+    data = body.get("data") if isinstance(body, dict) else None
+    if isinstance(data, list) and len(data) == 1:
+        data = data[0]
+    if not isinstance(data, dict):
+        raise ValueError("Unexpected Expo response shape")
+    return data
+
+
 async def send_push_to_user(
     db: AsyncSession,
     user: User,
@@ -45,7 +55,7 @@ async def send_push_to_user(
         async with httpx.AsyncClient(timeout=EXPO_TIMEOUT_SECONDS) as client:
             response = await client.post(EXPO_PUSH_URL, json=payload, headers=headers)
             response.raise_for_status()
-            ticket = response.json().get("data", {})
+            ticket = _extract_ticket(response.json())
     except (httpx.HTTPError, ValueError) as error:
         logger.error(
             "push_send_failed",

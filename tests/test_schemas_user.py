@@ -10,7 +10,15 @@ def test_push_token_accepts_expo_format(token: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "token", ["", "abc", "ExponentPushToken[", "ExponentPushToken[" + "a" * 300 + "]"]
+    "token",
+    [
+        "",
+        "abc",
+        "ExponentPushToken[]",
+        "ExpoPushToken[]",
+        "ExponentPushToken[",
+        "ExponentPushToken[" + "a" * 300 + "]",
+    ],
 )
 def test_push_token_rejects_invalid_format(token: str) -> None:
     with pytest.raises(ValidationError):

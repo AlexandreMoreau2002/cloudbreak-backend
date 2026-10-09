@@ -101,7 +101,7 @@ class PushTokenUpdate(BaseModel):
             len(value) > 255
             or not value.endswith("]")
             or not value.startswith(_EXPO_TOKEN_PREFIXES)
-            or value in _EXPO_TOKEN_PREFIXES
+            or not value.split("[", 1)[1][:-1]
         ):
             raise ValueError("Invalid Expo push token")
         return value

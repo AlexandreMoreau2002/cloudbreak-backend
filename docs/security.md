@@ -10,6 +10,12 @@ Document de référence sécurité. À mettre à jour à chaque story qui touche
 - Un token identifie un appareil : si le même token est enregistré par un autre compte, il est purgé chez l'ancien propriétaire pour qu'il ne reçoive pas les alertes du nouvel utilisateur.
 - `send_push_to_user` ne lève jamais (timeout 10 s) ; `DeviceNotRegistered` passe `push_token_valid` à false. `EXPO_ACCESS_TOKEN` reste optionnel, lu via `app/core/config.py`, jamais loggué.
 
+### À traiter avant la release 1.0.0
+
+- (a) Rate limiting sur `POST /api/v1/user/push-token` (aucun pour l'instant).
+- (b) Valider `EXPO_ACCESS_TOKEN` en production (validator de config ou log `CRITICAL` s'il est vide).
+- (c) TOCTOU théorique sur le transfert de token (purge puis écriture non atomiques entre deux requêtes concurrentes) : accepté en MVP.
+
 ---
 
 ## 2026-10-08 Story 2.9 — Nom d'usage

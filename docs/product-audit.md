@@ -49,6 +49,7 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 | Profil / état sondage (`GET /api/v1/user/me`) — expose `is_anonymous`, `provisioned`, `survey_completed_at`, `survey_skipped_at` | ✅ Stories 2.5/2.8 |
 | Email du compte conservé dans `users.email` (copie du claim JWT, nullable, rattrapée au prochain appel `provision`/`survey`/`preferences`/`notifications`) — jamais exposé par l'API ni loggué, supprimé avec le compte | ✅ PR #24 |
 | Nom d'usage facultatif (`PATCH /api/v1/user/display-name`) — compte permanent requis, 1 à 24 caractères après trim (tout caractère permis sauf contrôles), `null` pour effacer, visible dans le profil et `/me` | ✅ Story 2.9 — backend |
+| Infrastructure push (`POST/DELETE /api/v1/user/push-token`) — token Expo stocké sur `users` (indexé, compte permanent requis, jamais exposé ni loggué), purge du token partagé, service `send_push_to_user` (API Expo, invalide les tokens `DeviceNotRegistered`) | ✅ Story 5.1 — backend ; pas encore d'alertes envoyées, pas de rate limiting |
 | Migrations Alembic appliquées automatiquement au démarrage du conteneur (`CMD` du Dockerfile) ; chaîne vérifiée sur base vide (`subscriptions` créée par `a9c4e7b2d5f1`) | ✅ PR #23 |
 | Mini-sondage post-création (`PATCH /api/v1/user/survey`) — `acquisition_source`, `practice`, `newsletter_opt_in` ou `skipped`, colonnes typées de `users`, terminal + idempotent | ✅ Story 2.8 — JWT permanent requis |
 | Retrait consentement newsletter (`PATCH /api/v1/user/preferences`) — `newsletter_opt_in` booléen, non terminal (modifiable dans les deux sens, RGPD art. 7-3) | ✅ Stories 2.5/2.8 — JWT permanent requis (403 `ACCOUNT_REQUIRED` si anonyme) |
@@ -62,7 +63,7 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 
 - Test réel App Store Connect/Sandbox des abonnements StoreKit 2 — story 4.3
 - Photo optionnelle sur validation terrain + calcul du taux de précision — story 6.2
-- Notifications push
+- Alertes push (déclenchement et contenu) — l'infrastructure d'envoi existe depuis la story 5.1
 - Déploiement **production** (le dev tourne sur le VPS ; la prod exige `ENVIRONMENT=production` + identifiants Apple complets, voir `docs/infra-serveur.md` section 8ter à la racine)
 - Webhook Apple (notifications V2) testé de bout en bout : jamais prouvé, seul le chemin « l'app envoie l'achat » l'est
 - Sommets saisis à la main (le seed écrase nom/GPS/altitude/région sur un `slug` existant)

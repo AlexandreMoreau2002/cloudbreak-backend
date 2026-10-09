@@ -48,7 +48,7 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 | Provisioning compte permanent (`POST /api/v1/user/provision`) — projection `users` idempotente (get-or-create) à la conversion depuis une session anonyme | ✅ Stories 2.5/2.6 — JWT permanent requis (403 `ACCOUNT_REQUIRED` si anonyme) |
 | Profil / état sondage (`GET /api/v1/user/me`) — expose `is_anonymous`, `provisioned`, `survey_completed_at`, `survey_skipped_at` | ✅ Stories 2.5/2.8 |
 | Email du compte conservé dans `users.email` (copie du claim JWT, nullable, rattrapée au prochain appel `provision`/`survey`/`preferences`/`notifications`) — jamais exposé par l'API ni loggué, supprimé avec le compte | ✅ PR #24 |
-| Nom d'usage facultatif (`PATCH /api/v1/user/display-name`) — compte permanent requis, 1 à 25 caractères après trim, `null` pour effacer, visible dans le profil et `/me` | ✅ Story 2.9 — backend |
+| Nom d'usage facultatif (`PATCH /api/v1/user/display-name`) — compte permanent requis, 1 à 24 caractères après trim (tout caractère permis sauf contrôles), `null` pour effacer, visible dans le profil et `/me` | ✅ Story 2.9 — backend |
 | Migrations Alembic appliquées automatiquement au démarrage du conteneur (`CMD` du Dockerfile) ; chaîne vérifiée sur base vide (`subscriptions` créée par `a9c4e7b2d5f1`) | ✅ PR #23 |
 | Mini-sondage post-création (`PATCH /api/v1/user/survey`) — `acquisition_source`, `practice`, `newsletter_opt_in` ou `skipped`, colonnes typées de `users`, terminal + idempotent | ✅ Story 2.8 — JWT permanent requis |
 | Retrait consentement newsletter (`PATCH /api/v1/user/preferences`) — `newsletter_opt_in` booléen, non terminal (modifiable dans les deux sens, RGPD art. 7-3) | ✅ Stories 2.5/2.8 — JWT permanent requis (403 `ACCOUNT_REQUIRED` si anonyme) |

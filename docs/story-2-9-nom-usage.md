@@ -22,8 +22,10 @@ profil actualisé. `GET /api/v1/user/me` expose aussi le nom ; pour un compte an
 `null`.
 
 La limite s'applique après nettoyage des espaces : 24 caractères sont acceptés, 25 donnent
-422 sans écriture en base. Seuls sont autorisés les lettres (accents compris), les chiffres 0-9,
-l'espace, le tiret et l'apostrophe : émojis, symboles et caractères de contrôle donnent 422.
+422 sans écriture en base. Tous les caractères Unicode sont autorisés (lettres, chiffres, symboles, émojis), sauf les
+caractères de contrôle, les séparateurs de ligne ou de paragraphe, les caractères non assignés et
+les marques bidirectionnelles de surcharge, qui donnent 422 (anti-usurpation visuelle, lignes
+cassées). Le nom est stocké tel quel et doit être échappé par tout futur affichage web.
 La colonne PostgreSQL est un `VARCHAR(24)` nullable, créée par une seule migration.
 
 La suppression du compte efface la ligne `users` et donc le nom d’usage. Le champ n’est pas

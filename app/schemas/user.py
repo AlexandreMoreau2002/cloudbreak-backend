@@ -1,3 +1,4 @@
+import unicodedata
 from enum import StrEnum
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -38,9 +39,14 @@ class PreferencesUpdate(BaseModel):
     newsletter_opt_in: bool
 
 
+# Caractères de contrôle, séparateurs de ligne/paragraphe, surrogates, usage privé, non assignés
+# et marques bidirectionnelles de surcharge (usurpation visuelle) : tout le reste est permis.
+_FORBIDDEN_CATEGORIES = {"Cc", "Cs", "Co", "Cn", "Zl", "Zp"}
+_BIDI_OVERRIDES = {*map(chr, range(0x202A, 0x202F)), *map(chr, range(0x2066, 0x206A))}
+
+
 def _is_allowed_display_name_char(char: str) -> bool:
-    """Lettres (accents compris), chiffres 0-9, espace, tiret et apostrophe."""
-    return char.isalpha() or char in "0123456789 -'’"
+    return unicodedata.category(char) not in _FORBIDDEN_CATEGORIES and char not in _BIDI_OVERRIDES
 
 
 class DisplayNameUpdate(BaseModel):
@@ -59,7 +65,7 @@ class DisplayNameUpdate(BaseModel):
         if not 1 <= len(normalized) <= 24:
             raise ValueError("Display name must contain 1 to 24 characters")
         if not all(_is_allowed_display_name_char(char) for char in normalized):
-            raise ValueError("Display name may only contain letters, digits, spaces, - and '")
+            raise ValueError("Display name contains forbidden control characters")
         return normalized
 
 

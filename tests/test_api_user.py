@@ -355,6 +355,10 @@ def _display_name_profile(value: str | None) -> dict[str, object]:
         ("Jean-Pierre", "Jean-Pierre"),
         ("Élodie 75", "Élodie 75"),
         ("O'Brien", "O'Brien"),
+        ("xX_Alex-42*$Xx", "xX_Alex-42*$Xx"),
+        ("Alex 🏔🌄", "Alex 🏔🌄"),
+        ("👨‍👩‍👧", "👨‍👩‍👧"),
+        ("<b>Alex</b>", "<b>Alex</b>"),
     ],
 )
 def test_display_name_update_returns_profile_and_commits(
@@ -390,9 +394,12 @@ def test_display_name_update_returns_profile_and_commits(
     [
         {"display_name": "A" * 26},
         {"display_name": "Alex", "unknown": True},
-        {"display_name": "Alex 🏔"},
-        {"display_name": "Alex<script>"},
         {"display_name": "Al\nex"},
+        {"display_name": "Al\tex"},
+        {"display_name": "Al\x00ex"},
+        {"display_name": "Alex\u202eevil"},
+        {"display_name": "Al\u2028ex"},
+        {"display_name": "🏔" * 25},
     ],
 )
 def test_display_name_rejects_invalid_payload(payload: dict[str, object]) -> None:

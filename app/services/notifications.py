@@ -8,10 +8,11 @@ import logging
 from typing import Any
 
 import httpx
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import update
 
 from app.models.user import User
 from app.core.config import settings
+from app.db.session import async_session_maker
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +30,29 @@ def _extract_ticket(body: object) -> dict[str, Any]:
     return data
 
 
+async def _invalidate_token(user_id: str, token: str) -> None:
+    """Marque le token envoyé comme mort, dans une session courte dédiée.
+
+    Le `WHERE push_token = <token envoyé>` évite d'invalider un token ré-enregistré entre
+    l'envoi et la réponse d'Expo. Une session propre ne valide rien de ce que l'appelant a
+    modifié et ne dépend pas de sa transaction. Ne lève jamais.
+    """
+    try:
+        async with async_session_maker() as session:
+            await session.execute(
+                update(User)
+                .where(User.supabase_user_id == user_id, User.push_token == token)
+                .values(push_token_valid=False)
+            )
+            await session.commit()
+    except Exception as error:
+        logger.error(
+            "push_invalidation_failed",
+            extra={"user_id": user_id, "error": type(error).__name__},
+        )
+
+
 async def send_push_to_user(
-    db: AsyncSession,
     user: User,
     title: str,
     body: str,
@@ -38,9 +60,10 @@ async def send_push_to_user(
 ) -> bool:
     """Envoie un push à l'appareil de l'utilisateur. Retourne True si Expo a accepté.
 
-    Sur `DeviceNotRegistered`, `push_token_valid` passe à false et la session est
-    commitée ici, volontairement : l'invalidation doit survivre même si la transaction
-    de l'appelant est annulée ensuite (sinon on réessaierait un token mort).
+    Sur un ticket `DeviceNotRegistered`, le token envoyé est invalidé en base
+    (`push_token_valid = false`) par une session dédiée, indépendante de la transaction de
+    l'appelant (voir `_invalidate_token`). L'objet `user` de l'appelant n'est pas modifié.
+    Ne lève jamais.
     """
     token = user.push_token
     if not token or not user.push_token_valid:
@@ -73,6 +96,5 @@ async def send_push_to_user(
         extra={"user_id": str(user.supabase_user_id), "expo_error": error_code},
     )
     if error_code == "DeviceNotRegistered":
-        user.push_token_valid = False  # type: ignore[assignment]
-        await db.commit()
+        await _invalidate_token(str(user.supabase_user_id), str(token))
     return False

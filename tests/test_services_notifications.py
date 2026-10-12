@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
+from sqlalchemy.dialects import postgresql
 
 from app.services.notifications import send_push_to_user
 
@@ -34,7 +35,7 @@ def _ok() -> httpx.Response:
 async def test_sends_payload_to_expo_and_returns_true() -> None:
     client = _client(_ok())
     with patch("app.services.notifications.httpx.AsyncClient", return_value=client):
-        sent = await send_push_to_user(AsyncMock(), _user(), "Titre", "Corps", {"peak": "p1"})
+        sent = await send_push_to_user(_user(), "Titre", "Corps", {"peak": "p1"})
     assert sent is True
     payload = client.post.await_args.kwargs["json"]
     assert payload["to"] == "ExponentPushToken[a]"
@@ -47,14 +48,19 @@ async def test_sends_payload_to_expo_and_returns_true() -> None:
 async def test_skips_user_without_valid_token() -> None:
     client = _client(_ok())
     with patch("app.services.notifications.httpx.AsyncClient", return_value=client):
-        assert await send_push_to_user(AsyncMock(), _user(token=None), "t", "b") is False
-        assert await send_push_to_user(AsyncMock(), _user(valid=False), "t", "b") is False
+        assert await send_push_to_user(_user(token=None), "t", "b") is False
+        assert await send_push_to_user(_user(valid=False), "t", "b") is False
     client.post.assert_not_awaited()
 
 
-@pytest.mark.asyncio
-async def test_device_not_registered_marks_token_invalid() -> None:
-    response = httpx.Response(
+def _session_maker(session: MagicMock) -> MagicMock:
+    session.__aenter__ = AsyncMock(return_value=session)
+    session.__aexit__ = AsyncMock(return_value=None)
+    return MagicMock(return_value=session)
+
+
+def _device_not_registered() -> httpx.Response:
+    return httpx.Response(
         200,
         json={
             "data": {
@@ -65,13 +71,48 @@ async def test_device_not_registered_marks_token_invalid() -> None:
         },
         request=httpx.Request("POST", "http://x"),
     )
+
+
+@pytest.mark.asyncio
+async def test_device_not_registered_invalidates_token_in_dedicated_session() -> None:
     user = _user()
-    db = AsyncMock()
-    with patch("app.services.notifications.httpx.AsyncClient", return_value=_client(response)):
-        sent = await send_push_to_user(db, user, "t", "b")
+    session = MagicMock(execute=AsyncMock(), commit=AsyncMock())
+    with (
+        patch(
+            "app.services.notifications.httpx.AsyncClient",
+            return_value=_client(_device_not_registered()),
+        ),
+        patch("app.services.notifications.async_session_maker", _session_maker(session)),
+    ):
+        sent = await send_push_to_user(user, "t", "b")
     assert sent is False
-    assert user.push_token_valid is False
-    db.commit.assert_awaited()
+    assert user.push_token_valid is True  # l'objet de l'appelant n'est pas touché
+    session.commit.assert_awaited_once()
+    compiled = session.execute.await_args.args[0].compile(dialect=postgresql.dialect())
+    assert str(compiled) == (
+        "UPDATE users SET push_token_valid=%(push_token_valid)s "
+        "WHERE users.supabase_user_id = %(supabase_user_id_1)s "
+        "AND users.push_token = %(push_token_1)s"
+    )
+    assert compiled.params == {
+        "push_token_valid": False,
+        "supabase_user_id_1": "u1",
+        "push_token_1": "ExponentPushToken[a]",
+    }
+
+
+@pytest.mark.asyncio
+async def test_invalidation_failure_never_raises() -> None:
+    session = MagicMock(execute=AsyncMock(side_effect=OSError("db down")), commit=AsyncMock())
+    with (
+        patch(
+            "app.services.notifications.httpx.AsyncClient",
+            return_value=_client(_device_not_registered()),
+        ),
+        patch("app.services.notifications.async_session_maker", _session_maker(session)),
+    ):
+        assert await send_push_to_user(_user(), "t", "b") is False
+    session.commit.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -81,7 +122,7 @@ async def test_network_error_never_raises_and_keeps_token_valid() -> None:
         "app.services.notifications.httpx.AsyncClient",
         return_value=_client(httpx.ConnectError("boom")),
     ):
-        sent = await send_push_to_user(AsyncMock(), user, "t", "b")
+        sent = await send_push_to_user(user, "t", "b")
     assert sent is False
     assert user.push_token_valid is True
 
@@ -90,7 +131,7 @@ async def test_network_error_never_raises_and_keeps_token_valid() -> None:
 async def test_http_5xx_never_raises() -> None:
     response = httpx.Response(503, request=httpx.Request("POST", "http://x"))
     with patch("app.services.notifications.httpx.AsyncClient", return_value=_client(response)):
-        assert await send_push_to_user(AsyncMock(), _user(), "t", "b") is False
+        assert await send_push_to_user(_user(), "t", "b") is False
 
 
 @pytest.mark.asyncio
@@ -100,7 +141,7 @@ async def test_authorization_header_only_when_access_token_set() -> None:
         patch("app.services.notifications.httpx.AsyncClient", return_value=client),
         patch("app.services.notifications.settings.expo_access_token", "secret"),
     ):
-        await send_push_to_user(AsyncMock(), _user(), "t", "b")
+        await send_push_to_user(_user(), "t", "b")
     assert client.post.await_args.kwargs["headers"]["Authorization"] == "Bearer secret"
 
 
@@ -113,11 +154,11 @@ def _json_response(body: object) -> httpx.Response:
 async def test_unexpected_expo_body_never_raises(body: object) -> None:
     client = _client(_json_response(body))
     with patch("app.services.notifications.httpx.AsyncClient", return_value=client):
-        assert await send_push_to_user(AsyncMock(), _user(), "t", "b") is False
+        assert await send_push_to_user(_user(), "t", "b") is False
 
 
 @pytest.mark.asyncio
 async def test_batch_response_uses_first_ticket() -> None:
     client = _client(_json_response({"data": [{"status": "ok", "id": "x"}]}))
     with patch("app.services.notifications.httpx.AsyncClient", return_value=client):
-        assert await send_push_to_user(AsyncMock(), _user(), "t", "b") is True
+        assert await send_push_to_user(_user(), "t", "b") is True

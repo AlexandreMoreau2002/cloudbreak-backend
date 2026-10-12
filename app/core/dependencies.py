@@ -1,3 +1,4 @@
+import hmac
 import logging
 from uuid import UUID
 from typing import Any, cast
@@ -7,7 +8,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.db.session import get_db
@@ -69,6 +70,22 @@ async def get_redis() -> Redis:
     if _redis is None:
         _redis = Redis.from_url(settings.redis_url, decode_responses=False)
     return _redis
+
+
+def require_cron_secret(x_cron_secret: str | None = Header(default=None)) -> None:
+    """Protège les jobs internes (cron) : secret partagé en header, comparaison à temps constant.
+
+    Désactivé (503) tant que INTERNAL_CRON_SECRET n'est pas configuré : fail closed.
+    """
+    configured = settings.internal_cron_secret
+    if not configured:
+        raise ApiError(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Jobs internes désactivés",
+            ErrorCode.INTERNAL_JOBS_DISABLED,
+        )
+    if not x_cron_secret or not hmac.compare_digest(x_cron_secret.encode(), configured.encode()):
+        raise ApiError(status.HTTP_403_FORBIDDEN, "Accès refusé", ErrorCode.INTERNAL_AUTH_FAILED)
 
 
 def get_current_user(

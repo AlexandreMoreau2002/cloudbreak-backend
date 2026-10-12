@@ -1,0 +1,22 @@
+### Variables : le secret vient de INTERNAL_CRON_SECRET (.env du backend), jamais commité.
+@baseUrl = http://localhost:8000
+@cronSecret = {{$dotenv INTERNAL_CRON_SECRET}}
+
+### Lancer les alertes favoris (nominal) — 200 + résumé
+POST {{baseUrl}}/internal/notifications/run-favorites
+X-Cron-Secret: {{cronSecret}}
+
+### Sans secret — 403 INTERNAL_AUTH_FAILED
+POST {{baseUrl}}/internal/notifications/run-favorites
+
+### Mauvais secret — 403 INTERNAL_AUTH_FAILED
+POST {{baseUrl}}/internal/notifications/run-favorites
+X-Cron-Secret: pas-le-bon
+
+### JWT utilisateur seul — 403
+POST {{baseUrl}}/internal/notifications/run-favorites
+Authorization: Bearer {{$dotenv CLOUDBREAK_JWT}}
+
+### Secret non configuré côté serveur — 503 INTERNAL_JOBS_DISABLED (vider INTERNAL_CRON_SECRET puis relancer)
+POST {{baseUrl}}/internal/notifications/run-favorites
+X-Cron-Secret: n-importe-quoi

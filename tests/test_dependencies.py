@@ -443,3 +443,35 @@ async def test_anonymous_rate_limit_maps_to_stable_429_error() -> None:
     assert raised.value.code == "RATE_LIMIT_EXCEEDED"
     installation_quota.assert_not_awaited()
     user_quota.assert_not_awaited()
+
+
+def test_require_cron_secret_disabled_when_not_configured_returns_503() -> None:
+    from app.core.errors import ApiError
+    from app.core.dependencies import require_cron_secret
+
+    with patch("app.core.dependencies.settings.internal_cron_secret", ""):
+        with pytest.raises(ApiError) as raised:
+            require_cron_secret("anything")
+    assert raised.value.status_code == 503
+    assert raised.value.code == "INTERNAL_JOBS_DISABLED"
+
+
+@pytest.mark.parametrize("provided", [None, "", "wrong"])
+def test_require_cron_secret_rejects_missing_or_wrong_secret_with_403(
+    provided: str | None,
+) -> None:
+    from app.core.errors import ApiError
+    from app.core.dependencies import require_cron_secret
+
+    with patch("app.core.dependencies.settings.internal_cron_secret", "s3cret"):
+        with pytest.raises(ApiError) as raised:
+            require_cron_secret(provided)
+    assert raised.value.status_code == 403
+    assert raised.value.code == "INTERNAL_AUTH_FAILED"
+
+
+def test_require_cron_secret_accepts_the_configured_secret() -> None:
+    from app.core.dependencies import require_cron_secret
+
+    with patch("app.core.dependencies.settings.internal_cron_secret", "s3cret"):
+        assert require_cron_secret("s3cret") is None

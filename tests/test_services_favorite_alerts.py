@@ -1,12 +1,18 @@
 """Tests du service d'alertes favoris."""
 
+import asyncio
 import pytest
 from types import SimpleNamespace
 from sqlalchemy.dialects import postgresql
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import UTC, datetime, timedelta
 
-from app.services.favorite_alerts import Candidate, fetch_candidates, process_candidates
+from app.services.favorite_alerts import (
+    WEATHER_CONCURRENCY,
+    Candidate,
+    fetch_candidates,
+    process_candidates,
+)
 
 NOW = datetime(2026, 10, 12, 16, 0, tzinfo=UTC)
 
@@ -265,3 +271,59 @@ async def test_send_raising_releases_the_claim_and_continues() -> None:
         )
     assert summary.send_failed == 1 and summary.alerts_sent == 1
     redis.delete.assert_awaited_once_with("notif:fav:u1:p1:2026-10-13")
+
+
+class _ConcurrencyProbeWeather:
+    def __init__(self, failing_lat: float | None = None) -> None:
+        self.current = 0
+        self.peak = 0
+        self.failing_lat = failing_lat
+
+    async def get_forecast(self, lat: float, lng: float, date: str, hour: int):
+        self.current += 1
+        self.peak = max(self.peak, self.current)
+        try:
+            await asyncio.sleep(0.01)
+            if lat == self.failing_lat:
+                raise RuntimeError("down")
+            return object()
+        finally:
+            self.current -= 1
+
+
+def _peak_at(index: int):
+    peak = _peak(f"p{index}")
+    peak.lat = float(index)
+    return peak
+
+
+@pytest.mark.asyncio
+async def test_distinct_peaks_are_scored_concurrently_within_the_limit() -> None:
+    weather = _ConcurrencyProbeWeather()
+    candidates = [Candidate(_user(f"u{i}"), _peak_at(i)) for i in range(12)]
+    with _score():
+        summary = await process_candidates(
+            candidates,
+            redis=_redis(),
+            weather_service=weather,  # type: ignore[arg-type]
+            date=DATE,
+            send=AsyncMock(return_value=True),
+        )
+    assert 1 < weather.peak <= WEATHER_CONCURRENCY == 5
+    assert summary.peaks_scored == 12 and summary.alerts_sent == 12
+
+
+@pytest.mark.asyncio
+async def test_isolated_concurrent_weather_failure_does_not_break_others() -> None:
+    weather = _ConcurrencyProbeWeather(failing_lat=3.0)
+    candidates = [Candidate(_user(f"u{i}"), _peak_at(i)) for i in range(6)]
+    with _score():
+        summary = await process_candidates(
+            candidates,
+            redis=_redis(),
+            weather_service=weather,  # type: ignore[arg-type]
+            date=DATE,
+            send=AsyncMock(return_value=True),
+        )
+    assert summary.weather_failed == 1 and summary.peaks_scored == 5
+    assert summary.alerts_sent == 5

@@ -3,6 +3,7 @@
 Appelé par `POST /internal/notifications/run-favorites` (cron). Aucune alerte régionale.
 """
 
+import asyncio
 import logging
 from typing import Any, cast
 from dataclasses import dataclass
@@ -35,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 MAX_ROWS = 2000
 MAX_ALERTS_PER_RUN = 500
+WEATHER_CONCURRENCY = 5
 
 SendFn = Callable[..., Awaitable[bool]]
 
@@ -129,16 +131,23 @@ async def process_candidates(
     send: SendFn = send_push_to_user,
 ) -> AlertSummary:
     summary = AlertSummary(candidates=len(candidates))
-    scores: dict[str, dict[str, Any] | None] = {}
+
+    distinct_peaks: dict[str, Peak] = {}
+    for candidate in candidates:
+        distinct_peaks.setdefault(str(candidate.peak.id), candidate.peak)
+    semaphore = asyncio.Semaphore(WEATHER_CONCURRENCY)
+
+    async def _limited_score(peak: Peak) -> dict[str, Any] | None:
+        async with semaphore:
+            return await _score_peak(weather_service, peak, date)
+
+    results = await asyncio.gather(*(_limited_score(p) for p in distinct_peaks.values()))
+    scores: dict[str, dict[str, Any] | None] = dict(zip(distinct_peaks, results, strict=True))
+    summary.peaks_scored = sum(1 for r in results if r is not None)
+    summary.weather_failed = len(results) - summary.peaks_scored
 
     for candidate in candidates:
         peak_id = str(candidate.peak.id)
-        if peak_id not in scores:
-            scores[peak_id] = await _score_peak(weather_service, candidate.peak, date)
-            if scores[peak_id] is None:
-                summary.weather_failed += 1
-            else:
-                summary.peaks_scored += 1
         result = scores[peak_id]
         if result is None:
             continue

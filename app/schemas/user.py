@@ -1,3 +1,4 @@
+import re
 import unicodedata
 from enum import StrEnum
 from datetime import datetime
@@ -86,7 +87,7 @@ class NotificationPreferencesUpdate(BaseModel):
         return value
 
 
-_EXPO_TOKEN_PREFIXES = ("ExponentPushToken[", "ExpoPushToken[")
+_EXPO_TOKEN_PATTERN = re.compile(r"Expo(nent)?PushToken\[[A-Za-z0-9_-]+\]")
 
 
 class PushTokenUpdate(BaseModel):
@@ -97,12 +98,7 @@ class PushTokenUpdate(BaseModel):
     @field_validator("push_token")
     @classmethod
     def validate_expo_format(cls, value: str) -> str:
-        if (
-            len(value) > 255
-            or not value.endswith("]")
-            or not value.startswith(_EXPO_TOKEN_PREFIXES)
-            or not value.split("[", 1)[1][:-1]
-        ):
+        if len(value) > 255 or not _EXPO_TOKEN_PATTERN.fullmatch(value):
             raise ValueError("Invalid Expo push token")
         return value
 

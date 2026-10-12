@@ -4,7 +4,7 @@ from pydantic import ValidationError
 from app.schemas.user import PushTokenUpdate
 
 
-@pytest.mark.parametrize("token", ["ExponentPushToken[abc123]", "ExpoPushToken[abc123]"])
+@pytest.mark.parametrize("token", ["ExponentPushToken[abc123]", "ExpoPushToken[a_B-9]"])
 def test_push_token_accepts_expo_format(token: str) -> None:
     assert PushTokenUpdate(push_token=token).push_token == token
 
@@ -17,6 +17,16 @@ def test_push_token_accepts_expo_format(token: str) -> None:
         "ExponentPushToken[]",
         "ExpoPushToken[]",
         "ExponentPushToken[",
+        "ExponentPushToken[a b]",
+        "ExponentPushToken[ab]\n",
+        "ExponentPushToken[a\nb]",
+        " ExponentPushToken[ab]",
+        "ExponentPushToken[a[b]]",
+        "ExponentPushToken[a]]",
+        "ExponentPushToken[é]",
+        "ExponentPushToken[日本]",
+        "ExponentPushToken[a.b]",
+        "xExponentPushToken[ab]",
         "ExponentPushToken[" + "a" * 300 + "]",
     ],
 )

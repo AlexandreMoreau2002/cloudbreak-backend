@@ -82,7 +82,11 @@ async def send_push_to_user(
     except (httpx.HTTPError, ValueError) as error:
         logger.error(
             "push_send_failed",
-            extra={"user_id": str(user.supabase_user_id), "error": type(error).__name__},
+            extra={
+                "user_id": str(user.supabase_user_id),
+                "error": type(error).__name__,
+                "status_code": getattr(getattr(error, "response", None), "status_code", None),
+            },
         )
         return False
 
@@ -90,7 +94,8 @@ async def send_push_to_user(
         logger.info("push_sent", extra={"user_id": str(user.supabase_user_id)})
         return True
 
-    error_code = (ticket.get("details") or {}).get("error")
+    details = ticket.get("details")
+    error_code = details.get("error") if isinstance(details, dict) else None
     logger.error(
         "push_rejected",
         extra={"user_id": str(user.supabase_user_id), "expo_error": error_code},

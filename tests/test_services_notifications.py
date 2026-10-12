@@ -162,3 +162,26 @@ async def test_batch_response_uses_first_ticket() -> None:
     client = _client(_json_response({"data": [{"status": "ok", "id": "x"}]}))
     with patch("app.services.notifications.httpx.AsyncClient", return_value=client):
         assert await send_push_to_user(_user(), "t", "b") is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("details", ["oops", ["x"], 3, None])
+async def test_non_dict_details_never_raises(details: object) -> None:
+    body = {"data": {"status": "error", "message": "m", "details": details}}
+    client = _client(_json_response(body))
+    with patch("app.services.notifications.httpx.AsyncClient", return_value=client):
+        assert await send_push_to_user(_user(), "t", "b") is False
+
+
+@pytest.mark.asyncio
+async def test_http_error_logs_status_code_without_token(caplog: pytest.LogCaptureFixture) -> None:
+    response = httpx.Response(401, request=httpx.Request("POST", "http://x"))
+    client = _client(response)
+    with (
+        caplog.at_level("ERROR"),
+        patch("app.services.notifications.httpx.AsyncClient", return_value=client),
+    ):
+        assert await send_push_to_user(_user(), "t", "b") is False
+    record = next(r for r in caplog.records if r.message == "push_send_failed")
+    assert record.status_code == 401  # type: ignore[attr-defined]
+    assert "ExponentPushToken" not in caplog.text

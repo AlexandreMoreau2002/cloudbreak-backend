@@ -10,6 +10,20 @@ Content-Type: application/json
 
 { "push_token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" }
 
+### Avec la langue de l'app — 204
+POST {{baseUrl}}/api/v1/user/push-token
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "push_token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]", "locale": "en" }
+
+### Langue non supportée — 422
+POST {{baseUrl}}/api/v1/user/push-token
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "push_token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]", "locale": "de" }
+
 ### Format invalide — 422
 POST {{baseUrl}}/api/v1/user/push-token
 Authorization: Bearer {{token}}

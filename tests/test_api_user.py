@@ -614,6 +614,37 @@ def test_push_token_registered_returns_204(mock_set: AsyncMock) -> None:
     mock_set.assert_awaited_once()
 
 
+@patch("app.api.v1.endpoints.user.set_push_token", new_callable=AsyncMock)
+def test_push_token_forwards_locale_to_service(mock_set: AsyncMock) -> None:
+    app.dependency_overrides[get_current_user] = lambda: {"id": "u1", "is_anonymous": False}
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v1/user/push-token",
+                json={"push_token": "ExponentPushToken[a]", "locale": "en"},
+            )
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 204
+    assert mock_set.await_args.args[1] == "ExponentPushToken[a]"
+    assert mock_set.await_args.args[3] == "en"
+
+
+def test_push_token_invalid_locale_returns_422() -> None:
+    app.dependency_overrides[get_current_user] = lambda: {"id": "u1", "is_anonymous": False}
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v1/user/push-token",
+                json={"push_token": "ExponentPushToken[a]", "locale": "de"},
+            )
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 422
+
+
 @patch("app.api.v1.endpoints.user.clear_push_token", new_callable=AsyncMock)
 def test_push_token_deleted_returns_204(mock_clear: AsyncMock) -> None:
     app.dependency_overrides[get_current_user] = lambda: {"id": "u1", "is_anonymous": False}

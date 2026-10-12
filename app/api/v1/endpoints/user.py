@@ -117,7 +117,7 @@ async def register_push_token(
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Enregistre le token Expo Push de l'appareil (jamais loggué)."""
-    await set_push_token(current_user, payload.push_token, db)
+    await set_push_token(current_user, payload.push_token, db, payload.locale)
     await db.commit()
     logger.info("push_token_registered", extra={"user_id": str(current_user["id"])})
 

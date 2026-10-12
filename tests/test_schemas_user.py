@@ -38,3 +38,18 @@ def test_push_token_rejects_invalid_format(token: str) -> None:
 def test_push_token_forbids_extra_fields() -> None:
     with pytest.raises(ValidationError):
         PushTokenUpdate(push_token="ExponentPushToken[a]", other=1)  # type: ignore[call-arg]
+
+
+def test_push_token_locale_accepts_supported_values() -> None:
+    assert PushTokenUpdate(push_token="ExponentPushToken[a]", locale="en").locale == "en"
+    assert PushTokenUpdate(push_token="ExponentPushToken[a]", locale="fr").locale == "fr"
+
+
+def test_push_token_locale_is_optional() -> None:
+    assert PushTokenUpdate(push_token="ExponentPushToken[a]").locale is None
+
+
+@pytest.mark.parametrize("locale", ["de", "EN", "", "fr-FR"])
+def test_push_token_locale_rejects_unsupported_values(locale: str) -> None:
+    with pytest.raises(ValidationError):
+        PushTokenUpdate(push_token="ExponentPushToken[a]", locale=locale)  # type: ignore[arg-type]

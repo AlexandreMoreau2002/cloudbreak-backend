@@ -167,7 +167,9 @@ async def _assign_push_token(profile: User, user_id: str, token: str, db: AsyncS
     await db.flush()
 
 
-async def set_push_token(user: dict[str, object], token: str, db: AsyncSession) -> User:
+async def set_push_token(
+    user: dict[str, object], token: str, db: AsyncSession, locale: str | None = None
+) -> User:
     """Enregistre le token push de l'appareil courant.
 
     Un token identifie un appareil : s'il était rattaché à un autre compte (téléphone
@@ -187,6 +189,8 @@ async def set_push_token(user: dict[str, object], token: str, db: AsyncSession) 
         logger.info("push_token_conflict_replay", extra={"user_id": user_id})
         async with db.begin_nested():
             await _assign_push_token(profile, user_id, token, db)
+    if locale is not None:
+        profile.locale = locale  # type: ignore[assignment]
     return profile
 
 

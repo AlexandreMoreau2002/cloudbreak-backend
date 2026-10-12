@@ -8,6 +8,7 @@ from app.db.session import get_db
 from app.core.dependencies import get_redis
 from app.services.favorite_alerts import AlertSummary
 
+SECRET = "s" * 32
 URL = "/internal/notifications/run-favorites"
 
 
@@ -33,7 +34,7 @@ def test_disabled_when_secret_not_configured_returns_503() -> None:
 
 
 def test_missing_or_wrong_secret_returns_403() -> None:
-    with patch("app.core.dependencies.settings.internal_cron_secret", "s3cret"):
+    with patch("app.core.dependencies.settings.internal_cron_secret", SECRET):
         client = _client()
         assert client.post(URL).status_code == 403
         wrong = client.post(URL, headers={"X-Cron-Secret": "nope"})
@@ -42,7 +43,7 @@ def test_missing_or_wrong_secret_returns_403() -> None:
 
 
 def test_user_jwt_alone_is_not_enough() -> None:
-    with patch("app.core.dependencies.settings.internal_cron_secret", "s3cret"):
+    with patch("app.core.dependencies.settings.internal_cron_secret", SECRET):
         response = _client().post(URL, headers={"Authorization": "Bearer whatever"})
     assert response.status_code == 403
 
@@ -50,13 +51,13 @@ def test_user_jwt_alone_is_not_enough() -> None:
 def test_valid_secret_runs_the_job_and_returns_the_summary() -> None:
     summary = AlertSummary(candidates=3, peaks_scored=2, alerts_sent=1, skipped_not_ideal=2)
     with (
-        patch("app.core.dependencies.settings.internal_cron_secret", "s3cret"),
+        patch("app.core.dependencies.settings.internal_cron_secret", SECRET),
         patch(
             "app.api.v1.endpoints.internal_notifications.run_favorite_alerts",
             new=AsyncMock(return_value=summary),
         ) as job,
     ):
-        response = _client().post(URL, headers={"X-Cron-Secret": "s3cret"})
+        response = _client().post(URL, headers={"X-Cron-Secret": SECRET})
     assert response.status_code == 200
     assert response.json() == {
         "candidates": 3,
@@ -70,3 +71,10 @@ def test_valid_secret_runs_the_job_and_returns_the_summary() -> None:
         "skipped_locked": 0,
     }
     job.assert_awaited_once()
+
+
+def test_weak_secret_is_treated_as_not_configured_returns_503() -> None:
+    with patch("app.core.dependencies.settings.internal_cron_secret", "short"):
+        response = _client().post(URL, headers={"X-Cron-Secret": "short"})
+    assert response.status_code == 503
+    assert response.json()["code"] == "INTERNAL_JOBS_DISABLED"

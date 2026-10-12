@@ -8,6 +8,7 @@ from app.main import app
 
 
 client = TestClient(app)
+SECRET = "s" * 32
 
 
 def test_get_me_without_token() -> None:
@@ -463,7 +464,7 @@ def test_require_cron_secret_rejects_missing_or_wrong_secret_with_403(
     from app.core.errors import ApiError
     from app.core.dependencies import require_cron_secret
 
-    with patch("app.core.dependencies.settings.internal_cron_secret", "s3cret"):
+    with patch("app.core.dependencies.settings.internal_cron_secret", SECRET):
         with pytest.raises(ApiError) as raised:
             require_cron_secret(provided)
     assert raised.value.status_code == 403
@@ -473,5 +474,25 @@ def test_require_cron_secret_rejects_missing_or_wrong_secret_with_403(
 def test_require_cron_secret_accepts_the_configured_secret() -> None:
     from app.core.dependencies import require_cron_secret
 
-    with patch("app.core.dependencies.settings.internal_cron_secret", "s3cret"):
-        assert require_cron_secret("s3cret") is None
+    with patch("app.core.dependencies.settings.internal_cron_secret", SECRET):
+        assert require_cron_secret(SECRET) is None
+
+
+def test_require_cron_secret_weak_secret_returns_503_and_warns_once(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    from app.core import dependencies
+    from app.core.errors import ApiError
+    from app.core.dependencies import require_cron_secret
+
+    dependencies._weak_secret_warned = False
+    with patch("app.core.dependencies.settings.internal_cron_secret", "weak-secret"):
+        with caplog.at_level("WARNING"):
+            for _ in range(2):
+                with pytest.raises(ApiError) as raised:
+                    require_cron_secret("weak-secret")
+                assert raised.value.status_code == 503
+                assert raised.value.code == "INTERNAL_JOBS_DISABLED"
+    warnings = [r for r in caplog.records if r.message == "internal_cron_secret_too_weak"]
+    assert len(warnings) == 1
+    assert "weak-secret" not in caplog.text

@@ -72,12 +72,25 @@ async def get_redis() -> Redis:
     return _redis
 
 
+MIN_CRON_SECRET_LENGTH = 32
+_weak_secret_warned = False
+
+
 def require_cron_secret(x_cron_secret: str | None = Header(default=None)) -> None:
     """Protège les jobs internes (cron) : secret partagé en header, comparaison à temps constant.
 
-    Désactivé (503) tant que INTERNAL_CRON_SECRET n'est pas configuré : fail closed.
+    Désactivé (503) tant que INTERNAL_CRON_SECRET n'est pas configuré ou s'il fait moins de
+    32 caractères (secret faible refusé) : fail closed.
     """
+    global _weak_secret_warned
     configured = settings.internal_cron_secret
+    if configured and len(configured) < MIN_CRON_SECRET_LENGTH:
+        if not _weak_secret_warned:
+            _weak_secret_warned = True
+            logger.warning(
+                "internal_cron_secret_too_weak", extra={"min_length": MIN_CRON_SECRET_LENGTH}
+            )
+        configured = ""
     if not configured:
         raise ApiError(
             status.HTTP_503_SERVICE_UNAVAILABLE,

@@ -42,6 +42,7 @@ def test_upgrade_adds_token_and_validity_columns() -> None:
     assert columns["push_token"].nullable is True
     assert isinstance(columns["push_token_valid"].type, Boolean)
     assert columns["push_token_valid"].nullable is False
+    assert str(columns["push_token_valid"].server_default.arg) == "true"
 
 
 def test_upgrade_creates_partial_unique_push_token_index() -> None:
@@ -87,3 +88,4 @@ def test_model_columns_match_migration() -> None:
     assert User.__table__.c.push_token.nullable is True
     assert isinstance(User.__table__.c.push_token_valid.type, Boolean)
     assert User.__table__.c.push_token_valid.nullable is False
+    assert str(User.__table__.c.push_token_valid.server_default.arg) == "true"

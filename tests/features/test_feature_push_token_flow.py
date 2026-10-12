@@ -10,12 +10,14 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.dml import Update
 
 from app.core.dependencies import get_current_user
 from app.db.session import get_db
 from app.main import app
 from app.schemas.user import UserProfile
+from app.services.user import clear_push_token, set_push_token
 
 TOKEN = "ExponentPushToken[device-1]"
 USER_A = {"id": "user-a", "email": "a@test.com", "is_anonymous": False}
@@ -40,7 +42,7 @@ class _FakeSession:
         if isinstance(statement, Update):
             # Hypothèse : SQLAlchemy nomme les paramètres liés `<colonne>_<n>` dans l'ordre
             # d'apparition (`push_token_1` pour le WHERE, `supabase_user_id_1`). Le SET
-            # `push_token=None` est un littéral NULL, pas un paramètre, donc sans collision.
+            # `push_token=None` est le paramètre `push_token` (sans suffixe), donc sans collision.
             # Si une montée de version SQLAlchemy change ce nommage, ce test casse ici.
             params = statement.compile().params
             owner = next(v for k, v in params.items() if k.startswith("supabase_user_id_"))
@@ -142,3 +144,35 @@ def test_account_deletion_removes_profile_and_token(store: dict[str, SimpleNames
 def test_push_token_is_never_exposed_by_user_profile() -> None:
     assert "push_token" not in UserProfile.model_fields
     assert "push_token_valid" not in UserProfile.model_fields
+
+
+@pytest.mark.asyncio
+async def test_real_statements_compile_to_expected_postgres_sql() -> None:
+    """Fige le SQL réel de la purge et du clear (le faux ci-dessus ne lit que des noms)."""
+    captured: list[object] = []
+
+    class _Recorder(_FakeSession):
+        async def execute(self, statement: object) -> None:
+            captured.append(statement)
+
+    profile = SimpleNamespace(supabase_user_id="u1", push_token=None, push_token_valid=False)
+    db = _Recorder({})
+
+    with patch("app.services.user.get_or_create_user", AsyncMock(return_value=profile)):
+        await set_push_token({"id": "u1"}, TOKEN, db)  # type: ignore[arg-type]
+        await clear_push_token({"id": "u1"}, db)  # type: ignore[arg-type]
+
+    purge, clear = (s.compile(dialect=postgresql.dialect()) for s in captured)  # type: ignore[attr-defined]
+    assert str(purge) == (
+        "UPDATE users SET push_token=%(push_token)s WHERE users.push_token = %(push_token_1)s "
+        "AND users.supabase_user_id != %(supabase_user_id_1)s"
+    )
+    assert purge.params == {
+        "push_token": None,
+        "push_token_1": TOKEN,
+        "supabase_user_id_1": "u1",
+    }
+    assert str(clear) == (
+        "UPDATE users SET push_token=%(push_token)s WHERE users.supabase_user_id = "
+        "%(supabase_user_id_1)s"
+    )

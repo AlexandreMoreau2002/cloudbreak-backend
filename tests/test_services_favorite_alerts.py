@@ -252,3 +252,16 @@ async def test_run_is_capped() -> None:
             send=AsyncMock(return_value=True),
         )
     assert summary.alerts_sent == 2 and summary.skipped_cap == 3
+
+
+@pytest.mark.asyncio
+async def test_send_raising_releases_the_claim_and_continues() -> None:
+    redis = _redis()
+    send = AsyncMock(side_effect=[RuntimeError("boom"), True])
+    candidates = [Candidate(_user("u1"), _peak()), Candidate(_user("u2"), _peak())]
+    with _score():
+        summary = await process_candidates(
+            candidates, redis=redis, weather_service=_weather(), date=DATE, send=send
+        )
+    assert summary.send_failed == 1 and summary.alerts_sent == 1
+    redis.delete.assert_awaited_once_with("notif:fav:u1:p1:2026-10-13")

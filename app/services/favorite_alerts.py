@@ -159,7 +159,15 @@ async def process_candidates(
             str(candidate.peak.name), int(result["score"]), cast(str | None, candidate.user.locale)
         )
         data = {"type": "favorite_alert", "slug": str(candidate.peak.slug), "peak_id": peak_id}
-        if await send(candidate.user, title, body, data):
+        try:
+            sent = await send(candidate.user, title, body, data)
+        except Exception as error:
+            logger.error(
+                "favorite_alert_send_raised",
+                extra={"user_id": user_id, "peak_id": peak_id, "error": type(error).__name__},
+            )
+            sent = False
+        if sent:
             summary.alerts_sent += 1
             track(
                 "favorite_alert_sent", user_id, {"peak_id": peak_id, "score": int(result["score"])}

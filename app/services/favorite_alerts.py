@@ -20,7 +20,7 @@ from app.models.favorite import Favorite
 from app.domain.score import calculate_score
 from app.services.analytics import track
 from app.models.subscription import Subscription
-from app.domain.entitlement import is_entitlement_active
+from app.domain.entitlement import ACTIVE_STATUSES, PREMIUM_PLANS, is_entitlement_active
 from app.services.notifications import send_push_to_user
 from app.domain.favorite_alerts import (
     ALERT_HOUR,
@@ -46,14 +46,22 @@ class Candidate:
 
 
 async def fetch_candidates(db: AsyncSession, now: datetime | None = None) -> list[Candidate]:
-    """Couples (utilisateur Premium actif, sommet favori) à évaluer."""
+    """Couples (utilisateur Premium actif, sommet favori) à évaluer.
+
+    Le filtre Premium est appliqué en SQL (avant la limite) pour que des non-Premium ne
+    puissent pas évincer des abonnés ; `is_entitlement_active` reste le filet de sécurité
+    (même source de vérité des plans et statuts).
+    """
     moment = now or datetime.now(UTC)
     statement = (
         select(User, Peak, Subscription)
         .join(Favorite, Favorite.user_id == User.supabase_user_id)
         .join(Peak, Peak.id == Favorite.peak_id)
-        .outerjoin(Subscription, Subscription.user_id == User.supabase_user_id)
+        .join(Subscription, Subscription.user_id == User.supabase_user_id)
         .where(
+            Subscription.plan.in_(sorted(PREMIUM_PLANS)),
+            Subscription.status.in_(sorted(ACTIVE_STATUSES)),
+            Subscription.expires_at > moment,
             User.notif_favorites.is_(True),
             User.push_token.is_not(None),
             User.push_token_valid.is_(True),
@@ -62,6 +70,8 @@ async def fetch_candidates(db: AsyncSession, now: datetime | None = None) -> lis
         .limit(MAX_ROWS)
     )
     rows = (await db.execute(statement)).all()
+    if len(rows) >= MAX_ROWS:
+        logger.warning("favorite_alerts_truncated", extra={"limit": MAX_ROWS})
     return [
         Candidate(user=user, peak=peak)
         for user, peak, subscription in rows

@@ -64,6 +64,38 @@ async def test_query_filters_preference_and_valid_token_in_sql() -> None:
     assert "user_favorites" in sql and "subscriptions" in sql and "peaks" in sql
 
 
+@pytest.mark.asyncio
+async def test_query_filters_premium_entitlement_in_sql_before_the_limit() -> None:
+    db = _db([])
+    await fetch_candidates(db, NOW)
+    statement = db.execute.await_args.args[0]
+    sql = " ".join(str(statement.compile(dialect=postgresql.dialect())).lower().split())
+    assert "left outer join" not in sql
+    assert "subscriptions.plan in" in sql
+    assert "subscriptions.status in" in sql
+    assert "subscriptions.expires_at >" in sql
+    compiled = statement.compile(dialect=postgresql.dialect())
+    values = [v for v in compiled.params.values() if isinstance(v, list | tuple | set | frozenset)]
+    flat = {item for value in values for item in value}
+    assert {"premium", "pro", "trial", "active"} <= flat
+
+
+@pytest.mark.asyncio
+async def test_truncation_logs_a_warning(caplog: pytest.LogCaptureFixture) -> None:
+    rows = [(_user(f"u{i}"), _peak(), _sub()) for i in range(3)]
+    with patch("app.services.favorite_alerts.MAX_ROWS", 3):
+        with caplog.at_level("WARNING"):
+            await fetch_candidates(_db(rows), NOW)
+    assert any(r.message == "favorite_alerts_truncated" for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_no_truncation_warning_below_the_limit(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level("WARNING"):
+        await fetch_candidates(_db([(_user(), _peak(), _sub())]), NOW)
+    assert not any(r.message == "favorite_alerts_truncated" for r in caplog.records)
+
+
 DATE = "2026-10-13"
 
 

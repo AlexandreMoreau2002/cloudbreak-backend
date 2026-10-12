@@ -37,6 +37,8 @@ logger = logging.getLogger(__name__)
 MAX_ROWS = 2000
 MAX_ALERTS_PER_RUN = 500
 WEATHER_CONCURRENCY = 5
+LOCK_KEY = "lock:favorite-alerts"
+LOCK_TTL_SECONDS = 600
 
 SendFn = Callable[..., Awaitable[bool]]
 
@@ -97,6 +99,7 @@ class AlertSummary:
     skipped_cap: int = 0
     send_failed: int = 0
     weather_failed: int = 0
+    skipped_locked: int = 0
 
 
 async def _score_peak(
@@ -195,11 +198,17 @@ async def run_favorite_alerts(
     weather_service: WeatherService,
     now: datetime | None = None,
 ) -> AlertSummary:
-    moment = now or datetime.now(UTC)
-    candidates = await fetch_candidates(db, moment)
-    return await process_candidates(
-        candidates,
-        redis=redis,
-        weather_service=weather_service,
-        date=target_alert_date(moment),
-    )
+    if not await redis.set(LOCK_KEY, "1", nx=True, ex=LOCK_TTL_SECONDS):
+        logger.info("favorite_alerts_already_running")
+        return AlertSummary(skipped_locked=1)
+    try:
+        moment = now or datetime.now(UTC)
+        candidates = await fetch_candidates(db, moment)
+        return await process_candidates(
+            candidates,
+            redis=redis,
+            weather_service=weather_service,
+            date=target_alert_date(moment),
+        )
+    finally:
+        await redis.delete(LOCK_KEY)

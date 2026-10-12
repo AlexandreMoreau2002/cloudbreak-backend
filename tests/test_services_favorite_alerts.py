@@ -8,10 +8,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import UTC, datetime, timedelta
 
 from app.services.favorite_alerts import (
+    LOCK_KEY,
     WEATHER_CONCURRENCY,
     Candidate,
     fetch_candidates,
     process_candidates,
+    run_favorite_alerts,
 )
 
 NOW = datetime(2026, 10, 12, 16, 0, tzinfo=UTC)
@@ -327,3 +329,39 @@ async def test_isolated_concurrent_weather_failure_does_not_break_others() -> No
         )
     assert summary.weather_failed == 1 and summary.peaks_scored == 5
     assert summary.alerts_sent == 5
+
+
+@pytest.mark.asyncio
+async def test_run_is_skipped_when_the_lock_is_held() -> None:
+    redis = AsyncMock()
+    redis.set = AsyncMock(return_value=None)
+    with patch("app.services.favorite_alerts.fetch_candidates", new=AsyncMock()) as fetch:
+        summary = await run_favorite_alerts(AsyncMock(), redis, _weather(), NOW)
+    assert summary.skipped_locked == 1 and summary.alerts_sent == 0
+    fetch.assert_not_awaited()
+    redis.delete.assert_not_awaited()
+    assert redis.set.await_args.args[0] == LOCK_KEY == "lock:favorite-alerts"
+    assert redis.set.await_args.kwargs == {"nx": True, "ex": 600}
+
+
+@pytest.mark.asyncio
+async def test_lock_is_acquired_then_released_after_a_normal_run() -> None:
+    redis = AsyncMock()
+    redis.set = AsyncMock(return_value=True)
+    with patch("app.services.favorite_alerts.fetch_candidates", new=AsyncMock(return_value=[])):
+        summary = await run_favorite_alerts(AsyncMock(), redis, _weather(), NOW)
+    assert summary.skipped_locked == 0
+    redis.delete.assert_awaited_once_with(LOCK_KEY)
+
+
+@pytest.mark.asyncio
+async def test_lock_is_released_even_if_processing_raises() -> None:
+    redis = AsyncMock()
+    redis.set = AsyncMock(return_value=True)
+    with patch(
+        "app.services.favorite_alerts.fetch_candidates",
+        new=AsyncMock(side_effect=RuntimeError("db down")),
+    ):
+        with pytest.raises(RuntimeError):
+            await run_favorite_alerts(AsyncMock(), redis, _weather(), NOW)
+    redis.delete.assert_awaited_once_with(LOCK_KEY)

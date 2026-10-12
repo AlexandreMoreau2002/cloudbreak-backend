@@ -2,7 +2,8 @@
 
 import logging
 from datetime import UTC, datetime
-from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
 
@@ -153,3 +154,44 @@ async def update_user_notification_preferences(
         setattr(profile, field, value)
     await db.flush()
     return profile
+
+
+async def _assign_push_token(profile: User, user_id: str, token: str, db: AsyncSession) -> None:
+    await db.execute(
+        update(User)
+        .where(User.push_token == token, User.supabase_user_id != user_id)
+        .values(push_token=None)
+    )
+    profile.push_token = token  # type: ignore[assignment]
+    profile.push_token_valid = True  # type: ignore[assignment]
+    await db.flush()
+
+
+async def set_push_token(user: dict[str, object], token: str, db: AsyncSession) -> User:
+    """Enregistre le token push de l'appareil courant.
+
+    Un token identifie un appareil : s'il était rattaché à un autre compte (téléphone
+    partagé, changement de compte), il est retiré de ce dernier pour qu'il ne reçoive
+    plus les alertes du nouvel utilisateur. L'index unique partiel `ix_users_push_token`
+    tranche les courses entre deux POST simultanés : le perdant rejoue purge et
+    affectation une fois (dans un savepoint), puis laisse remonter l'erreur.
+    """
+    user_id = str(user["id"])
+    profile = await get_or_create_user(
+        user_id, str(user.get("auth_provider", "email")), db, _token_email(user)
+    )
+    try:
+        async with db.begin_nested():
+            await _assign_push_token(profile, user_id, token, db)
+    except IntegrityError:
+        logger.info("push_token_conflict_replay", extra={"user_id": user_id})
+        async with db.begin_nested():
+            await _assign_push_token(profile, user_id, token, db)
+    return profile
+
+
+async def clear_push_token(user: dict[str, object], db: AsyncSession) -> None:
+    """Retire le token de l'appelant. UPDATE seul : ne crée jamais de profil."""
+    await db.execute(
+        update(User).where(User.supabase_user_id == str(user["id"])).values(push_token=None)
+    )

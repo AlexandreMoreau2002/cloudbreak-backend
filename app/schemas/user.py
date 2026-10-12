@@ -1,3 +1,4 @@
+import re
 import unicodedata
 from enum import StrEnum
 from datetime import datetime
@@ -83,6 +84,22 @@ class NotificationPreferencesUpdate(BaseModel):
     def reject_explicit_null(cls, value: bool | None) -> bool | None:
         if value is None:
             raise ValueError("Notification preferences cannot be null")
+        return value
+
+
+_EXPO_TOKEN_PATTERN = re.compile(r"Expo(nent)?PushToken\[[A-Za-z0-9_-]+\]")
+
+
+class PushTokenUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    push_token: str
+
+    @field_validator("push_token")
+    @classmethod
+    def validate_expo_format(cls, value: str) -> str:
+        if len(value) > 255 or not _EXPO_TOKEN_PATTERN.fullmatch(value):
+            raise ValueError("Invalid Expo push token")
         return value
 
 

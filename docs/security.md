@@ -2,6 +2,26 @@
 
 Document de référence sécurité. À mettre à jour à chaque story qui touche auth, réseau, données ou dépendances.
 
+## 2026-10-09 Story 5.1 — Token push
+
+- `users.push_token` (Expo Push, `VARCHAR(255)`) et `users.push_token_valid` sont stockés en base ; seul un compte permanent authentifié peut les modifier via `POST`/`DELETE /api/v1/user/push-token` (anonyme : 403 `ACCOUNT_REQUIRED`, sans JWT : 403). Le format `ExponentPushToken[...]` / `ExpoPushToken[...]` est validé côté serveur (422 sinon).
+- Le token n'est jamais renvoyé par l'API (absent de `UserProfile` et de `GET /api/v1/user/me`) et jamais loggué : seuls `user_id` et le nom d'erreur Expo apparaissent dans les logs.
+- Retrait : `DELETE /push-token` à la déconnexion, et suppression de la ligne `users` à la suppression de compte (RGPD).
+- Un token identifie un appareil : si le même token est enregistré par un autre compte, il est purgé chez l'ancien propriétaire pour qu'il ne reçoive pas les alertes du nouvel utilisateur.
+- `send_push_to_user` ne lève jamais (timeout 10 s) ; un ticket `DeviceNotRegistered` passe `push_token_valid` à false (UPDATE ciblé sur le token envoyé, session dédiée ; les receipts ne sont pas lus, voir plus bas). `EXPO_ACCESS_TOKEN` reste optionnel, lu via `app/core/config.py`, jamais loggué.
+
+### À traiter avant la release 1.0.0
+
+- (a) Rate limiting sur `POST /api/v1/user/push-token` (aucun pour l'instant).
+- (b) Valider `EXPO_ACCESS_TOKEN` en production (validator de config ou log `CRITICAL` s'il est vide).
+- (c) TOCTOU théorique sur le transfert de token (purge puis écriture non atomiques entre deux requêtes concurrentes) : accepté en MVP.
+- (d) Le `DELETE /push-token` du logout peut échouer (hors ligne, JWT expiré) : l'ancien compte garde alors le token jusqu'à ce qu'un autre compte l'enregistre ou qu'Expo réponde `DeviceNotRegistered`. Piste : ignorer les utilisateurs inactifs à l'envoi (story 5.2).
+- (e) L'unicité de `push_token` est garantie par un index unique partiel (`WHERE push_token IS NOT NULL`) ; `set_push_token` rejoue purge + affectation une fois sur conflit (deux POST simultanés).
+- (f) Story 5.2 : lire les receipts Expo (stocker `ticket.id`, `/push/getReceipts`) pour invalider les tokens morts : `DeviceNotRegistered` arrive surtout dans les receipts, pas dans le ticket.
+- (g) Un compte permanent connaissant le token d'un autre appareil peut se l'approprier (le token Expo n'est pas devinable) : risque accepté.
+
+---
+
 ## 2026-10-08 Story 2.9 — Nom d'usage
 
 - `users.display_name` est une donnée personnelle facultative. Seul un compte permanent authentifié peut la modifier via `PATCH /api/v1/user/display-name` ; une session anonyme ou sans JWT reçoit 403.

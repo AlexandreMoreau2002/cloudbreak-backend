@@ -6,7 +6,7 @@ Appelé par `POST /internal/notifications/run-favorites` (cron). Aucune alerte r
 import asyncio
 import logging
 from typing import Any, cast
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from collections.abc import Awaitable, Callable
 
@@ -16,13 +16,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.peak import Peak
 from app.models.user import User
-from app.services.weather import WeatherService
 from app.models.favorite import Favorite
-from app.domain.score import calculate_score
 from app.services.analytics import track
+from app.domain.score import calculate_score
+from app.services.weather import WeatherService
 from app.models.subscription import Subscription
-from app.domain.entitlement import ACTIVE_STATUSES, PREMIUM_PLANS, is_entitlement_active
 from app.services.notifications import send_push_to_user
+from app.domain.entitlement import ACTIVE_STATUSES, PREMIUM_PLANS, is_entitlement_active
 from app.domain.favorite_alerts import (
     ALERT_HOUR,
     DEDUPE_TTL_SECONDS,
@@ -188,7 +188,7 @@ async def process_candidates(
             await redis.delete(key)
             summary.send_failed += 1
 
-    logger.info("favorite_alerts_run", extra=dict(summary.__dict__))
+    logger.info("favorite_alerts_run", extra=asdict(summary))
     return summary
 
 

@@ -108,8 +108,15 @@ DATE = "2026-10-13"
 
 
 def _redis(claim_results=None):
+    results = iter(claim_results or [True] * 50)
+
+    async def _set(key, value, nx=False, ex=None):
+        if nx is not True:
+            raise AssertionError("dedupe claim must use SET NX")
+        return next(results)
+
     redis = AsyncMock()
-    redis.set = AsyncMock(side_effect=claim_results or [True] * 50)
+    redis.set = AsyncMock(side_effect=_set)
     return redis
 
 

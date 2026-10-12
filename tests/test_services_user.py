@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from sqlalchemy.sql.dml import Delete
 from sqlalchemy.dialects import postgresql
 from unittest.mock import AsyncMock, MagicMock, patch
+from sqlalchemy.exc import IntegrityError
 
 from app.models.user import User
 from app.models.favorite import Favorite
@@ -473,6 +474,7 @@ async def test_update_user_display_name_erases_value(value: str | None) -> None:
 async def test_set_push_token_stores_token_and_marks_valid() -> None:
     profile = SimpleNamespace(supabase_user_id="u1", push_token=None, push_token_valid=False)
     db = AsyncMock()
+    db.begin_nested = MagicMock(side_effect=lambda: _Savepoint())
     with patch("app.services.user.get_or_create_user", AsyncMock(return_value=profile)):
         await set_push_token({"id": "u1", "auth_provider": "email"}, "ExponentPushToken[a]", db)
     assert profile.push_token == "ExponentPushToken[a]"
@@ -500,3 +502,37 @@ async def test_clear_push_token_updates_only_the_caller_without_creating_profile
     assert str(compiled).startswith("UPDATE users SET push_token=")
     assert "users.supabase_user_id = " in str(compiled)
     assert "u1" in compiled.params.values()
+
+
+class _Savepoint:
+    async def __aenter__(self) -> None:
+        return None
+
+    async def __aexit__(self, *exc: object) -> bool:
+        return False
+
+
+@pytest.mark.asyncio
+async def test_set_push_token_replays_purge_once_on_integrity_error() -> None:
+    profile = SimpleNamespace(supabase_user_id="u1", push_token=None, push_token_valid=False)
+    db = AsyncMock()
+    db.begin_nested = MagicMock(side_effect=lambda: _Savepoint())
+    db.flush.side_effect = [IntegrityError("stmt", {}, Exception("dup")), None]
+    with patch("app.services.user.get_or_create_user", AsyncMock(return_value=profile)):
+        await set_push_token({"id": "u1"}, "ExponentPushToken[a]", db)
+    assert db.begin_nested.call_count == 2
+    assert db.execute.await_count == 2  # purge rejouée
+    assert profile.push_token == "ExponentPushToken[a]"
+    assert profile.push_token_valid is True
+
+
+@pytest.mark.asyncio
+async def test_set_push_token_raises_if_replay_also_conflicts() -> None:
+    profile = SimpleNamespace(supabase_user_id="u1", push_token=None, push_token_valid=False)
+    db = AsyncMock()
+    db.begin_nested = MagicMock(side_effect=lambda: _Savepoint())
+    db.flush.side_effect = IntegrityError("stmt", {}, Exception("dup"))
+    with patch("app.services.user.get_or_create_user", AsyncMock(return_value=profile)):
+        with pytest.raises(IntegrityError):
+            await set_push_token({"id": "u1"}, "ExponentPushToken[a]", db)
+    assert db.begin_nested.call_count == 2

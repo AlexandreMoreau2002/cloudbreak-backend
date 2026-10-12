@@ -24,7 +24,13 @@ def upgrade() -> None:
         "users",
         sa.Column("push_token_valid", sa.Boolean(), nullable=False, server_default=sa.true()),
     )
-    op.create_index("ix_users_push_token", "users", ["push_token"])
+    op.create_index(
+        "ix_users_push_token",
+        "users",
+        ["push_token"],
+        unique=True,
+        postgresql_where=sa.text("push_token IS NOT NULL"),
+    )
 
 
 def downgrade() -> None:

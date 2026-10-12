@@ -30,6 +30,12 @@ class _FakeSession:
         self.commit = AsyncMock()
         self.flush = AsyncMock()
 
+    def begin_nested(self) -> AsyncMock:
+        savepoint = AsyncMock()
+        savepoint.__aenter__.return_value = None
+        savepoint.__aexit__.return_value = False
+        return savepoint
+
     async def execute(self, statement: object) -> None:
         if isinstance(statement, Update):
             # Hypothèse : SQLAlchemy nomme les paramètres liés `<colonne>_<n>` dans l'ordre

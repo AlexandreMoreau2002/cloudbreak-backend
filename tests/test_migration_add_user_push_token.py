@@ -44,12 +44,14 @@ def test_upgrade_adds_token_and_validity_columns() -> None:
     assert columns["push_token_valid"].nullable is False
 
 
-def test_upgrade_creates_push_token_index() -> None:
+def test_upgrade_creates_partial_unique_push_token_index() -> None:
     migration_op = _run("upgrade")
 
-    migration_op.create_index.assert_called_once_with(
-        "ix_users_push_token", "users", ["push_token"]
-    )
+    migration_op.create_index.assert_called_once()
+    call = migration_op.create_index.call_args
+    assert call.args == ("ix_users_push_token", "users", ["push_token"])
+    assert call.kwargs["unique"] is True
+    assert str(call.kwargs["postgresql_where"]) == "push_token IS NOT NULL"
 
 
 def test_downgrade_drops_index_before_columns() -> None:
@@ -60,9 +62,12 @@ def test_downgrade_drops_index_before_columns() -> None:
     migration_op.drop_index.assert_called_once_with("ix_users_push_token", table_name="users")
 
 
-def test_model_index_name_matches_migration() -> None:
-    index_names = {index.name for index in User.__table__.indexes}
-    assert "ix_users_push_token" in index_names
+def test_model_index_matches_migration() -> None:
+    indexes = {index.name: index for index in User.__table__.indexes}
+    index = indexes["ix_users_push_token"]
+    assert index.unique is True
+    assert str(index.dialect_options["postgresql"]["where"]) == "push_token IS NOT NULL"
+    assert [column.name for column in index.columns] == ["push_token"]
 
 
 def test_downgrade_drops_both_columns() -> None:

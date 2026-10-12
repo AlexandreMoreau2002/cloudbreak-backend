@@ -4,9 +4,9 @@ from sqlalchemy import String
 from datetime import UTC, datetime
 from pydantic import ValidationError
 from sqlalchemy.sql.dml import Delete
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.dialects import postgresql
 from unittest.mock import AsyncMock, MagicMock, patch
-from sqlalchemy.exc import IntegrityError
 
 from app.models.user import User
 from app.models.favorite import Favorite

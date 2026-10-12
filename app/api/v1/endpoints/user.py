@@ -10,10 +10,10 @@ from app.core.dependencies import get_current_user, get_permanent_user
 from app.schemas.user import (
     UserProfile,
     SurveyUpdate,
+    PushTokenUpdate,
     DisplayNameUpdate,
     PreferencesUpdate,
     NotificationPreferencesUpdate,
-    PushTokenUpdate,
 )
 from app.services.user import (
     provision_user,

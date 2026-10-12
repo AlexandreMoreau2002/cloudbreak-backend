@@ -2,8 +2,8 @@
 
 import logging
 from datetime import UTC, datetime
-from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
 

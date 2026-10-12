@@ -2,6 +2,11 @@
 
 `send_push_to_user` ne lève jamais : une panne réseau ou un token mort ne doit pas
 casser l'appelant (job d'alertes, endpoint). Le token n'est jamais loggué.
+
+Limite : seul le ticket renvoyé à l'envoi est exploité. Les appareils désinstallés
+remontent surtout dans les « receipts » Expo (`/push/getReceipts`, ~15 min plus tard),
+qui ne sont pas lus ici (story 5.2) : l'invalidation `DeviceNotRegistered` ci-dessous
+est donc partielle.
 """
 
 import logging
@@ -63,7 +68,7 @@ async def send_push_to_user(
     Sur un ticket `DeviceNotRegistered`, le token envoyé est invalidé en base
     (`push_token_valid = false`) par une session dédiée, indépendante de la transaction de
     l'appelant (voir `_invalidate_token`). L'objet `user` de l'appelant n'est pas modifié.
-    Ne lève jamais.
+    Les erreurs de receipt ne sont pas traitées ici. Ne lève jamais.
     """
     token = user.push_token
     if not token or not user.push_token_valid:

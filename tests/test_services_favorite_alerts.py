@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 
 from app.services.favorite_alerts import (
     LOCK_KEY,
+    MAX_CONSECUTIVE_SEND_FAILURES,
     WEATHER_CONCURRENCY,
     Candidate,
     fetch_candidates,
@@ -427,3 +428,70 @@ async def test_forecast_is_requested_for_the_peak_target_date_at_6h() -> None:
             send=AsyncMock(return_value=True),
         )
     weather.get_forecast.assert_awaited_once_with(lat=44.8, lng=5.5, date=DATE, hour=6)
+
+
+def _many(n: int):
+    return [Candidate(_user(f"u{i}"), _peak()) for i in range(n)]
+
+
+@pytest.mark.asyncio
+async def test_circuit_opens_after_consecutive_send_failures(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    assert MAX_CONSECUTIVE_SEND_FAILURES == 5
+    redis, send = _redis(), AsyncMock(return_value=False)
+    with _score(), caplog.at_level("WARNING"):
+        summary = await process_candidates(
+            _many(8), redis=redis, weather_service=_weather(), date=DATE, send=send
+        )
+    assert send.await_count == 5
+    assert summary.send_failed == 5 and summary.skipped_circuit_open == 3
+    assert redis.set.await_count == 5  # les clés des candidats non traités ne sont pas posées
+    assert redis.delete.await_count == 5  # y compris celle du candidat en cours
+    assert any(r.message == "favorite_alerts_circuit_open" for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_circuit_counts_raised_exceptions_as_failures() -> None:
+    send = AsyncMock(side_effect=RuntimeError("down"))
+    with _score():
+        summary = await process_candidates(
+            _many(7), redis=_redis(), weather_service=_weather(), date=DATE, send=send
+        )
+    assert send.await_count == 5 and summary.skipped_circuit_open == 2
+
+
+@pytest.mark.asyncio
+async def test_a_success_resets_the_consecutive_failure_counter() -> None:
+    outcomes = [False] * 4 + [True] + [False] * 4
+    send = AsyncMock(side_effect=outcomes)
+    with _score():
+        summary = await process_candidates(
+            _many(9), redis=_redis(), weather_service=_weather(), date=DATE, send=send
+        )
+    assert send.await_count == 9
+    assert summary.skipped_circuit_open == 0 and summary.alerts_sent == 1
+    assert summary.send_failed == 8
+
+
+@pytest.mark.asyncio
+async def test_lock_is_released_when_the_circuit_opens() -> None:
+    redis = _LockRedis()
+    redis.delete = AsyncMock()  # type: ignore[attr-defined]
+    failing = AsyncMock(return_value=False)
+    real = process_candidates
+
+    async def _with_failing_send(*args, **kwargs):
+        return await real(*args, send=failing, **kwargs)
+
+    with (
+        _score(),
+        patch(
+            "app.services.favorite_alerts.fetch_candidates",
+            new=AsyncMock(return_value=_many(6)),
+        ),
+        patch("app.services.favorite_alerts.process_candidates", new=_with_failing_send),
+    ):
+        summary = await run_favorite_alerts(AsyncMock(), redis, _weather(), NOW)  # type: ignore[arg-type]
+    assert summary.skipped_circuit_open == 1
+    assert LOCK_KEY not in redis.store

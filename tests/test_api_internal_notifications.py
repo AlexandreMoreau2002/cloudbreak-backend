@@ -69,6 +69,7 @@ def test_valid_secret_runs_the_job_and_returns_the_summary() -> None:
         "send_failed": 0,
         "weather_failed": 0,
         "skipped_locked": 0,
+        "skipped_circuit_open": 0,
     }
     job.assert_awaited_once()
 

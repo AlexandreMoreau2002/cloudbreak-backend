@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 MAX_ROWS = 2000
 MAX_ALERTS_PER_RUN = 500
 WEATHER_CONCURRENCY = 5
+MAX_CONSECUTIVE_SEND_FAILURES = 5
 LOCK_KEY = "lock:favorite-alerts"
 LOCK_TTL_SECONDS = 600
 # Compare-et-supprime atomique : ne libère le verrou que s'il appartient toujours à ce run.
@@ -105,6 +106,7 @@ class AlertSummary:
     send_failed: int = 0
     weather_failed: int = 0
     skipped_locked: int = 0
+    skipped_circuit_open: int = 0
 
 
 async def _score_peak(
@@ -154,7 +156,8 @@ async def process_candidates(
     summary.peaks_scored = sum(1 for r in results if r is not None)
     summary.weather_failed = len(results) - summary.peaks_scored
 
-    for candidate in candidates:
+    consecutive_failures = 0
+    for index, candidate in enumerate(candidates):
         peak_id = str(candidate.peak.id)
         result = scores[peak_id]
         if result is None:
@@ -185,6 +188,7 @@ async def process_candidates(
             )
             sent = False
         if sent:
+            consecutive_failures = 0
             summary.alerts_sent += 1
             track(
                 "favorite_alert_sent", user_id, {"peak_id": peak_id, "score": int(result["score"])}
@@ -192,6 +196,15 @@ async def process_candidates(
         else:
             await redis.delete(key)
             summary.send_failed += 1
+            consecutive_failures += 1
+            if consecutive_failures >= MAX_CONSECUTIVE_SEND_FAILURES:
+                # Expo semble indisponible : inutile d'enchaîner des timeouts de 10 s.
+                summary.skipped_circuit_open = len(candidates) - index - 1
+                logger.warning(
+                    "favorite_alerts_circuit_open",
+                    extra={"consecutive_failures": consecutive_failures},
+                )
+                break
 
     logger.info("favorite_alerts_run", extra=asdict(summary))
     return summary

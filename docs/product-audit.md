@@ -1,6 +1,6 @@
 # Cloudbreak — Audit produit
 
-_Dernière mise à jour : 2026-07-26_
+_Dernière mise à jour : 2026-10-13_
 
 ---
 
@@ -23,7 +23,7 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 |----------------|------|
 | API score mer de nuage | ✅ Fonctionne en vrai |
 | Données météo Open-Meteo | ✅ Appel réel (gratuit, sans clé) |
-| Cache Redis 10 min | ✅ Actif |
+| Cache Redis météo 30 min (1 800 secondes) | ✅ Actif |
 | Auth JWT Supabase | ✅ Validé localement |
 | Dataset sommets seedé depuis `app/db/peaks_data.json` (23 782 entrées source) | ✅ |
 | Index idx_peaks_name | ✅ Migration Alembic |
@@ -42,6 +42,7 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 | Quota freemium Redis — 1 sommet unique/jour, bypass Premium/ancien Pro uniquement si `trial`/`active` non expiré, reset minuit UTC | ✅ Story 4.1 + 4.3 |
 | Abonnements Premium StoreKit 2 — mensuel/annuel, essai Apple 7 jours conditionnel, validation JWS serveur, restauration et notifications V2 | 🟡 Implémenté sur branche story 4.3 ; Sandbox réel / PR à valider |
 | Invités score — UUID v4 d'installation haché, quota conservé après rotation du JWT, 60 requêtes/IP/minute | ✅ Quota invité + rate limit |
+| Prévision hebdomadaire (`GET /api/v1/score/week`) — 63 cellules en une requête authentifiée, cache météo Redis 30 min (1 800 s), distinct du cache mobile AsyncStorage de 3 h ; `QUOTA_EXCEEDED` ouvre le paywall tandis que `RATE_LIMIT_EXCEEDED` reste une erreur de réessai | ✅ Maintenance 2026-10-13 |
 | `make seed-test` / `make unseed-test` — users de test Supabase (freemium, pro) | ✅ Story 4.1 |
 | `make clean-subscriptions` / `make reset-db` — maintenance DB dev | ✅ Story 4.1 |
 | Suppression compte RGPD (`DELETE /api/v1/user/`) — suppression DB + Supabase Auth → 204, compte permanent requis | ✅ Story 2.4 |

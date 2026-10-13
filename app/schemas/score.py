@@ -67,3 +67,9 @@ class ScoreResponse(BaseModel):
     peak_name: str
     peak_altitude: int
     peak_region: str | None = None
+
+
+class WeekScoreResponse(BaseModel):
+    """Ensemble complet des scores horaires utiles pour une semaine."""
+
+    by_date: dict[str, dict[int, ScoreResponse]]

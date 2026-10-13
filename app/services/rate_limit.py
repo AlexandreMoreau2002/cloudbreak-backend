@@ -6,6 +6,7 @@ from hashlib import sha256
 from redis.asyncio import Redis
 
 ANONYMOUS_SCORE_LIMIT = 60
+SCORE_WEEK_LIMIT = 12
 WINDOW_SECONDS = 60
 
 INCREMENT_WITH_TTL_SCRIPT = """
@@ -39,3 +40,13 @@ class RateLimitService:
 
         if count > ANONYMOUS_SCORE_LIMIT:
             raise RateLimitExceededException("Anonymous score rate limit exceeded")
+
+    async def check_score_week(self, user_id: str) -> None:
+        """Autorise au plus 12 lectures hebdomadaires par utilisateur et par minute."""
+        user_hash = sha256(user_id.encode()).hexdigest()
+        window = int(time.time() // WINDOW_SECONDS)
+        key = f"rate_limit:score_week:{user_hash}:{window}"
+        count = await self._redis.eval(INCREMENT_WITH_TTL_SCRIPT, 1, key, str(WINDOW_SECONDS))  # type: ignore[misc]
+
+        if count > SCORE_WEEK_LIMIT:
+            raise RateLimitExceededException("Score week rate limit exceeded")

@@ -43,17 +43,17 @@ weather:43.1:5.87:2026-10-15:6
 | Date | jour ISO 8601 | Prévision par journée |
 | Heure | heure entière 0-23 | Open-Meteo retourne 24 valeurs horaires par requête, on extrait 1 index |
 
-### TTL : 600 secondes (10 minutes)
+### TTL : 1 800 secondes (30 minutes)
 
 ```python
-CACHE_TTL = 600  # app/services/weather.py
+CACHE_TTL = 1800  # app/services/weather.py
 ```
 
-Pourquoi 10 minutes :
+Pourquoi 30 minutes :
 - Les prévisions Open-Meteo sont mises à jour toutes les heures (modèle GFS / IFS)
-- 10 minutes = bon compromis fraîcheur / économie d'appels
+- 30 minutes = bon compromis fraîcheur / économie d'appels
 - Un user qui recharge l'écran plusieurs fois dans la minute reçoit les données cachées
-- En cas de pointe de trafic, la fenêtre de 10 minutes absorbe les rafales
+- En cas de pointe de trafic, la fenêtre de 30 minutes absorbe les rafales
 
 ### Ce qui est caché
 
@@ -194,13 +194,13 @@ Cela signifie que pour un même sommet et une même date :
 
 ```
 Slot    Clé Redis                         1er appel         2e appel
-6h   →  weather:45.83:6.86:2026-10-15:6  MISS → API        HIT (600s TTL)
-9h   →  weather:45.83:6.86:2026-10-15:9  MISS → API        HIT (600s TTL)
-12h  →  weather:45.83:6.86:2026-10-15:12 MISS → API        HIT (600s TTL)
+6h   →  weather:45.83:6.86:2026-10-15:6  MISS → API        HIT (1 800s TTL)
+9h   →  weather:45.83:6.86:2026-10-15:9  MISS → API        HIT (1 800s TTL)
+12h  →  weather:45.83:6.86:2026-10-15:12 MISS → API        HIT (1 800s TTL)
 ```
 
 Chaque heure déclenche un appel Open-Meteo distinct — pas de batch côté serveur.
-En revanche, si deux users demandent le même sommet/date/heure dans la fenêtre de 10 minutes, seul le premier appelle l'API.
+En revanche, si deux users demandent le même sommet/date/heure dans la fenêtre de 30 minutes, seul le premier appelle l'API.
 
 ---
 
@@ -277,10 +277,10 @@ docker exec cloudbreak-redis redis-cli --scan --pattern "weather:*" | xargs dock
 
 ### Staleness du cache
 
-Les données météo peuvent être vieilles de jusqu'à 10 minutes.
+Les données météo peuvent être vieilles de jusqu'à 30 minutes.
 Acceptable car :
 - Open-Meteo met à jour ses modèles numériques toutes les heures (pas plus fréquent)
-- Une mer de nuage ne se dissipe pas en 10 minutes
+- Une mer de nuage ne se dissipe pas nécessairement en 30 minutes
 - Le cas d'usage principal est la planification (J+1, J+7) — pas le temps réel
 
 ### Comportement si Open-Meteo est down
@@ -298,7 +298,7 @@ except Exception as exc:
 ```
 
 - Aucun fallback provider implémenté en MVP (Météo-France prévu mais non connecté)
-- Le cache Redis protège pendant 10 minutes si l'API tombe après un premier appel réussi
+- Le cache Redis protège pendant 30 minutes si l'API tombe après un premier appel réussi
 - Au-delà du TTL en cas de panne prolongée → 503 côté mobile
 
 ### Pas de cache cross-peaks

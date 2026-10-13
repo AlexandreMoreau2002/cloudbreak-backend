@@ -493,6 +493,30 @@ async def test_set_push_token_stores_token_and_marks_valid() -> None:
 
 
 @pytest.mark.asyncio
+async def test_set_push_token_stores_locale_when_given() -> None:
+    profile = SimpleNamespace(
+        supabase_user_id="u1", push_token=None, push_token_valid=False, locale=None
+    )
+    db = AsyncMock()
+    db.begin_nested = MagicMock(side_effect=lambda: _Savepoint())
+    with patch("app.services.user.get_or_create_user", AsyncMock(return_value=profile)):
+        await set_push_token({"id": "u1"}, "ExponentPushToken[a]", db, locale="en")
+    assert profile.locale == "en"
+
+
+@pytest.mark.asyncio
+async def test_set_push_token_without_locale_keeps_existing_value() -> None:
+    profile = SimpleNamespace(
+        supabase_user_id="u1", push_token=None, push_token_valid=False, locale="en"
+    )
+    db = AsyncMock()
+    db.begin_nested = MagicMock(side_effect=lambda: _Savepoint())
+    with patch("app.services.user.get_or_create_user", AsyncMock(return_value=profile)):
+        await set_push_token({"id": "u1"}, "ExponentPushToken[a]", db)
+    assert profile.locale == "en"
+
+
+@pytest.mark.asyncio
 async def test_clear_push_token_updates_only_the_caller_without_creating_profile() -> None:
     db = AsyncMock()
     with patch("app.services.user.get_or_create_user", AsyncMock()) as get_or_create:

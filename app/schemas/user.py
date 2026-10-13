@@ -1,6 +1,7 @@
 import re
 import unicodedata
 from enum import StrEnum
+from typing import Literal
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -94,6 +95,7 @@ class PushTokenUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     push_token: str
+    locale: Literal["fr", "en"] | None = None
 
     @field_validator("push_token")
     @classmethod

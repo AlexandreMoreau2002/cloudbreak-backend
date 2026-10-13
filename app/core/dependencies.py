@@ -1,3 +1,4 @@
+import hmac
 import logging
 from uuid import UUID
 from typing import Any, cast
@@ -7,7 +8,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.db.session import get_db
@@ -69,6 +70,35 @@ async def get_redis() -> Redis:
     if _redis is None:
         _redis = Redis.from_url(settings.redis_url, decode_responses=False)
     return _redis
+
+
+MIN_CRON_SECRET_LENGTH = 32
+_weak_secret_warned = False
+
+
+def require_cron_secret(x_cron_secret: str | None = Header(default=None)) -> None:
+    """Protège les jobs internes (cron) : secret partagé en header, comparaison à temps constant.
+
+    Désactivé (503) tant que INTERNAL_CRON_SECRET n'est pas configuré ou s'il fait moins de
+    32 caractères (secret faible refusé) : fail closed.
+    """
+    global _weak_secret_warned
+    configured = settings.internal_cron_secret
+    if configured and len(configured) < MIN_CRON_SECRET_LENGTH:
+        if not _weak_secret_warned:
+            _weak_secret_warned = True
+            logger.warning(
+                "internal_cron_secret_too_weak", extra={"min_length": MIN_CRON_SECRET_LENGTH}
+            )
+        configured = ""
+    if not configured:
+        raise ApiError(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Jobs internes désactivés",
+            ErrorCode.INTERNAL_JOBS_DISABLED,
+        )
+    if not x_cron_secret or not hmac.compare_digest(x_cron_secret.encode(), configured.encode()):
+        raise ApiError(status.HTTP_403_FORBIDDEN, "Accès refusé", ErrorCode.INTERNAL_AUTH_FAILED)
 
 
 def get_current_user(

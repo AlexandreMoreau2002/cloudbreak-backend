@@ -35,6 +35,9 @@ class User(Base):
     push_token = Column(String(255), nullable=True)
     push_token_valid = Column(Boolean, nullable=False, server_default=true())
 
+    # Langue d'interface de l'app ("fr" | "en"), envoyée avec le token : sert à localiser les push.
+    locale = Column(String(5), nullable=True)
+
     # Unicité partielle : un token = un appareil = un seul compte. Garantit en base ce que la
     # purge de `set_push_token` ne peut pas assurer seule entre deux POST simultanés.
     __table_args__ = (

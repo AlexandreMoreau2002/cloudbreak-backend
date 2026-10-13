@@ -2,6 +2,27 @@
 
 Document de référence sécurité. À mettre à jour à chaque story qui touche auth, réseau, données ou dépendances.
 
+## 2026-10-12 Story 5.2 — Alertes push favoris (endpoint interne)
+
+- `POST /internal/notifications/run-favorites` est déclenché par un cron, jamais par l'app. Il est joignable publiquement derrière Traefik, mais protégé par le header `X-Cron-Secret` : sans `INTERNAL_CRON_SECRET` configuré, ou avec un secret de moins de 32 caractères (traité comme absent), il répond 503 `INTERNAL_JOBS_DISABLED` (fail closed) ; secret absent ou faux : 403 `INTERNAL_AUTH_FAILED`. Un JWT utilisateur ne suffit pas.
+- Le secret est comparé à temps constant (`hmac.compare_digest`) et n'est jamais loggué (un secret trop court déclenche seulement un WARNING `internal_cron_secret_too_weak`, une fois, sans la valeur).
+- Pas de rate limiting sur cet endpoint : un secret fort (32 caractères minimum, `openssl rand -hex 32`) est jugé suffisant. Un verrou Redis (`lock:favorite-alerts`, jeton unique, TTL 600 s, libération compare-et-supprime) empêche deux exécutions simultanées.
+- Le payload du push ne contient aucune donnée personnelle ni position : titre/texte localisé (nom et score du sommet) et `data = {type, slug, peak_id}`. Le token push n'est jamais loggué ; les logs ne portent que `user_id`, `peak_id` et un nom d'erreur.
+- Les alertes ne partent que pour un Premium actif (`is_entitlement_active`, filtré aussi en SQL) ayant `notif_favorites` actif et un token valide.
+
+### Risques résiduels (acceptés ou à traiter avant la 1.0.0)
+
+- Troncature à `MAX_ROWS = 2000` couples favori/utilisateur sans pagination (WARNING `favorite_alerts_truncated`) : prévoir une pagination keyset avant de dépasser ce volume.
+- La clé de déduplication est posée avant l'envoi : un crash du process entre les deux perd l'alerte du jour (sémantique « au plus une fois »). Un échec d'envoi, lui, relâche la clé.
+- La session DB reste ouverte pendant tout l'envoi (jusqu'à 500 push séquentiels).
+- `target_alert_date` = jour Paris + 1 : le cron doit tourner en soirée, avant minuit Europe/Paris.
+- Restriction réseau de l'endpoint (Traefik, liste d'IP) possible en durcissement, hors code (Task 7).
+- `weather_service` est importé depuis l'endpoint score (couplage au singleton) : dette notée.
+- Dépendances mobile, en PR séparées : envoi de la langue avec le token push, et gestion du tap sur une notification `favorite_alert`.
+- Les receipts Expo ne sont toujours pas lus (partie B du plan, voir 5.1 point f).
+
+---
+
 ## 2026-10-09 Story 5.1 — Token push
 
 - `users.push_token` (Expo Push, `VARCHAR(255)`) et `users.push_token_valid` sont stockés en base ; seul un compte permanent authentifié peut les modifier via `POST`/`DELETE /api/v1/user/push-token` (anonyme : 403 `ACCOUNT_REQUIRED`, sans JWT : 403). Le format `ExponentPushToken[...]` / `ExpoPushToken[...]` est validé côté serveur (422 sinon).

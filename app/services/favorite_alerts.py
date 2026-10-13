@@ -5,6 +5,7 @@ Appelé par `POST /internal/notifications/run-favorites` (cron). Aucune alerte r
 
 import asyncio
 import logging
+from uuid import uuid4
 from typing import Any, cast
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -39,6 +40,10 @@ MAX_ALERTS_PER_RUN = 500
 WEATHER_CONCURRENCY = 5
 LOCK_KEY = "lock:favorite-alerts"
 LOCK_TTL_SECONDS = 600
+# Compare-et-supprime atomique : ne libère le verrou que s'il appartient toujours à ce run.
+_RELEASE_LOCK_SCRIPT = (
+    "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) end return 0"
+)
 
 SendFn = Callable[..., Awaitable[bool]]
 
@@ -198,7 +203,8 @@ async def run_favorite_alerts(
     weather_service: WeatherService,
     now: datetime | None = None,
 ) -> AlertSummary:
-    if not await redis.set(LOCK_KEY, "1", nx=True, ex=LOCK_TTL_SECONDS):
+    token = uuid4().hex
+    if not await redis.set(LOCK_KEY, token, nx=True, ex=LOCK_TTL_SECONDS):
         logger.info("favorite_alerts_already_running")
         return AlertSummary(skipped_locked=1)
     try:
@@ -211,4 +217,4 @@ async def run_favorite_alerts(
             date=target_alert_date(moment),
         )
     finally:
-        await redis.delete(LOCK_KEY)
+        await redis.eval(_RELEASE_LOCK_SCRIPT, 1, LOCK_KEY, token)  # type: ignore[misc]

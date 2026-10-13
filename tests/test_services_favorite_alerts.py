@@ -339,40 +339,80 @@ async def test_isolated_concurrent_weather_failure_does_not_break_others() -> No
     assert summary.alerts_sent == 5
 
 
+class _LockRedis:
+    """Redis en mémoire : SET NX et compare-et-supprime (équivalent du script Lua)."""
+
+    def __init__(self) -> None:
+        self.store: dict[str, str] = {}
+        self.set_calls: list[tuple] = []
+
+    async def set(self, key: str, value: str, nx: bool = False, ex: int | None = None):
+        self.set_calls.append((key, value, nx, ex))
+        if nx and key in self.store:
+            return None
+        self.store[key] = value
+        return True
+
+    async def eval(self, script: str, numkeys: int, key: str, token: str) -> int:
+        assert numkeys == 1
+        if self.store.get(key) == token:
+            del self.store[key]
+            return 1
+        return 0
+
+
 @pytest.mark.asyncio
 async def test_run_is_skipped_when_the_lock_is_held() -> None:
-    redis = AsyncMock()
-    redis.set = AsyncMock(return_value=None)
+    redis = _LockRedis()
+    redis.store[LOCK_KEY] = "other-run"
     with patch("app.services.favorite_alerts.fetch_candidates", new=AsyncMock()) as fetch:
         summary = await run_favorite_alerts(AsyncMock(), redis, _weather(), NOW)
     assert summary.skipped_locked == 1 and summary.alerts_sent == 0
     fetch.assert_not_awaited()
-    redis.delete.assert_not_awaited()
-    assert redis.set.await_args.args[0] == LOCK_KEY == "lock:favorite-alerts"
-    assert redis.set.await_args.kwargs == {"nx": True, "ex": 600}
+    assert redis.store[LOCK_KEY] == "other-run"
+    key, _, nx, ex = redis.set_calls[0]
+    assert key == LOCK_KEY == "lock:favorite-alerts" and nx is True and ex == 600
 
 
 @pytest.mark.asyncio
-async def test_lock_is_acquired_then_released_after_a_normal_run() -> None:
-    redis = AsyncMock()
-    redis.set = AsyncMock(return_value=True)
-    with patch("app.services.favorite_alerts.fetch_candidates", new=AsyncMock(return_value=[])):
-        summary = await run_favorite_alerts(AsyncMock(), redis, _weather(), NOW)
-    assert summary.skipped_locked == 0
-    redis.delete.assert_awaited_once_with(LOCK_KEY)
+async def test_lock_holds_a_unique_token_and_is_released_after_a_normal_run() -> None:
+    redis = _LockRedis()
+    seen: list[str] = []
+
+    async def _fetch(db, moment):
+        seen.append(redis.store[LOCK_KEY])
+        return []
+
+    with patch("app.services.favorite_alerts.fetch_candidates", new=_fetch):
+        await run_favorite_alerts(AsyncMock(), redis, _weather(), NOW)
+        await run_favorite_alerts(AsyncMock(), redis, _weather(), NOW)
+    assert len(seen[0]) == 32 and seen[0] != seen[1]
+    assert LOCK_KEY not in redis.store
 
 
 @pytest.mark.asyncio
 async def test_lock_is_released_even_if_processing_raises() -> None:
-    redis = AsyncMock()
-    redis.set = AsyncMock(return_value=True)
+    redis = _LockRedis()
     with patch(
         "app.services.favorite_alerts.fetch_candidates",
         new=AsyncMock(side_effect=RuntimeError("db down")),
     ):
         with pytest.raises(RuntimeError):
             await run_favorite_alerts(AsyncMock(), redis, _weather(), NOW)
-    redis.delete.assert_awaited_once_with(LOCK_KEY)
+    assert LOCK_KEY not in redis.store
+
+
+@pytest.mark.asyncio
+async def test_lock_taken_over_by_another_run_is_not_deleted() -> None:
+    redis = _LockRedis()
+
+    async def _fetch(db, moment):
+        redis.store[LOCK_KEY] = "other-run"  # notre verrou a expiré, un autre run l'a repris
+        return []
+
+    with patch("app.services.favorite_alerts.fetch_candidates", new=_fetch):
+        await run_favorite_alerts(AsyncMock(), redis, _weather(), NOW)
+    assert redis.store[LOCK_KEY] == "other-run"
 
 
 @pytest.mark.asyncio

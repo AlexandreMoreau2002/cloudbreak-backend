@@ -495,3 +495,34 @@ async def test_lock_is_released_when_the_circuit_opens() -> None:
         summary = await run_favorite_alerts(AsyncMock(), redis, _weather(), NOW)  # type: ignore[arg-type]
     assert summary.skipped_circuit_open == 1
     assert LOCK_KEY not in redis.store
+
+
+class _ReleaseFailsRedis(_LockRedis):
+    async def eval(self, *args):  # type: ignore[override]
+        raise ConnectionError("redis down")
+
+
+@pytest.mark.asyncio
+async def test_lock_release_failure_does_not_mask_the_original_error() -> None:
+    with patch(
+        "app.services.favorite_alerts.fetch_candidates",
+        new=AsyncMock(side_effect=RuntimeError("db down")),
+    ):
+        with pytest.raises(RuntimeError, match="db down"):
+            await run_favorite_alerts(AsyncMock(), _ReleaseFailsRedis(), _weather(), NOW)  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_lock_release_failure_does_not_break_a_successful_run(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    redis = _ReleaseFailsRedis()
+    with (
+        patch("app.services.favorite_alerts.fetch_candidates", new=AsyncMock(return_value=[])),
+        caplog.at_level("ERROR"),
+    ):
+        summary = await run_favorite_alerts(AsyncMock(), redis, _weather(), NOW)  # type: ignore[arg-type]
+    assert summary.candidates == 0
+    assert any(r.message == "favorite_alerts_lock_release_failed" for r in caplog.records)
+    token = redis.set_calls[0][1]
+    assert token not in caplog.text

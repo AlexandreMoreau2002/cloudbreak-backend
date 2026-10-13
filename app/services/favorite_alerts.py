@@ -230,4 +230,10 @@ async def run_favorite_alerts(
             date=target_alert_date(moment),
         )
     finally:
-        await redis.eval(_RELEASE_LOCK_SCRIPT, 1, LOCK_KEY, token)  # type: ignore[misc]
+        try:
+            await redis.eval(_RELEASE_LOCK_SCRIPT, 1, LOCK_KEY, token)  # type: ignore[misc]
+        except Exception as error:
+            # Ne masque ni le résultat du run ni l'erreur d'origine ; le TTL expirera le verrou.
+            logger.error(
+                "favorite_alerts_lock_release_failed", extra={"error": type(error).__name__}
+            )

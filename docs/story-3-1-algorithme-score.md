@@ -6,7 +6,7 @@
 |---------|------|
 | `app/services/weather_providers/base.py` | Structures de données météo (`WeatherData`, `PressureLevelData`) |
 | `app/services/weather_providers/open_meteo.py` | Appel API Open-Meteo + calcul de la base des nuages (Skew-T) |
-| `app/services/weather.py` | Cache Redis des données météo (TTL 10min) |
+| `app/services/weather.py` | Cache Redis des données météo (TTL 30 min / 1 800 secondes) |
 | `app/domain/score.py` | Orchestrateur du score mer de nuage et du contrat de réponse |
 | `app/domain/score_components.py` | Calcul des composantes métier et seuils produit (`45%`, `55%`) |
 | `app/domain/score_context.py` | Choix du message contextuel et des paramètres i18n |
@@ -32,7 +32,7 @@ Quand tu appelles `GET /api/v1/score` via le fichier HTTP :
 - La DB PostgreSQL est interrogée pour récupérer le sommet (coordonnées, altitude)
 - Open-Meteo est appelé en vrai avec les coordonnées GPS du sommet
 - Le score est calculé sur des données météo réelles
-- Le résultat est mis en cache Redis 10 minutes
+- Le résultat est mis en cache Redis 30 minutes (1 800 secondes)
 
 ---
 
@@ -51,7 +51,7 @@ Tu appelles GET /api/v1/score?peak_id=...&date=2026-03-22&hour=6
          ▼
 3. Cache Redis consulté
    clé: weather:46.38:5.63:2026-03-22:6
-   → si données déjà en cache (< 10min) : utilisées directement
+   → si données déjà en cache (< 30 min) : utilisées directement
    → sinon : appel Open-Meteo
          │
          ▼

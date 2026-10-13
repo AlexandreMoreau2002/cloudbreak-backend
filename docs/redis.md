@@ -4,7 +4,7 @@ Redis 7 remplit **deux rôles distincts et indépendants** dans Cloudbreak :
 
 | Rôle | Préfixe clé | TTL | Valeur |
 |------|-------------|-----|--------|
-| Cache météo | `weather:*` | 600s (10 min) | JSON sérialisé `WeatherData` |
+| Cache météo | `weather:*` | 1 800s (30 min) | JSON sérialisé `WeatherData` |
 | Quota freemium | `quota:*` | Minuit UTC | Compteur entier (INCR) |
 
 ---
@@ -32,7 +32,7 @@ weather:45.8326:6.8652:2026-04-04:9
 ### TTL
 
 ```python
-CACHE_TTL = 600  # 10 minutes — défini dans weather.py
+CACHE_TTL = 1800  # 30 minutes — défini dans weather.py
 ```
 
 ### Ce qui est caché
@@ -72,7 +72,7 @@ GET /api/v1/score?peak_id=&date=&hour=
  JSON parse  Open-Meteo API call
     │           │
     │           ▼
-    │        Redis SETEX (TTL 600s)
+    │        Redis SETEX (TTL 1 800s)
     │           │
     └─────┬─────┘
           ▼
@@ -437,5 +437,5 @@ docker logs cloudbreak-redis -f
 
 | Clé | Exemple | TTL | Opérations |
 |-----|---------|-----|------------|
-| `weather:{lat}:{lng}:{date}:{hour}` | `weather:45.83:6.86:2026-04-04:9` | 600s | GET, SETEX |
+| `weather:{lat}:{lng}:{date}:{hour}` | `weather:45.83:6.86:2026-04-04:9` | 1 800s (30 min) | GET, SETEX |
 | `quota:{user_id}:{date}` | `quota:ddce4acf...:2026-05-14` | 86400s (24h glissantes) | SADD, SCARD, EXPIRE (pipeline) |

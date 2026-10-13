@@ -668,5 +668,6 @@ Ce verdict ne valide pas la configuration du déploiement ni une identité maté
 - Le quota freemium et le rate limit conservent leurs codes métier distincts :
   `QUOTA_EXCEEDED` et `RATE_LIMIT_EXCEEDED`. Le mobile ne transforme donc pas un rate limit en
   paywall.
-- Le cache Redis hebdomadaire de météo dure 10 minutes ; il ne contient que des données météo
+- Le cache Redis hebdomadaire de météo dure 30 minutes (1 800 secondes) ; distinct du cache
+  mobile AsyncStorage de 3 heures, il ne contient que des données météo
   normalisées. Les nouveaux logs du batch n'enregistrent ni jeton, ni détail de prédiction.

@@ -3,7 +3,7 @@ Tests du service météo avec cache Redis.
 
 Ce service :
 1. Reçoit une demande de prévision (lat, lng, date, hour)
-2. Vérifie le cache Redis (clé weather:{lat}:{lng}:{date}:{hour}, TTL 10min)
+2. Vérifie le cache Redis (clé weather:{lat}:{lng}:{date}:{hour}, TTL 30min)
 3. Si cache HIT → retourne les données sans appeler l'API externe
 4. Si cache MISS → appelle le WeatherProvider, stocke en cache, retourne
 """
@@ -14,8 +14,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.weather import WeatherService
 from app.domain.weather_types import WeatherData
+from app.services.weather import WeatherService
 
 
 SAMPLE_WEATHER = WeatherData(
@@ -60,7 +60,7 @@ def service(mock_redis: MagicMock, mock_provider: MagicMock) -> WeatherService:
 class TestCacheRedis:
     """
     Le cache Redis évite d'appeler l'API météo externe à chaque requête.
-    Clé : weather:{lat}:{lng}:{date}:{hour}  — TTL : 600 secondes (10 minutes)
+    Clé : weather:{lat}:{lng}:{date}:{hour}  — TTL : 1 800 secondes (30 minutes)
     """
 
     @pytest.mark.asyncio
@@ -76,12 +76,12 @@ class TestCacheRedis:
     async def test_cache_miss_stocke_en_cache(
         self, service: WeatherService, mock_redis: MagicMock
     ) -> None:
-        """Après un appel provider, le résultat est mis en cache avec TTL 600s."""
+        """Après un appel provider, le résultat est mis en cache avec TTL 1 800s."""
         mock_redis.get = AsyncMock(return_value=None)
         await service.get_forecast(lat=45.83, lng=6.86, date="2026-10-15", hour=6)
         mock_redis.setex.assert_called_once()
         call_args = mock_redis.setex.call_args
-        assert call_args[0][1] == 600
+        assert call_args[0][1] == 1800
 
     @pytest.mark.asyncio
     async def test_cache_hit_n_appelle_pas_le_provider(
@@ -149,7 +149,7 @@ class TestWeekCacheRedis:
             hours=WEEK_HOURS,
         )
         mock_redis.setex.assert_awaited_once()
-        assert mock_redis.setex.call_args.args[1] == 600
+        assert mock_redis.setex.call_args.args[1] == 1800
 
     @pytest.mark.asyncio
     async def test_week_cache_hit_skips_provider(

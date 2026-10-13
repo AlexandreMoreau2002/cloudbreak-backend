@@ -6,7 +6,7 @@ API backend de l'application Cloudbreak — prédit la probabilité de mer de nu
 
 - **Python 3.12** + **FastAPI 0.115**
 - **PostgreSQL 16** — base de données principale
-- **Redis 7** — cache météo (TTL 10min) + quota freemium
+- **Redis 7** — cache météo (TTL 30 min / 1 800 secondes) + quota freemium
 - **SQLAlchemy async** + **Alembic** — ORM et migrations
 - **Pydantic v2** — validation et settings
 - **Gunicorn + Uvicorn** — serveur de production

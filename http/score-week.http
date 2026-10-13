@@ -3,6 +3,7 @@
 #
 # Sélectionner l'environnement REST Client `local` après avoir défini les JWT
 # de test dans .vscode/settings.json. Aucun token réel ne doit être écrit ici.
+# Cache météo Redis : 30 minutes (1 800 secondes). Cache mobile AsyncStorage hors-ligne : 3 heures.
 
 @baseUrl = http://localhost:8000/api/v1
 @startDate = 2026-10-12

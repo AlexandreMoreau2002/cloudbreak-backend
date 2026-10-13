@@ -1,12 +1,12 @@
 """
 Service météo avec cache Redis.
 
-Rôle : intercepter les appels provider avec un cache Redis TTL 10min.
+Rôle : intercepter les appels provider avec un cache Redis TTL 30min.
 Chaque requête unique (lat, lng, date, hour) est mise en cache après le premier appel.
 Les requêtes suivantes pour le même sommet/date/heure retournent le cache sans appel API.
 
 Clé Redis : weather:{lat}:{lng}:{date}:{hour}
-TTL       : 600 secondes (10 minutes)
+TTL       : 1 800 secondes (30 minutes)
 """
 
 import json
@@ -20,7 +20,7 @@ from app.domain.weather_types import PressureLevelData, WeatherData, WeatherProv
 
 logger = logging.getLogger(__name__)
 
-CACHE_TTL = 600  # 10 minutes en secondes
+CACHE_TTL = 1800  # 30 minutes en secondes
 WEEK_CACHE_TTL = CACHE_TTL
 
 

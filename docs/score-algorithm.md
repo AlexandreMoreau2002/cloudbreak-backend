@@ -36,7 +36,7 @@ ScoreResult(
 | `app/domain/score_components.py` | Composantes individuelles + paramètres |
 | `app/domain/score_context.py` | Présentation (fenêtre optimale, contexte i18n) |
 | `app/domain/weather_types.py` | `WeatherData`, `WeatherProvider` interface |
-| `app/services/weather.py` | Cache Redis TTL 10min |
+| `app/services/weather.py` | Cache Redis météo TTL 30 min (1 800 secondes) |
 | `app/services/weather_providers/open_meteo.py` | Appel API + méthode Skew-T |
 | `app/api/v1/endpoints/score.py` | Endpoint `GET /api/v1/score` |
 
@@ -325,7 +325,7 @@ Pourquoi Skew-T et non `cloud_cover_*` directement : le champ `cloud_cover` par 
 
 ```
 Clé   : weather:{lat}:{lng}:{date}:{hour}
-TTL   : 600s (10 minutes)
+TTL   : 1 800s (30 minutes)
 ```
 
 Le `WeatherService` intercepte chaque appel provider avec ce cache :

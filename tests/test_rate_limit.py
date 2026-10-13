@@ -68,3 +68,22 @@ class TestRateLimitService:
         script = mock_redis.eval.call_args.args[0]
         assert "redis.call('TTL', KEYS[1]) == -1" in script
         assert "redis.call('EXPIRE', KEYS[1], ARGV[1])" in script
+
+    @pytest.mark.asyncio
+    async def test_score_week_uses_hashed_user_key_and_twelve_request_limit(
+        self, mock_redis: AsyncMock
+    ) -> None:
+        """Le batch est limité pour tous les utilisateurs sans exposer leur identifiant."""
+        mock_redis.eval.return_value = 13
+
+        with patch("app.services.rate_limit.time.time", return_value=120.0):
+            with pytest.raises(RateLimitExceededException):
+                await RateLimitService(mock_redis).check_score_week("user-123")
+
+        args = mock_redis.eval.call_args.args
+        assert args[1:] == (
+            1,
+            "rate_limit:score_week:fcdec6df4d44dbc637c7c5b58efface52a7f8a88535423430255be0bb89bedd8:2",
+            "60",
+        )
+        assert "user-123" not in args[2]

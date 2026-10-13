@@ -1,0 +1,36 @@
+###
+# Cloudbreak — endpoint batch score semaine
+#
+# Sélectionner l'environnement REST Client `local` après avoir défini les JWT
+# de test dans .vscode/settings.json. Aucun token réel ne doit être écrit ici.
+
+@baseUrl = http://localhost:8000/api/v1
+@startDate = 2026-10-12
+@peakVentoux = 0728f7c7-a0c9-5fb0-b87d-d9edc8696840
+@peakPuyDome = 42cd96c1-c2c0-5cd0-8534-3931e696790b
+
+### 1 — Semaine nominale : 7 dates × 9 heures, toutes avec prediction_id
+GET {{baseUrl}}/score/week?peak_id={{peakVentoux}}&start_date={{startDate}}
+Authorization: Bearer {{freemiumEmail-jwt}}
+
+### 2 — Absence d'Authorization → 403
+GET {{baseUrl}}/score/week?peak_id={{peakVentoux}}&start_date={{startDate}}
+
+### 3 — Date invalide → 422
+GET {{baseUrl}}/score/week?peak_id={{peakVentoux}}&start_date=invalide
+Authorization: Bearer {{freemiumEmail-jwt}}
+
+### 4 — Sommet absent → 404 PEAK_NOT_FOUND
+GET {{baseUrl}}/score/week?peak_id=00000000-0000-0000-0000-000000000000&start_date={{startDate}}
+Authorization: Bearer {{freemiumEmail-jwt}}
+
+### 5 — Quota : exécuter après avoir déverrouillé un autre sommet avec ce compte
+# Attendu : 429 et code QUOTA_EXCEEDED.
+GET {{baseUrl}}/score/week?peak_id={{peakPuyDome}}&start_date={{startDate}}
+Authorization: Bearer {{freemiumEmail-jwt}}
+
+### 6 — Rate limit batch : la 13e requête dans la même minute répond RATE_LIMIT_EXCEEDED
+# Cette protection s'applique aussi à Premium. L'endpoint compte une demande par semaine,
+# indépendamment du quota freemium ; consulter score-quota.http pour celui-ci.
+GET {{baseUrl}}/score/week?peak_id={{peakVentoux}}&start_date={{startDate}}
+Authorization: Bearer {{freemiumEmail-jwt}}

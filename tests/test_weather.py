@@ -30,6 +30,11 @@ SAMPLE_WEATHER = WeatherData(
     month=10,
 )
 
+WEEK_HOURS = (6, 8, 10, 12, 14, 16, 18, 20, 22)
+SAMPLE_WEEK = {
+    f"2026-10-{day:02d}": {hour: SAMPLE_WEATHER for hour in WEEK_HOURS} for day in range(12, 19)
+}
+
 
 @pytest.fixture
 def mock_redis() -> MagicMock:
@@ -43,6 +48,7 @@ def mock_redis() -> MagicMock:
 def mock_provider() -> MagicMock:
     provider = MagicMock()
     provider.get_forecast = AsyncMock(return_value=SAMPLE_WEATHER)
+    provider.get_week_forecast = AsyncMock(return_value=SAMPLE_WEEK)
     return provider
 
 
@@ -121,3 +127,53 @@ class TestCacheRedis:
         result = await service.get_forecast(lat=45.83, lng=6.86, date="2026-10-15", hour=6)
         assert isinstance(result, WeatherData)
         assert result.cloud_base == SAMPLE_WEATHER.cloud_base
+
+
+class TestWeekCacheRedis:
+    """Le cache hebdomadaire évite le fan-out de 63 appels provider."""
+
+    @pytest.mark.asyncio
+    async def test_week_cache_miss_calls_provider_once_and_stores_one_week(
+        self,
+        service: WeatherService,
+        mock_provider: MagicMock,
+        mock_redis: MagicMock,
+    ) -> None:
+        result = await service.get_week_forecast(45.83, 6.86, "2026-10-12", WEEK_HOURS)
+
+        assert result == SAMPLE_WEEK
+        mock_provider.get_week_forecast.assert_awaited_once_with(
+            lat=45.83,
+            lng=6.86,
+            start_date="2026-10-12",
+            hours=WEEK_HOURS,
+        )
+        mock_redis.setex.assert_awaited_once()
+        assert mock_redis.setex.call_args.args[1] == 600
+
+    @pytest.mark.asyncio
+    async def test_week_cache_hit_skips_provider(
+        self,
+        service: WeatherService,
+        mock_provider: MagicMock,
+        mock_redis: MagicMock,
+    ) -> None:
+        serialized_week = {
+            date: {str(hour): asdict(weather) for hour, weather in by_hour.items()}
+            for date, by_hour in SAMPLE_WEEK.items()
+        }
+        mock_redis.get = AsyncMock(return_value=json.dumps(serialized_week).encode())
+
+        result = await service.get_week_forecast(45.83, 6.86, "2026-10-12", WEEK_HOURS)
+
+        assert result["2026-10-12"][6] == SAMPLE_WEATHER
+        mock_provider.get_week_forecast.assert_not_awaited()
+        mock_redis.setex.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_week_cache_key_is_versioned_and_stable(
+        self, service: WeatherService, mock_redis: MagicMock
+    ) -> None:
+        await service.get_week_forecast(45.83, 6.86, "2026-10-12", WEEK_HOURS)
+
+        assert mock_redis.get.call_args.args[0] == "weather:week:v1:45.83:6.86:2026-10-12"

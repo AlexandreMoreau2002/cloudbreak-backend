@@ -59,3 +59,13 @@ class WeatherProvider(ABC):
         Returns:
             WeatherData normalisé — même structure quel que soit le provider
         """
+
+    @abstractmethod
+    async def get_week_forecast(
+        self,
+        lat: float,
+        lng: float,
+        start_date: str,
+        hours: tuple[int, ...],
+    ) -> dict[str, dict[int, WeatherData]]:
+        """Retourne les prévisions utiles de sept jours en un appel provider."""

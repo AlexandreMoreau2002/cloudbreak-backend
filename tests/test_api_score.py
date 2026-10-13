@@ -11,11 +11,15 @@ On mocke :
 Pour tester uniquement la logique de l'endpoint lui-même.
 """
 
-import pytest
-from httpx import AsyncClient, ASGITransport
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch, MagicMock
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+
 from app.main import app
-from app.core.dependencies import get_redis
+from app.core.dependencies import get_current_user, get_redis
+from app.db.session import get_db
 from app.domain.weather_types import PressureLevelData, WeatherData
 
 
@@ -58,6 +62,15 @@ MOCK_WEATHER = WeatherData(
     ],
 )
 
+WEEK_HOURS = (6, 8, 10, 12, 14, 16, 18, 20, 22)
+WEEK_START_DATE = datetime.now(UTC).date()
+MOCK_WEEK = {
+    (WEEK_START_DATE + timedelta(days=offset)).isoformat(): {
+        hour: MOCK_WEATHER for hour in WEEK_HOURS
+    }
+    for offset in range(7)
+}
+
 
 @pytest.fixture
 def auth_override():
@@ -65,8 +78,7 @@ def auth_override():
 
     # Mock Redis (quota check)
     mock_redis = AsyncMock()
-    mock_redis.get.return_value = None  # No quota exceeded
-    mock_redis.incr.return_value = 1
+    mock_redis.eval.return_value = 1
 
     async def mock_get_redis_impl():
         return mock_redis
@@ -80,7 +92,7 @@ def auth_override():
         new_callable=AsyncMock,
         return_value=None,
     ):
-        yield
+        yield mock_redis
 
     app.dependency_overrides.clear()
 
@@ -304,3 +316,274 @@ async def test_get_score_persiste_une_prediction_et_expose_son_id(auth_override:
     assert body["prediction_id"] == "pred-uuid-1"
     assert mock_db.add.called
     assert mock_db.commit.await_count >= 1
+
+
+@pytest.mark.asyncio
+async def test_score_week_returns_seven_days_and_nine_hours(auth_override: AsyncMock) -> None:
+    mock_db = AsyncMock()
+    mock_db.add_all = MagicMock()
+    mock_db.commit = AsyncMock()
+    app.dependency_overrides[get_db] = lambda: mock_db
+    patch_peak = patch(
+        "app.api.v1.endpoints.score.get_peak_by_id",
+        new_callable=AsyncMock,
+        return_value=MOCK_PEAK,
+    )
+    patch_weather = patch(
+        "app.api.v1.endpoints.score.weather_service.get_week_forecast",
+        new_callable=AsyncMock,
+        return_value=MOCK_WEEK,
+    )
+
+    try:
+        with patch_peak, patch_weather:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                response = await client.get(
+                    "/api/v1/score/week",
+                    params={"peak_id": "peak-1", "start_date": WEEK_START_DATE.isoformat()},
+                )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    by_date = response.json()["by_date"]
+    assert len(by_date) == 7
+    assert set(by_date[WEEK_START_DATE.isoformat()]) == {str(hour) for hour in WEEK_HOURS}
+    assert auth_override.eval.await_count == 2
+    persisted_ids = {str(prediction.id) for prediction in mock_db.add_all.call_args.args[0]}
+    response_ids = {
+        score["prediction_id"] for by_hour in by_date.values() for score in by_hour.values()
+    }
+    assert response_ids == persisted_ids
+
+
+@pytest.mark.asyncio
+async def test_score_week_rejects_malformed_start_date(auth_override: AsyncMock) -> None:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get(
+            "/api/v1/score/week",
+            params={"peak_id": "peak-1", "start_date": "not-a-date"},
+        )
+
+    assert response.status_code == 422
+    auth_override.eval.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_score_week_rejects_start_date_outside_ui_window_without_redis(
+    auth_override: AsyncMock,
+) -> None:
+    outside_ui_window = (datetime.now(UTC).date() + timedelta(days=2)).isoformat()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get(
+            "/api/v1/score/week",
+            params={"peak_id": "peak-1", "start_date": outside_ui_window},
+        )
+
+    assert response.status_code == 422
+    auth_override.eval.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_score_week_returns_peak_not_found(auth_override: AsyncMock) -> None:
+    with patch(
+        "app.api.v1.endpoints.score.get_peak_by_id",
+        new_callable=AsyncMock,
+        return_value=None,
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(
+                "/api/v1/score/week",
+                params={"peak_id": "missing", "start_date": WEEK_START_DATE.isoformat()},
+            )
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["code"] == "PEAK_NOT_FOUND"
+    auth_override.eval.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_score_week_returns_weather_unavailable(auth_override: AsyncMock) -> None:
+    patch_peak = patch(
+        "app.api.v1.endpoints.score.get_peak_by_id",
+        new_callable=AsyncMock,
+        return_value=MOCK_PEAK,
+    )
+    patch_weather = patch(
+        "app.api.v1.endpoints.score.weather_service.get_week_forecast",
+        new_callable=AsyncMock,
+        side_effect=Exception("timeout"),
+    )
+
+    with patch_peak, patch_weather:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(
+                "/api/v1/score/week",
+                params={"peak_id": "peak-1", "start_date": WEEK_START_DATE.isoformat()},
+            )
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["code"] == "WEATHER_UNAVAILABLE"
+
+
+@pytest.mark.asyncio
+async def test_score_week_returns_generated_prediction_ids_if_persistence_fails(
+    auth_override: AsyncMock,
+) -> None:
+    mock_db = AsyncMock()
+    mock_db.add_all = MagicMock()
+    mock_db.commit = AsyncMock(side_effect=Exception("database unavailable"))
+    mock_db.rollback = AsyncMock()
+    app.dependency_overrides[get_db] = lambda: mock_db
+    patch_peak = patch(
+        "app.api.v1.endpoints.score.get_peak_by_id",
+        new_callable=AsyncMock,
+        return_value=MOCK_PEAK,
+    )
+    patch_weather = patch(
+        "app.api.v1.endpoints.score.weather_service.get_week_forecast",
+        new_callable=AsyncMock,
+        return_value=MOCK_WEEK,
+    )
+
+    try:
+        with patch_peak, patch_weather:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                response = await client.get(
+                    "/api/v1/score/week",
+                    params={"peak_id": "peak-1", "start_date": WEEK_START_DATE.isoformat()},
+                )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert mock_db.add_all.call_count == 1
+    assert mock_db.commit.await_count == 1
+    assert mock_db.rollback.await_count == 1
+    prediction_ids = [
+        score["prediction_id"]
+        for by_hour in response.json()["by_date"].values()
+        for score in by_hour.values()
+    ]
+    assert len(prediction_ids) == 63
+    assert len(set(prediction_ids)) == 63
+
+
+@pytest.mark.asyncio
+async def test_score_week_preserves_quota_exceeded_code(auth_override: AsyncMock) -> None:
+    auth_override.eval.side_effect = [1, -1]
+
+    with patch(
+        "app.api.v1.endpoints.score.get_peak_by_id",
+        new_callable=AsyncMock,
+        return_value=MOCK_PEAK,
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(
+                "/api/v1/score/week",
+                params={"peak_id": "peak-1", "start_date": WEEK_START_DATE.isoformat()},
+            )
+
+    assert response.status_code == 429
+    assert response.json()["detail"]["code"] == "QUOTA_EXCEEDED"
+    assert auth_override.eval.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_score_week_rate_limit_preserves_error_code(auth_override: AsyncMock) -> None:
+    auth_override.eval.return_value = 13
+
+    with patch(
+        "app.api.v1.endpoints.score.get_peak_by_id",
+        new_callable=AsyncMock,
+        return_value=MOCK_PEAK,
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(
+                "/api/v1/score/week",
+                params={"peak_id": "peak-1", "start_date": WEEK_START_DATE.isoformat()},
+            )
+
+    assert response.status_code == 429
+    assert response.json()["code"] == "RATE_LIMIT_EXCEEDED"
+    auth_override.eval.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_score_week_preserves_rate_limit_exceeded_code() -> None:
+    anonymous_user = {"id": "guest-123", "email": None, "is_anonymous": True}
+    mock_redis = AsyncMock()
+    mock_redis.eval.return_value = 61
+
+    async def get_mock_redis() -> AsyncMock:
+        return mock_redis
+
+    app.dependency_overrides[get_current_user] = lambda: anonymous_user
+    app.dependency_overrides[get_redis] = get_mock_redis
+    try:
+        with patch(
+            "app.api.v1.endpoints.score.get_peak_by_id",
+            new_callable=AsyncMock,
+            return_value=MOCK_PEAK,
+        ):
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                response = await client.get(
+                    "/api/v1/score/week",
+                    params={"peak_id": "peak-1", "start_date": WEEK_START_DATE.isoformat()},
+                    headers={
+                        "X-Cloudbreak-Installation-Id": "550e8400-e29b-41d4-a716-446655440000"
+                    },
+                )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 429
+    assert response.json()["code"] == "RATE_LIMIT_EXCEEDED"
+    mock_redis.eval.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_score_week_rate_limit_also_applies_to_premium_user() -> None:
+    premium_user = {"id": "premium-123", "email": "premium@test.com"}
+    subscription = MagicMock(
+        plan="premium",
+        status="active",
+        expires_at=datetime(2099, 1, 1, tzinfo=UTC),
+    )
+    mock_redis = AsyncMock()
+    mock_redis.eval.return_value = 13
+
+    async def get_mock_redis() -> AsyncMock:
+        return mock_redis
+
+    app.dependency_overrides[get_current_user] = lambda: premium_user
+    app.dependency_overrides[get_redis] = get_mock_redis
+    try:
+        with (
+            patch(
+                "app.api.v1.endpoints.score.get_peak_by_id",
+                new_callable=AsyncMock,
+                return_value=MOCK_PEAK,
+            ),
+            patch(
+                "app.core.dependencies.get_user_subscription",
+                new_callable=AsyncMock,
+                return_value=subscription,
+            ),
+        ):
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                response = await client.get(
+                    "/api/v1/score/week",
+                    params={"peak_id": "peak-1", "start_date": WEEK_START_DATE.isoformat()},
+                )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 429
+    assert response.json()["code"] == "RATE_LIMIT_EXCEEDED"
+    mock_redis.eval.assert_awaited_once()

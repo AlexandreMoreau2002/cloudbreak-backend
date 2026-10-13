@@ -7,6 +7,7 @@ Couvre :
 - Paramètre hour : index dans les données horaires
 """
 
+from datetime import date, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -158,6 +159,38 @@ def _make_hourly(
     return hourly
 
 
+def _make_hourly_for_timestamps(timestamps: list[str]) -> dict:
+    """Construit un payload Open-Meteo dont chaque index est identifiable par le vent."""
+    hourly = {key: [values[0]] * len(timestamps) for key, values in _make_hourly().items()}
+    hourly["time"] = timestamps
+    hourly["wind_speed_10m"] = [float(index) for index in range(len(timestamps))]
+    return hourly
+
+
+def _make_week_hourly() -> dict:
+    """Construit sept jours standard de données horaires avec timestamps locaux."""
+    start = datetime(2026, 10, 12)
+    timestamps = [
+        (start + timedelta(hours=index)).strftime("%Y-%m-%dT%H:%M") for index in range(7 * 24)
+    ]
+    return _make_hourly_for_timestamps(timestamps)
+
+
+def _make_dst_week_timestamps(start_date: date, dst_date: date, spring: bool) -> list[str]:
+    """Simule le calendrier local Open-Meteo d'une semaine contenant un changement d'heure."""
+    timestamps: list[str] = []
+    for offset in range(7):
+        current_day = start_date + timedelta(days=offset)
+        hours = list(range(24))
+        if current_day == dst_date:
+            if spring:
+                hours = [hour for hour in hours if hour != 2]
+            else:
+                hours = [*range(3), 2, *range(3, 24)]
+        timestamps.extend(f"{current_day.isoformat()}T{hour:02d}:00" for hour in hours)
+    return timestamps
+
+
 @pytest.mark.asyncio
 async def test_get_forecast_retourne_weather_data() -> None:
     """get_forecast retourne un WeatherData bien construit."""
@@ -269,3 +302,67 @@ async def test_get_forecast_cloud_cover_low() -> None:
     result = await provider.get_forecast(lat=45.83, lng=6.86, date="2026-10-15")
 
     assert result.cloud_cover_low == pytest.approx(65.0)
+
+
+@pytest.mark.asyncio
+async def test_get_week_forecast_uses_one_http_request_and_returns_63_cells() -> None:
+    """Une semaine est récupérée en une requête puis réduite aux heures utiles."""
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.get = AsyncMock(return_value=_make_mock_response(_make_week_hourly()))
+    provider = OpenMeteoProvider(client=mock_client)
+    hours = (6, 8, 10, 12, 14, 16, 18, 20, 22)
+
+    result = await provider.get_week_forecast(
+        lat=45.83,
+        lng=6.86,
+        start_date="2026-10-12",
+        hours=hours,
+    )
+
+    assert mock_client.get.await_count == 1
+    assert len(result) == 7
+    assert all(set(day) == set(hours) for day in result.values())
+    assert sum(len(day) for day in result.values()) == 63
+    params = mock_client.get.call_args.kwargs["params"]
+    assert params["start_date"] == "2026-10-12"
+    assert params["end_date"] == "2026-10-18"
+
+
+@pytest.mark.asyncio
+async def test_get_week_forecast_uses_timestamps_after_spring_dst_transition() -> None:
+    """Le jour de 23h ne décale pas les heures des jours suivants."""
+    timestamps = _make_dst_week_timestamps(date(2026, 3, 28), date(2026, 3, 29), spring=True)
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.get = AsyncMock(
+        return_value=_make_mock_response(_make_hourly_for_timestamps(timestamps))
+    )
+    provider = OpenMeteoProvider(client=mock_client)
+
+    result = await provider.get_week_forecast(45.83, 6.86, "2026-03-28", (6,))
+
+    expected_index = timestamps.index("2026-04-03T06:00")
+    assert result["2026-04-03"][6].wind_speed == pytest.approx(float(expected_index))
+    assert mock_client.get.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_get_week_forecast_uses_timestamps_after_autumn_dst_transition() -> None:
+    """Le jour de 25h ne décale pas les heures des jours suivants."""
+    timestamps = _make_dst_week_timestamps(date(2026, 10, 24), date(2026, 10, 25), spring=False)
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.get = AsyncMock(
+        return_value=_make_mock_response(_make_hourly_for_timestamps(timestamps))
+    )
+    provider = OpenMeteoProvider(client=mock_client)
+
+    result = await provider.get_week_forecast(45.83, 6.86, "2026-10-24", (6,))
+
+    expected_index = timestamps.index("2026-10-30T06:00")
+    assert result["2026-10-30"][6].wind_speed == pytest.approx(float(expected_index))
+    assert mock_client.get.await_count == 1

@@ -654,3 +654,19 @@ tests ; ils ne valident ni l'exécution réelle de Lua ni la chaîne réseau Tra
 
 SECURE dans le périmètre de l'atténuation étage 1, avec les warnings ci-dessus à traiter.
 Ce verdict ne valide pas la configuration du déploiement ni une identité matérielle de l'invité.
+
+---
+
+## 2026-10-13 — Batch hebdomadaire de score
+
+### Garde-fous vérifiés
+
+- `GET /api/v1/score/week` reste protégé par JWT. `start_date` est validée avant toute mutation
+  Redis ou appel météo et limitée à aujourd'hui UTC ± 1 jour.
+- Une identité authentifiée est limitée à 12 lectures hebdomadaires par fenêtre fixe de 60 secondes.
+  La clé Redis emploie le hachage SHA-256 de l'identité, sans identifiant brut dans la clé.
+- Le quota freemium et le rate limit conservent leurs codes métier distincts :
+  `QUOTA_EXCEEDED` et `RATE_LIMIT_EXCEEDED`. Le mobile ne transforme donc pas un rate limit en
+  paywall.
+- Le cache Redis hebdomadaire de météo dure 10 minutes ; il ne contient que des données météo
+  normalisées. Les nouveaux logs du batch n'enregistrent ni jeton, ni détail de prédiction.

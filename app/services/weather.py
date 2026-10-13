@@ -21,6 +21,7 @@ from app.domain.weather_types import PressureLevelData, WeatherData, WeatherProv
 logger = logging.getLogger(__name__)
 
 CACHE_TTL = 600  # 10 minutes en secondes
+WEEK_CACHE_TTL = CACHE_TTL
 
 
 def _weather_data_from_dict(data: dict[str, Any]) -> WeatherData:
@@ -64,3 +65,37 @@ class WeatherService:
 
         await self._redis.setex(cache_key, CACHE_TTL, json.dumps(asdict(weather)))
         return weather
+
+    async def get_week_forecast(
+        self,
+        lat: float,
+        lng: float,
+        start_date: str,
+        hours: tuple[int, ...],
+    ) -> dict[str, dict[int, WeatherData]]:
+        """Retourne la semaine utile, en conservant une entrée Redis atomique pour le batch."""
+        cache_key = f"weather:week:v1:{lat}:{lng}:{start_date}"
+        cached = await self._redis.get(cache_key)
+        if cached:
+            logger.info("weather_week_cache_hit", extra={"key": cache_key})
+            raw_week: dict[str, dict[str, dict[str, Any]]] = json.loads(cached)
+            return {
+                date: {
+                    int(hour): _weather_data_from_dict(weather) for hour, weather in by_hour.items()
+                }
+                for date, by_hour in raw_week.items()
+            }
+
+        logger.info("weather_week_cache_miss", extra={"key": cache_key})
+        weather_week = await self._provider.get_week_forecast(
+            lat=lat,
+            lng=lng,
+            start_date=start_date,
+            hours=hours,
+        )
+        serialized_week = {
+            date: {str(hour): asdict(weather) for hour, weather in by_hour.items()}
+            for date, by_hour in weather_week.items()
+        }
+        await self._redis.setex(cache_key, WEEK_CACHE_TTL, json.dumps(serialized_week))
+        return weather_week

@@ -20,7 +20,9 @@ Comment on calcule l'inversion thermique :
 """
 
 import logging
+from typing import cast
 from datetime import date as date_type
+from datetime import datetime, timedelta
 
 import httpx
 
@@ -37,6 +39,7 @@ CLOUD_DEWPOINT_SPREAD_MAX = 2.0  # T - Td maximal (°C) — air saturé
 PRESSURE_LEVELS = [925, 850, 800, 700]
 
 BASE_URL = "https://api.open-meteo.com/v1/forecast"
+HourlyPayload = dict[str, list[object]]
 
 
 def _estimate_cloud_base_skewt(levels: list[PressureLevelData]) -> int:
@@ -59,11 +62,8 @@ class OpenMeteoProvider(WeatherProvider):
     def __init__(self, client: httpx.AsyncClient | None = None) -> None:
         self._client = client
 
-    async def get_forecast(self, lat: float, lng: float, date: str, hour: int = 6) -> WeatherData:
-        """
-        Appelle l'API Open-Meteo et retourne un WeatherData normalisé.
-        Utilise l'heure spécifiée (défaut 6h, optimal pour mer de nuage matinale).
-        """
+    @staticmethod
+    def _hourly_variables() -> str:
         pressure_vars: list[str] = []
         for p in PRESSURE_LEVELS:
             pressure_vars.extend(
@@ -75,7 +75,7 @@ class OpenMeteoProvider(WeatherProvider):
                 ]
             )
 
-        hourly_vars = ",".join(
+        return ",".join(
             [
                 "relative_humidity_2m",
                 "wind_speed_10m",
@@ -86,18 +86,27 @@ class OpenMeteoProvider(WeatherProvider):
             ]
         )
 
+    async def _get_hourly_payload(
+        self,
+        lat: float,
+        lng: float,
+        start_date: str,
+        end_date: str,
+    ) -> HourlyPayload:
+        """Récupère une plage Open-Meteo, commune aux lectures simple et hebdomadaire."""
         params: dict[str, str] = {
             "latitude": str(lat),
             "longitude": str(lng),
-            "hourly": hourly_vars,
-            "start_date": date,
-            "end_date": date,
+            "hourly": self._hourly_variables(),
+            "start_date": start_date,
+            "end_date": end_date,
             "wind_speed_unit": "kmh",
             "timezone": "Europe/Paris",
         }
 
         logger.info(
-            "open_meteo_request", extra={"lat": lat, "lng": lng, "date": date, "hour": hour}
+            "open_meteo_request",
+            extra={"lat": lat, "lng": lng, "start_date": start_date, "end_date": end_date},
         )
 
         async with self._client or httpx.AsyncClient() as client:
@@ -105,16 +114,27 @@ class OpenMeteoProvider(WeatherProvider):
             response.raise_for_status()
             data = response.json()
 
-        hourly = data["hourly"]
-        idx = hour  # index = heure locale (0-23)
+        return cast(HourlyPayload, data["hourly"])
 
-        # Construire le profil vertical par niveau de pression
+    @staticmethod
+    def _weather_from_hourly(hourly: HourlyPayload, date: str, index: int) -> WeatherData:
+        """Normalise les vecteurs horaires Open-Meteo pour une cellule donnée."""
+
+        def value(name: str, fallback: float) -> float:
+            values = hourly.get(name)
+            if values is None or index >= len(values):
+                return fallback
+            raw_value = values[index]
+            if not isinstance(raw_value, int | float):
+                raise ValueError(f"Valeur météo invalide pour {name}")
+            return float(raw_value)
+
         pressure_levels: list[PressureLevelData] = []
         for p in PRESSURE_LEVELS:
-            temp_c = hourly.get(f"temperature_{p}hPa", [0.0] * 24)[idx]
-            rh = hourly.get(f"relative_humidity_{p}hPa", [0.0] * 24)[idx]
-            geo_height = hourly.get(f"geopotential_height_{p}hPa", [0.0] * 24)[idx]
-            dew_point = hourly.get(f"dew_point_{p}hPa", [0.0] * 24)[idx]
+            temp_c = value(f"temperature_{p}hPa", 0.0)
+            rh = value(f"relative_humidity_{p}hPa", 0.0)
+            geo_height = value(f"geopotential_height_{p}hPa", 0.0)
+            dew_point = value(f"dew_point_{p}hPa", 0.0)
             pressure_levels.append(
                 PressureLevelData(
                     pressure_hpa=p,
@@ -125,22 +145,59 @@ class OpenMeteoProvider(WeatherProvider):
                 )
             )
 
-        cloud_base = _estimate_cloud_base_skewt(pressure_levels)
-
-        temp_850 = hourly.get("temperature_850hPa", [8.0] * 24)[idx]
-        temp_925 = hourly.get("temperature_925hPa", [5.0] * 24)[idx]
-        temp_2m = hourly.get("temperature_2m", [5.0] * 24)[idx]
-        parsed_date = date_type.fromisoformat(date)
-
         return WeatherData(
-            cloud_base=cloud_base,
-            humidity=hourly.get("relative_humidity_2m", [70.0] * 24)[idx],
-            wind_speed=hourly.get("wind_speed_10m", [15.0] * 24)[idx],
-            temperature_2m=temp_2m,
-            temperature_850hpa=temp_850,
-            temperature_925hpa=temp_925,
-            pressure=hourly.get("surface_pressure", [1013.0] * 24)[idx],
-            cloud_cover_low=hourly.get("cloud_cover_low", [0.0] * 24)[idx],
-            month=parsed_date.month,
+            cloud_base=_estimate_cloud_base_skewt(pressure_levels),
+            humidity=value("relative_humidity_2m", 70.0),
+            wind_speed=value("wind_speed_10m", 15.0),
+            temperature_2m=value("temperature_2m", 5.0),
+            temperature_850hpa=value("temperature_850hPa", 8.0),
+            temperature_925hpa=value("temperature_925hPa", 5.0),
+            pressure=value("surface_pressure", 1013.0),
+            cloud_cover_low=value("cloud_cover_low", 0.0),
+            month=date_type.fromisoformat(date).month,
             pressure_levels=pressure_levels,
         )
+
+    @staticmethod
+    def _hourly_indexes(hourly: HourlyPayload) -> dict[tuple[str, int], int]:
+        """Indexe les valeurs par date et heure locales retournées par Open-Meteo."""
+        timestamps = hourly.get("time")
+        if timestamps is None:
+            raise ValueError("Horodatages Open-Meteo absents")
+
+        indexes: dict[tuple[str, int], int] = {}
+        for index, timestamp in enumerate(timestamps):
+            if not isinstance(timestamp, str):
+                raise ValueError("Horodatage Open-Meteo invalide")
+            local_datetime = datetime.fromisoformat(timestamp)
+            indexes.setdefault((local_datetime.date().isoformat(), local_datetime.hour), index)
+        return indexes
+
+    async def get_forecast(self, lat: float, lng: float, date: str, hour: int = 6) -> WeatherData:
+        """Retourne la prévision normalisée d'une heure sans changer le contrat existant."""
+        hourly = await self._get_hourly_payload(lat, lng, date, date)
+        return self._weather_from_hourly(hourly, date, hour)
+
+    async def get_week_forecast(
+        self,
+        lat: float,
+        lng: float,
+        start_date: str,
+        hours: tuple[int, ...],
+    ) -> dict[str, dict[int, WeatherData]]:
+        """Retourne les heures utiles de sept jours depuis une seule réponse Open-Meteo."""
+        first_day = date_type.fromisoformat(start_date)
+        days = [first_day + timedelta(days=offset) for offset in range(7)]
+        hourly = await self._get_hourly_payload(lat, lng, start_date, days[-1].isoformat())
+        indexes = self._hourly_indexes(hourly)
+        return {
+            day.isoformat(): {
+                hour: self._weather_from_hourly(
+                    hourly,
+                    day.isoformat(),
+                    indexes[(day.isoformat(), hour)],
+                )
+                for hour in hours
+            }
+            for day in days
+        }

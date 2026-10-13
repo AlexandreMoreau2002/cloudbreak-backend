@@ -70,6 +70,7 @@ async def test_query_filters_preference_and_valid_token_in_sql() -> None:
     assert "push_token is not null" in sql
     assert "push_token_valid is true" in sql
     assert "user_favorites" in sql and "subscriptions" in sql and "peaks" in sql
+    assert "order by users.supabase_user_id, peaks.id" in " ".join(sql.split())
 
 
 @pytest.mark.asyncio
@@ -372,3 +373,17 @@ async def test_lock_is_released_even_if_processing_raises() -> None:
         with pytest.raises(RuntimeError):
             await run_favorite_alerts(AsyncMock(), redis, _weather(), NOW)
     redis.delete.assert_awaited_once_with(LOCK_KEY)
+
+
+@pytest.mark.asyncio
+async def test_forecast_is_requested_for_the_peak_target_date_at_6h() -> None:
+    weather = _weather()
+    with _score():
+        await process_candidates(
+            [Candidate(_user(), _peak())],
+            redis=_redis(),
+            weather_service=weather,
+            date=DATE,
+            send=AsyncMock(return_value=True),
+        )
+    weather.get_forecast.assert_awaited_once_with(lat=44.8, lng=5.5, date=DATE, hour=6)

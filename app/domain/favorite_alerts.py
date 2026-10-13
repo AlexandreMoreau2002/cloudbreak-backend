@@ -10,6 +10,7 @@ from app.domain.score_context import PARIS_TZ
 
 ALERT_HOUR = 6
 DEDUPE_TTL_SECONDS = 36 * 3600
+MAX_PEAK_NAME_LENGTH = 80
 
 SUPPORTED_LOCALES = ("fr", "en")
 DEFAULT_LOCALE = "fr"
@@ -42,6 +43,8 @@ def resolve_locale(locale: str | None) -> str:
 
 def build_favorite_alert(peak_name: str, score: int, locale: str | None = None) -> tuple[str, str]:
     title, template = _MESSAGES[resolve_locale(locale)]
+    if len(peak_name) > MAX_PEAK_NAME_LENGTH:
+        peak_name = peak_name[:MAX_PEAK_NAME_LENGTH] + "…"  # payload Expo limité à 4 Ko
     return title, template.format(hour=ALERT_HOUR, peak=peak_name, score=score)
 
 

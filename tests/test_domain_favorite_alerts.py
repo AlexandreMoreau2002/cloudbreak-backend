@@ -1,5 +1,6 @@
 """Tests des règles pures des alertes favoris."""
 
+import pytest
 from datetime import UTC, datetime
 
 from app.domain.favorite_alerts import (
@@ -53,3 +54,23 @@ def test_dedupe_key_is_prefixed_and_scoped_per_user_peak_and_date() -> None:
     assert key == "notif:fav:user-1:peak-9:2026-10-13"
     assert key != alert_dedupe_key("user-2", "peak-9", "2026-10-13")
     assert key != alert_dedupe_key("user-1", "peak-9", "2026-10-14")
+
+
+def test_short_peak_name_is_unchanged() -> None:
+    assert "Mont Aiguille" in build_favorite_alert("Mont Aiguille", 87)[1]
+    assert "…" not in build_favorite_alert("Mont Aiguille", 87)[1]
+
+
+def test_peak_name_of_exactly_80_characters_is_unchanged() -> None:
+    name = "a" * 80
+    for locale in ("fr", "en"):
+        body = build_favorite_alert(name, 87, locale)[1]
+        assert name in body and "…" not in body.replace("—", "")
+
+
+@pytest.mark.parametrize("locale", ["fr", "en"])
+def test_long_peak_name_is_truncated_with_an_ellipsis(locale: str) -> None:
+    body = build_favorite_alert("a" * 5000, 87, locale)[1]
+    assert "a" * 80 + "…" in body
+    assert "a" * 81 not in body
+    assert len(body) < 200

@@ -31,7 +31,8 @@ GET {{baseUrl}}/score/week?peak_id={{peakPuyDome}}&start_date={{startDate}}
 Authorization: Bearer {{freemiumEmail-jwt}}
 
 ### 6 — Rate limit batch : la 13e requête dans la même minute répond RATE_LIMIT_EXCEEDED
-# Cette protection s'applique aussi à Premium. L'endpoint compte une demande par semaine,
-# indépendamment du quota freemium ; consulter score-quota.http pour celui-ci.
+# Envoyer exactement cette même requête 13 fois, dans la même minute, avec le même JWT et le même sommet.
+# Les 12 premières répondent 200 ; la 13e répond 429 avec le code RATE_LIMIT_EXCEEDED.
+# Cette protection s'applique aussi à Premium ; le même sommet ne consomme pas de nouvelle unité du quota freemium.
 GET {{baseUrl}}/score/week?peak_id={{peakVentoux}}&start_date={{startDate}}
 Authorization: Bearer {{freemiumEmail-jwt}}

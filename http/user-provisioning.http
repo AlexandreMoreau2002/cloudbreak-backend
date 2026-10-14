@@ -14,7 +14,8 @@ Authorization: Bearer {{token}}
 GET {{baseUrl}}/api/v1/user/me
 Authorization: Bearer {{token}}
 
-### Optional survey (closed body)
+### Survey persistence: first answer (use a fresh permanent account)
+# Expected: 200, survey_completed_at set, app_store / hiker / false returned.
 PATCH {{baseUrl}}/api/v1/user/survey
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -25,6 +26,24 @@ Content-Type: application/json
   "newsletter_opt_in": false,
   "skipped": false
 }
+
+### Survey persistence: second answer is ignored (terminal state)
+# Expected: 200 with the exact values and survey_completed_at from the first request.
+PATCH {{baseUrl}}/api/v1/user/survey
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "acquisition_source": "instagram",
+  "practice": "photographer",
+  "newsletter_opt_in": true,
+  "skipped": false
+}
+
+### Survey persistence: read the terminal state
+# Expected: the survey_completed_at from the first request and survey_skipped_at null.
+GET {{baseUrl}}/api/v1/user/me
+Authorization: Bearer {{token}}
 
 ### Or skip it (terminal and idempotent)
 PATCH {{baseUrl}}/api/v1/user/survey

@@ -120,6 +120,20 @@ async def update_user_survey(
     return profile
 
 
+async def reset_user_survey(user: dict[str, object], db: AsyncSession) -> User:
+    """Remet le sondage à zéro (outil de dev : permet de le rejouer sur un compte déjà répondu)."""
+    profile = await get_or_create_user(
+        str(user["id"]), str(user.get("auth_provider", "email")), db, _token_email(user)
+    )
+    profile.survey_completed_at = None  # type: ignore[assignment]
+    profile.survey_skipped_at = None  # type: ignore[assignment]
+    profile.acquisition_source = None  # type: ignore[assignment]
+    profile.practice = None  # type: ignore[assignment]
+    profile.newsletter_opt_in = None  # type: ignore[assignment]
+    await db.flush()
+    return profile
+
+
 async def update_user_preferences(
     user: dict[str, object], prefs: PreferencesUpdate, db: AsyncSession
 ) -> User:

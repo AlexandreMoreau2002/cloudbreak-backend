@@ -1,9 +1,10 @@
 import logging
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.core.config import settings
+from app.core.errors import ErrorCode
 from app.services.analytics import track
 from app.core.security import delete_supabase_user
 from app.core.dependencies import get_current_user, get_permanent_user
@@ -21,6 +22,7 @@ from app.services.user import (
     clear_push_token,
     get_user_profile,
     delete_user_data,
+    reset_user_survey,
     update_user_survey,
     update_user_display_name,
     update_user_preferences,
@@ -83,6 +85,23 @@ async def survey(
 ) -> object:
     profile = await update_user_survey(current_user, payload, db)
     await db.commit()
+    return profile
+
+
+@router.post("/survey/reset", response_model=UserProfile)
+async def reset_survey(
+    current_user: dict[str, object] = Depends(get_permanent_user),
+    db: AsyncSession = Depends(get_db),
+) -> object:
+    """Outil de dev : remet le sondage à zéro. Inexistant (404) en production."""
+    if settings.environment.lower() == "production":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"detail": "Introuvable", "code": ErrorCode.NOT_FOUND},
+        )
+    profile = await reset_user_survey(current_user, db)
+    await db.commit()
+    logger.info("survey_reset", extra={"user_id": str(current_user["id"])})
     return profile
 
 

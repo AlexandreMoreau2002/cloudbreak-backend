@@ -1,5 +1,6 @@
 import pytest
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -674,3 +675,63 @@ def test_delete_push_token_requires_authorization_returns_403() -> None:
     with TestClient(app) as client:
         response = client.delete("/api/v1/user/push-token")
     assert response.status_code == 403
+
+
+def _profile_dict() -> dict[str, object]:
+    return {
+        "supabase_user_id": "user-123",
+        "auth_provider": "email",
+        "created_at": datetime.now(UTC),
+        "converted_at": datetime.now(UTC),
+        "notif_favorites": True,
+        "notif_regional": True,
+        "notif_terrain": True,
+    }
+
+
+@patch("app.api.v1.endpoints.user.reset_user_survey", new_callable=AsyncMock)
+def test_reset_survey_returns_profile_in_development(mock_reset: AsyncMock) -> None:
+    mock_reset.return_value = _profile_dict()
+    app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        with TestClient(app) as client:
+            response = client.post("/api/v1/user/survey/reset")
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert response.json()["survey_completed_at"] is None
+    mock_reset.assert_awaited_once()
+
+
+@patch("app.api.v1.endpoints.user.reset_user_survey", new_callable=AsyncMock)
+def test_reset_survey_returns_404_in_production(mock_reset: AsyncMock) -> None:
+    app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        with patch("app.api.v1.endpoints.user.settings", SimpleNamespace(environment="production")):
+            with TestClient(app) as client:
+                response = client.post("/api/v1/user/survey/reset")
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 404
+    assert response.json()["detail"]["code"] == "NOT_FOUND"
+    mock_reset.assert_not_awaited()
+
+
+def test_reset_survey_without_authorization_returns_403() -> None:
+    with TestClient(app) as client:
+        response = client.post("/api/v1/user/survey/reset")
+    assert response.status_code == 403
+
+
+def test_anonymous_cannot_reset_survey() -> None:
+    app.dependency_overrides[get_current_user] = lambda: {"id": "anon-123", "is_anonymous": True}
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        with TestClient(app) as client:
+            response = client.post("/api/v1/user/survey/reset")
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "ACCOUNT_REQUIRED"

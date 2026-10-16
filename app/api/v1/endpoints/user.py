@@ -94,7 +94,7 @@ async def reset_survey(
     db: AsyncSession = Depends(get_db),
 ) -> object:
     """Outil de dev : remet le sondage à zéro. Inexistant (404) en production."""
-    if settings.environment.lower() == "production":
+    if settings.environment.strip().lower() == "production":
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"detail": "Introuvable", "code": ErrorCode.NOT_FOUND},

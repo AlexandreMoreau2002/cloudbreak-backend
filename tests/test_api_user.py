@@ -1,6 +1,6 @@
 import pytest
-from datetime import UTC, datetime
 from types import SimpleNamespace
+from datetime import UTC, datetime
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -716,6 +716,22 @@ def test_reset_survey_returns_404_in_production(mock_reset: AsyncMock) -> None:
         app.dependency_overrides.clear()
     assert response.status_code == 404
     assert response.json()["detail"]["code"] == "NOT_FOUND"
+    mock_reset.assert_not_awaited()
+
+
+@patch("app.api.v1.endpoints.user.reset_user_survey", new_callable=AsyncMock)
+def test_reset_survey_returns_404_for_padded_production_value(mock_reset: AsyncMock) -> None:
+    app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        with patch(
+            "app.api.v1.endpoints.user.settings", SimpleNamespace(environment=" Production ")
+        ):
+            with TestClient(app) as client:
+                response = client.post("/api/v1/user/survey/reset")
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 404
     mock_reset.assert_not_awaited()
 
 

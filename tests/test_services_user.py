@@ -30,6 +30,7 @@ from app.services.user import (
     get_user_profile,
     provision_user,
     set_push_token,
+    reset_user_survey,
     update_user_notification_preferences,
     update_user_survey,
     update_user_preferences,
@@ -560,3 +561,57 @@ async def test_set_push_token_raises_if_replay_also_conflicts() -> None:
         with pytest.raises(IntegrityError):
             await set_push_token({"id": "u1"}, "ExponentPushToken[a]", db)
     assert db.begin_nested.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_reset_user_survey_clears_answers_and_allows_new_answer() -> None:
+    profile = User(supabase_user_id="user-123", auth_provider="email")
+    profile.survey_completed_at = datetime.now(UTC)
+    profile.survey_skipped_at = None
+    profile.acquisition_source = AcquisitionSource.APP_STORE.value
+    profile.practice = Practice.HIKER.value
+    profile.newsletter_opt_in = False
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = profile
+    db = AsyncMock()
+    db.execute.return_value = result
+    user = {"id": "user-123", "auth_provider": "email"}
+
+    actual = await reset_user_survey(user, db)
+
+    assert actual is profile
+    assert profile.survey_completed_at is None
+    assert profile.survey_skipped_at is None
+    assert profile.acquisition_source is None
+    assert profile.practice is None
+    assert profile.newsletter_opt_in is None
+    db.flush.assert_awaited()
+
+    await update_user_survey(
+        user,
+        SurveyUpdate(
+            acquisition_source=AcquisitionSource.INSTAGRAM,
+            practice=Practice.PHOTOGRAPHER,
+            newsletter_opt_in=True,
+        ),
+        db,
+    )
+
+    assert profile.acquisition_source == AcquisitionSource.INSTAGRAM.value
+    assert profile.practice == Practice.PHOTOGRAPHER.value
+    assert profile.newsletter_opt_in is True
+    assert profile.survey_completed_at is not None
+
+
+@pytest.mark.asyncio
+async def test_reset_user_survey_clears_terminal_skip() -> None:
+    profile = User(supabase_user_id="user-123", auth_provider="email")
+    profile.survey_skipped_at = datetime.now(UTC)
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = profile
+    db = AsyncMock()
+    db.execute.return_value = result
+
+    await reset_user_survey({"id": "user-123", "auth_provider": "email"}, db)
+
+    assert profile.survey_skipped_at is None

@@ -55,3 +55,9 @@ variables Supabase/JWKS et la `service_role` key sont injectées par secret ; el
 ni dans la documentation, ni dans les logs, ni dans le fichier HTTP. La levée de la gate exige
 une preuve mobile de l'UUID conservé avant/après conversion et une preuve backend de la ligne
 `users` correspondante.
+
+## Outil de dev : rejouer le sondage
+
+`POST /api/v1/user/survey/reset` (compte permanent requis) remet à NULL les colonnes du sondage du compte
+courant pour pouvoir le rejouer pendant les tests ; il répond 404 `NOT_FOUND` quand `ENVIRONMENT=production`.
+Le verrou terminal de `PATCH /api/v1/user/survey` reste inchangé.

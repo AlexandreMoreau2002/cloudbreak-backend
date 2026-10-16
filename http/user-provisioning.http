@@ -86,3 +86,12 @@ Content-Type: application/json
 ### Delete account (RGPD: local users/data first, then auth.users)
 # DELETE {{baseUrl}}/api/v1/user
 # Authorization: Bearer {{token}}
+
+### Dev only: reset the survey (404 when ENVIRONMENT=production)
+# Expected: 200, survey_completed_at and survey_skipped_at null. Then PATCH /survey is accepted again.
+POST {{baseUrl}}/api/v1/user/survey/reset
+Authorization: Bearer {{token}}
+
+### Reset without Authorization
+# Expected: 403
+POST {{baseUrl}}/api/v1/user/survey/reset

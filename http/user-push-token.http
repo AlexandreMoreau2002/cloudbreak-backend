@@ -47,3 +47,10 @@ Content-Type: application/json
 ### Désinscrire le token — 204
 DELETE {{baseUrl}}/api/v1/user/push-token
 Authorization: Bearer {{token}}
+
+### Rate-limit — 11e POST dans la même minute → 429 RATE_LIMIT_EXCEEDED (limite : 10/min/utilisateur)
+POST {{baseUrl}}/api/v1/user/push-token
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "push_token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" }

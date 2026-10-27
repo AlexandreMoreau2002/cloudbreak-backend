@@ -7,6 +7,7 @@ from redis.asyncio import Redis
 
 ANONYMOUS_SCORE_LIMIT = 60
 SCORE_WEEK_LIMIT = 12
+PUSH_TOKEN_LIMIT = 10
 WINDOW_SECONDS = 60
 
 INCREMENT_WITH_TTL_SCRIPT = """
@@ -50,3 +51,13 @@ class RateLimitService:
 
         if count > SCORE_WEEK_LIMIT:
             raise RateLimitExceededException("Score week rate limit exceeded")
+
+    async def check_push_token(self, user_id: str) -> None:
+        """Autorise au plus 10 enregistrements de token push par utilisateur et par minute."""
+        user_hash = sha256(user_id.encode()).hexdigest()
+        window = int(time.time() // WINDOW_SECONDS)
+        key = f"rate_limit:push_token:{user_hash}:{window}"
+        count = await self._redis.eval(INCREMENT_WITH_TTL_SCRIPT, 1, key, str(WINDOW_SECONDS))  # type: ignore[misc]
+
+        if count > PUSH_TOKEN_LIMIT:
+            raise RateLimitExceededException("Push token rate limit exceeded")

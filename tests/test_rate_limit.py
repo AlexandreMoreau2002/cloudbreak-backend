@@ -95,7 +95,10 @@ class TestRateLimitService:
         """L'enregistrement du token est limité à 10 par minute, sans exposer l'identifiant."""
         mock_redis.eval.return_value = 10
 
-        with patch("app.services.rate_limit.time.time", return_value=120.0):
+        with (
+            patch("app.services.rate_limit.time.time", return_value=120.0),
+            patch("app.services.rate_limit.settings.environment", "production"),
+        ):
             await RateLimitService(mock_redis).check_push_token("user-123")
 
         args = mock_redis.eval.call_args.args
@@ -106,6 +109,25 @@ class TestRateLimitService:
         assert args[3] == "60"
 
         mock_redis.eval.return_value = 11
-        with patch("app.services.rate_limit.time.time", return_value=120.0):
+        with (
+            patch("app.services.rate_limit.time.time", return_value=120.0),
+            patch("app.services.rate_limit.settings.environment", "production"),
+        ):
             with pytest.raises(RateLimitExceededException):
                 await RateLimitService(mock_redis).check_push_token("user-123")
+
+    @pytest.mark.asyncio
+    async def test_push_token_limit_is_raised_outside_production(
+        self, mock_redis: AsyncMock
+    ) -> None:
+        """En développement la limite passe à 1000 par minute."""
+        service = RateLimitService(mock_redis)
+        with (
+            patch("app.services.rate_limit.time.time", return_value=120.0),
+            patch("app.services.rate_limit.settings.environment", "development"),
+        ):
+            mock_redis.eval.return_value = 1000
+            await service.check_push_token("user-123")
+            mock_redis.eval.return_value = 1001
+            with pytest.raises(RateLimitExceededException):
+                await service.check_push_token("user-123")

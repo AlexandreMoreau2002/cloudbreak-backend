@@ -5,9 +5,12 @@ from hashlib import sha256
 
 from redis.asyncio import Redis
 
+from app.core.config import settings
+
 ANONYMOUS_SCORE_LIMIT = 60
 SCORE_WEEK_LIMIT = 12
 PUSH_TOKEN_LIMIT = 10
+PUSH_TOKEN_DEV_LIMIT = 1000
 WINDOW_SECONDS = 60
 
 INCREMENT_WITH_TTL_SCRIPT = """
@@ -53,11 +56,14 @@ class RateLimitService:
             raise RateLimitExceededException("Score week rate limit exceeded")
 
     async def check_push_token(self, user_id: str) -> None:
-        """Autorise au plus 10 enregistrements de token push par utilisateur et par minute."""
+        """Autorise 10 enregistrements de token push par utilisateur et par minute (1000 en dev)."""
         user_hash = sha256(user_id.encode()).hexdigest()
         window = int(time.time() // WINDOW_SECONDS)
         key = f"rate_limit:push_token:{user_hash}:{window}"
         count = await self._redis.eval(INCREMENT_WITH_TTL_SCRIPT, 1, key, str(WINDOW_SECONDS))  # type: ignore[misc]
 
-        if count > PUSH_TOKEN_LIMIT:
+        # Hors production (rechargements Metro répétés), la limite est relevée.
+        is_production = settings.environment.lower() == "production"
+        limit = PUSH_TOKEN_LIMIT if is_production else PUSH_TOKEN_DEV_LIMIT
+        if count > limit:
             raise RateLimitExceededException("Push token rate limit exceeded")

@@ -597,7 +597,10 @@ def test_push_token_rate_limited_returns_429(mock_set: AsyncMock) -> None:
     app.dependency_overrides[get_db] = _override_db
     app.dependency_overrides[get_redis] = _redis_with_count(11)
     try:
-        with TestClient(app) as client:
+        with (
+            patch("app.services.rate_limit.settings.environment", "production"),
+            TestClient(app) as client,
+        ):
             response = client.post(
                 "/api/v1/user/push-token", json={"push_token": "ExponentPushToken[a]"}
             )

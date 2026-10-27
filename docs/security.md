@@ -33,7 +33,7 @@ Document de référence sécurité. À mettre à jour à chaque story qui touche
 
 ### À traiter avant la release 1.0.0
 
-- (a) ~~Rate limiting sur `POST /api/v1/user/push-token`~~ : fait, 10 requêtes/min par utilisateur (Redis, clé hachée `rate_limit:push_token:*`), 429 `RATE_LIMIT_EXCEEDED`.
+- (a) ~~Rate limiting sur `POST /api/v1/user/push-token`~~ : fait, 10 requêtes/min par utilisateur (1000 hors production) (Redis, clé hachée `rate_limit:push_token:*`), 429 `RATE_LIMIT_EXCEEDED`.
 - (b) Valider `EXPO_ACCESS_TOKEN` en production (validator de config ou log `CRITICAL` s'il est vide).
 - (c) TOCTOU théorique sur le transfert de token (purge puis écriture non atomiques entre deux requêtes concurrentes) : accepté en MVP.
 - (d) Le `DELETE /push-token` du logout peut échouer (hors ligne, JWT expiré) : l'ancien compte garde alors le token jusqu'à ce qu'un autre compte l'enregistre ou qu'Expo réponde `DeviceNotRegistered`. Piste : ignorer les utilisateurs inactifs à l'envoi (story 5.2).

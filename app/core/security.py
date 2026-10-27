@@ -49,7 +49,7 @@ async def delete_supabase_user(user_id: str, supabase_url: str, service_role_key
         service_role_key: Clé service role (jamais exposée côté client)
 
     Raises:
-        HTTPException(500) si la suppression échoue côté Supabase
+        HTTPException(500) si la suppression échoue côté Supabase (404 = déjà supprimé, OK)
     """
     url = f"{supabase_url}/auth/v1/admin/users/{user_id}"
     headers = {
@@ -67,7 +67,8 @@ async def delete_supabase_user(user_id: str, supabase_url: str, service_role_key
                     "code": ErrorCode.SERVICE_UNAVAILABLE,
                 },
             ) from exc
-    if response.status_code not in (200, 204):
+    # 404 : compte déjà supprimé côté Supabase (rejeu) -> suppression idempotente.
+    if response.status_code not in (200, 204, 404):
         raise HTTPException(
             status_code=500,
             detail={"detail": "Erreur suppression compte", "code": ErrorCode.INTERNAL_ERROR},

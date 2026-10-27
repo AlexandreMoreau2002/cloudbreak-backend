@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
 
 from app.models.user import User
+from app.models.apple_subscription_event import AppleSubscriptionEvent
 from app.models.favorite import Favorite
 from app.models.prediction import Prediction
 from app.models.subscription import Subscription
@@ -31,8 +32,12 @@ async def delete_user_data(user_id: str, db: AsyncSession) -> None:
     l'endpoint POST /api/v1/validations), puis predictions (le
     ondelete="CASCADE" de terrain_validations.prediction_id supprimera au
     passage toute validation résiduelle du même utilisateur), puis favoris,
+    puis apple_subscription_events (liées via original_transaction_id),
     puis subscription. La table `events` n'existe pas encore et reste ignorée
     silencieusement.
+
+    Idempotent : sans ligne `users` (session anonyme jamais provisionnée) ou
+    sans donnée, les DELETE ne touchent aucune ligne et ne lèvent rien.
 
     Args:
         user_id: ID utilisateur Supabase (UUID string)
@@ -41,6 +46,17 @@ async def delete_user_data(user_id: str, db: AsyncSession) -> None:
     await db.execute(delete(TerrainValidation).where(TerrainValidation.user_id == user_id))
     await db.execute(delete(Prediction).where(Prediction.user_id == user_id))
     await db.execute(delete(Favorite).where(Favorite.user_id == user_id))
+    # Avant les subscriptions : l'original_transaction_id sert de lien vers l'utilisateur.
+    await db.execute(
+        delete(AppleSubscriptionEvent).where(
+            AppleSubscriptionEvent.original_transaction_id.in_(
+                select(Subscription.original_transaction_id).where(
+                    Subscription.user_id == user_id,
+                    Subscription.original_transaction_id.is_not(None),
+                )
+            )
+        )
+    )
     await db.execute(delete(Subscription).where(Subscription.user_id == user_id))
     await db.execute(delete(User).where(User.supabase_user_id == user_id))
     await db.commit()

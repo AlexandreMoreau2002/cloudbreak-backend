@@ -712,3 +712,11 @@ Ce verdict ne valide pas la configuration du déploiement ni une identité maté
 - Le cache Redis hebdomadaire de météo dure 30 minutes (1 800 secondes) ; distinct du cache
   mobile AsyncStorage de 3 heures, il ne contient que des données météo
   normalisées. Les nouveaux logs du batch n'enregistrent ni jeton, ni détail de prédiction.
+
+## 2026-10-27 — Suppression de compte : sessions anonymes, events Apple, clés quota (RGPD)
+
+- **[endpoints/user.py]** `DELETE /api/v1/user` n'exige plus un compte permanent : toute session authentifiée, anonyme comprise, peut exercer son droit à l'effacement (`get_current_user` au lieu de `get_permanent_user`). Sans JWT : 403. Supersede l'entrée du 2026-09-05 (qui ne visait que l'exposition accidentelle de l'endpoint à un anonyme). L'action ne concerne que le `sub` du JWT lui-même : pas d'élévation de privilège.
+- **[services/user.py]** La suppression est idempotente : un anonyme jamais provisionné n'a pas de ligne `users`, les `DELETE` sont alors sans effet (pas d'erreur).
+- **[services/user.py]** `apple_subscription_events` est purgée avant `subscriptions` pour les `original_transaction_id` de l'utilisateur ; les events d'autres utilisateurs sont conservés. Les events sans `original_transaction_id` ne sont pas rattachables à un utilisateur et restent (ledger d'idempotence, aucune donnée directement identifiante).
+- **[services/quota.py]** Les clés Redis `quota:{user_id}:*` sont supprimées (SCAN, best-effort : une panne Redis est loggée sans faire échouer la suppression ; TTL minuit UTC en filet de sécurité). Les clés `quota:installation:{hash}:*` sont des hash d'installation non liés au compte et expirent seuls.
+- **[core/security.py]** `delete_supabase_user` traite un 404 (compte Supabase déjà supprimé, rejeu) comme un succès. Comportement de l'API Admin pour les utilisateurs anonymes non vérifié sur une instance réelle (ils existent dans `auth.users`, `DELETE /auth/v1/admin/users/{id}` est censé fonctionner).

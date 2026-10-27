@@ -80,12 +80,13 @@ async def test_delete_user_data_deletes_local_user_rows_then_commits() -> None:
 
     await delete_user_data("user-123", db)
 
-    assert db.execute.await_count == 5
+    assert db.execute.await_count == 6
     validation_statement = db.execute.await_args_list[0].args[0]
     prediction_statement = db.execute.await_args_list[1].args[0]
     favorite_statement = db.execute.await_args_list[2].args[0]
-    subscription_statement = db.execute.await_args_list[3].args[0]
-    user_statement = db.execute.await_args_list[4].args[0]
+    apple_events_statement = db.execute.await_args_list[3].args[0]
+    subscription_statement = db.execute.await_args_list[4].args[0]
+    user_statement = db.execute.await_args_list[5].args[0]
 
     assert isinstance(validation_statement, Delete)
     assert validation_statement.table.name == TerrainValidation.__tablename__
@@ -98,6 +99,13 @@ async def test_delete_user_data_deletes_local_user_rows_then_commits() -> None:
     assert isinstance(favorite_statement, Delete)
     assert favorite_statement.table.name == Favorite.__tablename__
     assert "user_favorites.user_id = :user_id_1" in str(favorite_statement)
+
+    # Events Apple purgés AVANT les subscriptions, via le original_transaction_id de l'user.
+    assert isinstance(apple_events_statement, Delete)
+    assert apple_events_statement.table.name == "apple_subscription_events"
+    apple_sql = str(apple_events_statement)
+    assert "original_transaction_id IN" in apple_sql
+    assert "subscriptions.user_id = :user_id_1" in apple_sql
 
     assert isinstance(subscription_statement, Delete)
     assert subscription_statement.table.name == Subscription.__tablename__

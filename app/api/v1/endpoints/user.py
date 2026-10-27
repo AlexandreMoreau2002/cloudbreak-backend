@@ -7,6 +7,7 @@ from app.db.session import get_db
 from app.core.config import settings
 from app.core.errors import ApiError, ErrorCode
 from app.services.analytics import track
+from app.services.quota import QuotaService
 from app.core.security import delete_supabase_user
 from app.services.rate_limit import RateLimitExceededException, RateLimitService
 from app.core.dependencies import get_current_user, get_permanent_user, get_redis
@@ -166,16 +167,19 @@ async def unregister_push_token(
 
 @router.delete("", status_code=204)
 async def delete_user(
-    current_user: dict[str, object] = Depends(get_permanent_user),
+    current_user: dict[str, object] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
 ) -> None:
     """Supprime le compte utilisateur et toutes ses données (RGPD).
 
-    Ordre : données DB en premier, compte Supabase ensuite.
+    Ouvert à tout utilisateur authentifié, session anonyme comprise (droit à l'effacement).
+    Ordre : données DB, clés quota Redis (best-effort), compte Supabase ensuite.
     Retourne 204 No Content en cas de succès.
     """
     user_id = str(current_user["id"])
     await delete_user_data(user_id, db)
+    await QuotaService(redis).delete_user_keys(user_id)
     await delete_supabase_user(user_id, settings.supabase_url, settings.supabase_service_role_key)
     logger.info("user_deleted", extra={"user_id": user_id})
     track("account_deleted", user_id)

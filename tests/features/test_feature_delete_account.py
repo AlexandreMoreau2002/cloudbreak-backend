@@ -53,3 +53,25 @@ def test_delete_account_ordre_suppression(
         app.dependency_overrides.clear()
 
     assert call_order == ["db", "supabase"]
+
+
+@patch("app.api.v1.endpoints.user.delete_supabase_user", new_callable=AsyncMock)
+@patch("app.api.v1.endpoints.user.delete_user_data", new_callable=AsyncMock)
+def test_delete_account_anonyme_flux_complet_retourne_204(
+    mock_delete_data: AsyncMock, mock_delete_supabase: AsyncMock
+) -> None:
+    """Une session anonyme exerce son droit à l'effacement : DB puis Supabase, 204."""
+    app.dependency_overrides[get_current_user] = lambda: {
+        "id": "anon-9",
+        "email": None,
+        "is_anonymous": True,
+    }
+    try:
+        with TestClient(app) as client:
+            response = client.delete("/api/v1/user/")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 204
+    mock_delete_data.assert_called_once()
+    mock_delete_supabase.assert_called_once()

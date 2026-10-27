@@ -188,7 +188,7 @@ def _install_async_client(monkeypatch: pytest.MonkeyPatch, delete_mock: AsyncMoc
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("status_code", [200, 204])
+@pytest.mark.parametrize("status_code", [200, 204, 404])
 async def test_delete_supabase_user_accepts_success_statuses(
     monkeypatch: pytest.MonkeyPatch, status_code: int
 ) -> None:

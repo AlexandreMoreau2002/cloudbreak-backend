@@ -48,6 +48,6 @@ Les données d'une session anonyme perdue (`predictions`, `terrain_validations`,
 ## Reste à faire hors backend
 
 - Cron VPS `cloudbreak-purge-anonymous.sh` (calqué sur `cloudbreak-run-favorites.sh`, header lu
-  depuis un fichier, 04:00 Europe/Paris), d'abord en `dry_run` sur dev.
+  depuis un fichier, 06:00 Europe/Paris, après la sauvegarde de 03:00 UTC), d'abord en `dry_run` sur dev.
 - `docs/infra-serveur.md` racine, `TODO.md`, `docs/versions.md` après merge.
 - Politique de confidentialité (ops) : citer la durée de 30 jours.

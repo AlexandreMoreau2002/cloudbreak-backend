@@ -742,3 +742,15 @@ Ce verdict ne valide pas la configuration du déploiement ni une identité maté
 ### Verdict
 
 SECURE POUR LE MERGE — aucun CRITIQUE. Les deux WARNING sont non immédiats (amplification Supabase gated par le rate limiting Supabase sur la création de sessions, fenêtre fixe déjà acceptée sur le push token). Les limites résiduelles sont documentées dans `docs/story-2-4b-suppression-comptes-anonymes.md`.
+
+## 2026-10-27 — Purge automatique des comptes anonymes inactifs (story 2-4c)
+
+**Surface ajoutée** : endpoint interne `POST /internal/maintenance/purge-anonymous?dry_run=` (router `internal_maintenance.py`, tag `internal`), appelé par un cron du VPS ; nouvel appel sortant `GET {SUPABASE_URL}/auth/v1/admin/users/{id}` avec la `service_role_key`.
+
+- **[endpoints/internal_maintenance.py]** Protégé par `require_cron_secret` (header `X-Cron-Secret`, comparaison à temps constant, fail closed : secret absent ou < 32 car. → 503, faux ou JWT seul → 403). Aucun paramètre client ne désigne un utilisateur : pas d'IDOR possible, seul `dry_run` (bool, 422 sinon) est accepté. 503 `SERVICE_UNAVAILABLE` si `SUPABASE_URL` ou `SUPABASE_SERVICE_ROLE_KEY` manque (aucun appel sortant vers une URL relative).
+- **[services/anonymous_purge.py]** Double garde contre la suppression d'un compte permanent : préfiltre SQL (aucune ligne `users`) **et** confirmation Supabase `is_anonymous is True` (comparaison stricte : `"true"`, `1`, champ absent → non supprimé, compté `skipped_not_anonymous`). Sélection en une requête ORM paramétrée (union des tables d'activité, `LIMIT`), pas de SQL brut.
+- **[core/security.py:get_supabase_user]** Fail safe : seul un 200 avec corps JSON objet ou un 404 confirmé `error_code == "user_not_found"` est exploité ; réseau, 5xx, 401, 404 sans marqueur, corps non JSON → `SupabaseAdminError`, le candidat est compté en `errors` et **rien** n'est supprimé. Un `SUPABASE_URL` mal configuré ne peut donc pas déclencher de purge. Logs : statut HTTP ou type d'exception seulement, ni identifiant ni clé.
+- **[Plafond]** `ANON_PURGE_MAX_PER_RUN` (200) borne le nombre d'appels Admin Supabase et la durée de l'appel ; un secret cron compromis ne peut purger que des comptes réellement anonymes et inactifs depuis `ANON_RETENTION_DAYS`, au rythme du plafond.
+- **[Logs / réponse]** Compteurs uniquement (`anonymous_purge_done`), aucun `user_id`. Limite connue : `delete_user_data` émet un `logger.debug("user_data_deleted", user_id)` préexistant, silencieux au niveau `INFO` figé en prod.
+- **[dry_run]** Effectue les mêmes lectures Supabase que la purge réelle (appels Admin en lecture seule), sans aucune écriture.
+- **Risques résiduels** : purge d'un anonyme qui redevient actif dans la fenêtre sélection → suppression (secondes) ; si la suppression Supabase échoue après l'effacement local, un compte anonyme vide reste chez Supabase (aucune donnée chez nous). Rétention 30 jours à valider juridiquement et à publier dans la politique de confidentialité.

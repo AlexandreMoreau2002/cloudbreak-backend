@@ -1,0 +1,34 @@
+### Variables : le secret vient de INTERNAL_CRON_SECRET (.env du backend), jamais commité.
+@baseUrl = http://localhost:8000
+@cronSecret = {{$dotenv INTERNAL_CRON_SECRET}}
+
+### Purge des anonymes inactifs — simulation (aucune suppression) — 200 + résumé, dry_run=true
+POST {{baseUrl}}/internal/maintenance/purge-anonymous?dry_run=true
+X-Cron-Secret: {{cronSecret}}
+
+### Purge réelle (nominal) — 200 {candidates, purged, skipped_not_anonymous, errors, dry_run:false}
+POST {{baseUrl}}/internal/maintenance/purge-anonymous
+X-Cron-Secret: {{cronSecret}}
+
+### dry_run invalide — 422
+POST {{baseUrl}}/internal/maintenance/purge-anonymous?dry_run=peut-etre
+X-Cron-Secret: {{cronSecret}}
+
+### Sans secret — 403 INTERNAL_AUTH_FAILED
+POST {{baseUrl}}/internal/maintenance/purge-anonymous
+
+### Mauvais secret — 403 INTERNAL_AUTH_FAILED
+POST {{baseUrl}}/internal/maintenance/purge-anonymous
+X-Cron-Secret: pas-le-bon
+
+### JWT utilisateur seul — 403
+POST {{baseUrl}}/internal/maintenance/purge-anonymous
+Authorization: Bearer {{$dotenv CLOUDBREAK_JWT}}
+
+### Secret non configuré côté serveur — 503 INTERNAL_JOBS_DISABLED (vider INTERNAL_CRON_SECRET puis relancer)
+POST {{baseUrl}}/internal/maintenance/purge-anonymous
+X-Cron-Secret: n-importe-quoi
+
+### API Admin Supabase non configurée — 503 SERVICE_UNAVAILABLE (vider SUPABASE_SERVICE_ROLE_KEY puis relancer)
+POST {{baseUrl}}/internal/maintenance/purge-anonymous?dry_run=true
+X-Cron-Secret: {{cronSecret}}

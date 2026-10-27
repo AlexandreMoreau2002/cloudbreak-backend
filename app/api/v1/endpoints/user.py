@@ -142,6 +142,7 @@ async def register_push_token(
     try:
         await RateLimitService(redis).check_push_token(str(current_user["id"]))
     except RateLimitExceededException:
+        logger.warning("push_token_rate_limited", extra={"user_id": str(current_user["id"])})
         raise ApiError(
             status.HTTP_429_TOO_MANY_REQUESTS,
             "Trop de requêtes",

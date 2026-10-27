@@ -154,6 +154,10 @@ cp .env.example .env
 | `SUPABASE_KEY`      | Clé publique Supabase (validation JWT locale)     |
 | `POSTHOG_API_KEY`   | Clé PostHog analytics                             |
 | `EXPO_ACCESS_TOKEN` | Token Expo Push Notifications                     |
+| `INTERNAL_CRON_SECRET` | Secret des jobs internes `/internal/*` (32 car. min., sinon 503) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Clé Admin Supabase (suppression de compte, purge des anonymes) |
+| `ANON_RETENTION_DAYS` | Jours d'inactivité avant purge d'un compte anonyme (défaut 30) |
+| `ANON_PURGE_MAX_PER_RUN` | Comptes anonymes traités au plus par appel de purge (défaut 200) |
 
 ## Documentation features
 
@@ -161,6 +165,7 @@ Chaque feature implementée a sa documentation dans `docs/` :
 
 - [Setup squelette FastAPI](docs/story-1-2-setup-backend.md)
 - [Auth Supabase JWT](docs/story-2-1-auth-supabase.md)
+- [Purge des comptes anonymes inactifs — story 2.4c](docs/story-2-4c-purge-comptes-anonymes-inactifs.md)
 - [Algorithme score mer de nuage](docs/story-3-1-algorithme-score.md)
 - [Seed base de données des sommets](docs/story-3-2-seed-sommets.md)
 - [Gestion des données sommets — guide opérationnel](docs/peaks-data-management.md)

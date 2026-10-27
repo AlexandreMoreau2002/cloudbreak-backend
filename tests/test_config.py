@@ -95,3 +95,10 @@ def test_production_accepts_complete_readable_apple_configuration(tmp_path: Path
 def test_apple_environment_rejects_unknown_values() -> None:
     with pytest.raises(ValidationError):
         Settings(_env_file=None, apple_environment="Xcode")  # type: ignore[arg-type]
+
+
+def test_anonymous_purge_defaults() -> None:
+    settings = Settings(_env_file=None)  # type: ignore[call-arg]
+
+    assert settings.anon_retention_days == 30
+    assert settings.anon_purge_max_per_run == 200

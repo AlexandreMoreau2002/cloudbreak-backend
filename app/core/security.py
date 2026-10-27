@@ -81,6 +81,51 @@ async def delete_supabase_user(user_id: str, supabase_url: str, service_role_key
     )
 
 
+class SupabaseAdminError(Exception):
+    """Réponse inattendue de l'API Admin Supabase (réseau, 5xx, 404 non confirmé, corps invalide).
+
+    Le message ne contient jamais d'identifiant utilisateur ni de clé.
+    """
+
+
+async def get_supabase_user(
+    user_id: str, supabase_url: str, service_role_key: str
+) -> dict[str, object] | None:
+    """Lit un utilisateur via l'API Admin Supabase (`GET /auth/v1/admin/users/{id}`).
+
+    Returns:
+        Le corps JSON de l'utilisateur, ou None s'il n'existe pas (404 confirmé par
+        `error_code == "user_not_found"`).
+
+    Raises:
+        SupabaseAdminError pour toute autre issue : l'appelant ne doit alors rien supprimer.
+    """
+    url = f"{supabase_url}/auth/v1/admin/users/{user_id}"
+    headers = {
+        "apikey": service_role_key,
+        "Authorization": f"Bearer {service_role_key}",
+    }
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.get(url, headers=headers)
+        except httpx.HTTPError as exc:
+            logger.warning("supabase_user_lookup_failed", extra={"error": type(exc).__name__})
+            raise SupabaseAdminError("network error") from exc
+    if response.status_code == 200:
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+        if isinstance(body, dict):
+            return body
+        logger.warning("supabase_user_lookup_failed", extra={"status_code": 200})
+        raise SupabaseAdminError("unexpected body for status 200")
+    if response.status_code == 404 and _is_user_not_found(response):
+        return None
+    logger.warning("supabase_user_lookup_failed", extra={"status_code": response.status_code})
+    raise SupabaseAdminError(f"unexpected status {response.status_code}")
+
+
 def _is_user_not_found(response: httpx.Response) -> bool:
     """Vrai si le corps JSON d'un 404 Supabase Admin indique `user_not_found`."""
     try:

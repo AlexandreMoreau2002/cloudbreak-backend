@@ -60,8 +60,9 @@ delete_supabase_user  DELETE {SUPABASE_URL}/auth/v1/admin/users/{id}
   sont pas purgés (ledger d'idempotence, aucune donnée directement identifiante).
 - Le JWT est validé localement (`app/core/dependencies.py::get_current_user` : signature, `aud`,
   `iss`, expiration ; aucun appel Supabase ni DB). Après suppression, le token reste donc accepté
-  jusqu'à son expiration ; un appel ultérieur avec ce token peut par exemple recréer une ligne via
-  le provisioning.
+  jusqu'à son expiration. Pour un token anonyme, `/user/provision` et les favoris restent refusés
+  (403, `get_permanent_user`), mais `GET /score` peut encore écrire une ligne `predictions`. Pour un
+  token permanent, `/user/provision` peut recréer la ligne `users`.
 - Les comptes anonymes abandonnés (jamais supprimés par l'utilisateur) restent dans
   `auth.users` : une purge automatique planifiée reste à concevoir.
 - Le comportement de l'API Admin Supabase pour les anonymes n'a pas été vérifié sur une instance réelle.

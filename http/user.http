@@ -196,3 +196,9 @@ Authorization: Bearer {{testEmail-jwt}}
 ###
 # Suppression de compte sans token -> 403
 DELETE {{baseUrl}}/api/v1/user
+
+###
+# Suppression de compte, rate-limit -> 429 RATE_LIMIT_EXCEEDED à la 6e tentative en moins d'1 h
+# (même utilisateur ; rejouer 6 fois avec un token dont le compte existe encore côté auth)
+DELETE {{baseUrl}}/api/v1/user
+Authorization: Bearer {{testEmail-jwt}}

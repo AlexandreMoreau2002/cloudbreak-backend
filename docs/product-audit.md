@@ -46,6 +46,7 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 | `make seed-test` / `make unseed-test` — users de test Supabase (freemium, pro) | ✅ Story 4.1 |
 | `make clean-subscriptions` / `make reset-db` — maintenance DB dev | ✅ Story 4.1 |
 | Suppression compte RGPD (`DELETE /api/v1/user/`) — suppression DB + Supabase Auth → 204, compte permanent requis | ✅ Story 2.4 |
+| Suppression de compte ouverte aux sessions anonymes (`DELETE /api/v1/user`) — purge DB, events Apple liés, clés quota Redis, puis compte Supabase ; 404 Supabase idempotent seulement si `user_not_found` ; rate-limit 5/h par utilisateur (429 `RATE_LIMIT_EXCEEDED`) | ✅ Story 2.4b — voir `docs/story-2-4b-suppression-comptes-anonymes.md` |
 | Provisioning compte permanent (`POST /api/v1/user/provision`) — projection `users` idempotente (get-or-create) à la conversion depuis une session anonyme | ✅ Stories 2.5/2.6 — JWT permanent requis (403 `ACCOUNT_REQUIRED` si anonyme) |
 | Profil / état sondage (`GET /api/v1/user/me`) — expose `is_anonymous`, `provisioned`, `survey_completed_at`, `survey_skipped_at` | ✅ Stories 2.5/2.8 |
 | Email du compte conservé dans `users.email` (copie du claim JWT, nullable, rattrapée au prochain appel `provision`/`survey`/`preferences`/`notifications`) — jamais exposé par l'API ni loggué, supprimé avec le compte | ✅ PR #24 |

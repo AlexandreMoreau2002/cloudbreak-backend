@@ -1,5 +1,6 @@
 """Tests de l'endpoint interne de purge des comptes anonymes inactifs."""
 
+from typing import Any
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch
 
@@ -27,7 +28,7 @@ def teardown_function() -> None:
     app.dependency_overrides.clear()
 
 
-def _configured():  # type: ignore[no-untyped-def]
+def _configured() -> tuple[Any, Any, Any]:
     return (
         patch("app.core.dependencies.settings.internal_cron_secret", SECRET),
         patch(f"{ENDPOINT}.settings.supabase_url", "https://supabase.test"),
@@ -96,6 +97,7 @@ def test_valid_secret_runs_the_purge_and_returns_the_summary() -> None:
         "skipped_not_anonymous": 1,
         "errors": 1,
         "dry_run": False,
+        "skipped_locked": 0,
     }
     kwargs = job.await_args.kwargs
     assert kwargs["retention_days"] == 30
@@ -127,3 +129,20 @@ def test_invalid_dry_run_value_returns_422() -> None:
     with secret, url, key:
         response = _client().post(f"{URL}?dry_run=peut-etre", headers={"X-Cron-Secret": SECRET})
     assert response.status_code == 422
+
+
+def test_concurrent_run_returns_200_with_skipped_locked() -> None:
+    secret, url, key = _configured()
+    with (
+        secret,
+        url,
+        key,
+        patch(
+            f"{ENDPOINT}.purge_inactive_anonymous_accounts",
+            new=AsyncMock(return_value=PurgeSummary(skipped_locked=1)),
+        ),
+    ):
+        response = _client().post(URL, headers={"X-Cron-Secret": SECRET})
+    assert response.status_code == 200
+    assert response.json()["skipped_locked"] == 1
+    assert response.json()["purged"] == 0

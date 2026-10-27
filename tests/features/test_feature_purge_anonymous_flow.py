@@ -36,6 +36,8 @@ def _redis() -> MagicMock:
 
     redis = MagicMock()
     redis.scan_iter = MagicMock(side_effect=_no_keys)
+    redis.set = AsyncMock(return_value=True)
+    redis.eval = AsyncMock(return_value=1)
     return redis
 
 
@@ -76,6 +78,7 @@ def test_dry_run_then_real_purge_flow() -> None:
         "skipped_not_anonymous": 1,
         "errors": 0,
         "dry_run": True,
+        "skipped_locked": 0,
     }
     delete_data.assert_not_awaited()
     delete_supabase.assert_not_awaited()
@@ -88,3 +91,4 @@ def test_dry_run_then_real_purge_flow() -> None:
     delete_supabase.assert_awaited_once()
     assert delete_supabase.await_args.args[0] == "anon-old"
     assert "anon-old" not in str(body)
+    assert body["skipped_locked"] == 0

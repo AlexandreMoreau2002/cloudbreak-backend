@@ -118,7 +118,9 @@ async def get_supabase_user(
             body = None
         if isinstance(body, dict):
             return body
-    elif response.status_code == 404 and _is_user_not_found(response):
+        logger.warning("supabase_user_lookup_failed", extra={"status_code": 200})
+        raise SupabaseAdminError("unexpected body for status 200")
+    if response.status_code == 404 and _is_user_not_found(response):
         return None
     logger.warning("supabase_user_lookup_failed", extra={"status_code": response.status_code})
     raise SupabaseAdminError(f"unexpected status {response.status_code}")

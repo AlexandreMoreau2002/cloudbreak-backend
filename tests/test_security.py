@@ -386,6 +386,17 @@ async def test_get_supabase_user_unexpected_response_raises(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "response", [_FakeResponse(200, invalid_json=True), _FakeResponse(200, ["x"])]
+)
+async def test_get_supabase_user_invalid_200_body_has_a_distinct_message(
+    monkeypatch: pytest.MonkeyPatch, response: _FakeResponse
+) -> None:
+    with pytest.raises(SupabaseAdminError, match="unexpected body for status 200"):
+        await _get_with(monkeypatch, AsyncMock(return_value=response))
+
+
+@pytest.mark.asyncio
 async def test_get_supabase_user_network_error_raises(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:

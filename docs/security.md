@@ -754,3 +754,42 @@ SECURE POUR LE MERGE — aucun CRITIQUE. Les deux WARNING sont non immédiats (a
 - **[Logs / réponse]** Compteurs uniquement (`anonymous_purge_done`), aucun `user_id`. Limite connue : `delete_user_data` émet un `logger.debug("user_data_deleted", user_id)` préexistant, silencieux au niveau `INFO` figé en prod.
 - **[dry_run]** Effectue les mêmes lectures Supabase que la purge réelle (appels Admin en lecture seule), sans aucune écriture.
 - **Risques résiduels** : purge d'un anonyme qui redevient actif dans la fenêtre sélection → suppression (secondes) ; si la suppression Supabase échoue après l'effacement local, un compte anonyme vide reste chez Supabase (aucune donnée chez nous). Rétention 30 jours à valider juridiquement et à publier dans la politique de confidentialité.
+
+---
+
+## 2026-10-27 Audit sécurité — Story 2-4c : Purge automatique des comptes anonymes inactifs (feature/purge-inactive-anonymous)
+
+Périmètre : diff `feature/account-deletion-gdpr..feature/purge-inactive-anonymous`. Fichiers audités : `app/services/anonymous_purge.py`, `app/core/security.py` (ajout `get_supabase_user`/`SupabaseAdminError`), `app/api/v1/endpoints/internal_maintenance.py`, `app/core/config.py` (ajout `ANON_*`).
+
+### 🔴 CRITIQUE
+
+Aucun.
+
+### 🟡 WARNING
+
+- **[app/services/anonymous_purge.py:86-104]** État partiel permanent si `delete_supabase_user` échoue après `delete_user_data`. `delete_user_data` appelle `await db.commit()` en interne avant de retourner ; si `delete_supabase_user` lève ensuite, le `await db.rollback()` dans le bloc `except` est un no-op (la transaction est déjà fermée). Résultat : données locales supprimées de façon permanente, compte Supabase toujours actif et orphelin. Comme le candidat n'a plus de données dans nos tables d'activité, il ne réapparaîtra pas dans les passes suivantes : l'orphelin Supabase est permanent. Ce n'est pas un risque de sécurité direct (aucune donnée perso dans notre système) mais une non-conformité RGPD partielle (le compte Supabase subsiste). Recommandation : a) distinguer l'erreur pré-commit (rollback correct) de l'erreur post-commit avec un log `WARNING` explicite `"anonymous_purge_supabase_orphan"` ; b) envisager un mécanisme de retry ou un topic de dead-letter pour rejouer la suppression Supabase.
+
+- **[app/api/v1/endpoints/internal_maintenance.py]** Pas de verrou Redis contre les exécutions concurrentes (contrairement à `lock:favorite-alerts` de l'endpoint run-favorites). Deux déclenchements simultanés (cron mal configuré + déclenchement manuel) traitent les mêmes candidats : les opérations sont idempotentes (`delete_user_data` supporte les re-runs car commit déjà fait, Redis no-op, Supabase 404 géré), mais cela double les appels Admin Supabase (`GET` + éventuellement `DELETE`) et peut heurter le rate limit Supabase côté admin. Recommandation : ajouter un verrou Redis `lock:anon-purge` (jeton unique, TTL 300 s) en tête d'endpoint, retourner 200 `{dry_run: false, candidates: 0, ...}` si le verrou est pris.
+
+### 🔵 INFO
+
+- **[app/core/security.py:get_supabase_user]** Gestion exhaustive des cas Supabase : réseau, 5xx, 401, 200 sans corps JSON-objet (corps non-JSON → `ValueError` attrapé → `body = None` → `SupabaseAdminError`), 404 sans marqueur `user_not_found` → tous lèvent `SupabaseAdminError` → candidat compté en erreur, rien supprimé. La suppression n'a lieu que sur un 200 JSON-objet confirmant `is_anonymous is True`, ou sur un 404 `user_not_found` (nettoyage des données locales seulement). Conception fail-safe correcte.
+
+- **[app/services/anonymous_purge.py:90]** `supabase_user.get("is_anonymous") is not True` traite les cas `False`, `None`, et champ absent comme non-anonyme (skip). La suppression n'a lieu que si le champ est explicitement booléen `True`. Correct et conservateur.
+
+- **[app/services/anonymous_purge.py:build_candidates_query]** Les trois tables d'activité utilisent `DateTime(timezone=True)` et le cutoff est `datetime.now(UTC)` (timezone-aware). Pas de comparaison naïve possible. UNION `HAVING max(at) < cutoff` avec `ORDER BY last_activity ASC, user_id ASC` et `LIMIT` : tri déterministe et plafond respectés.
+
+- **[Traefik / exposition publique]** L'endpoint `/internal/maintenance/purge-anonymous` hérite de la même exposition que `/internal/notifications/run-favorites` (Traefik porte 443, pas de restriction IP dans le code). Protection : cron secret seul. Avec un secret compromis, l'attaquant peut purger au plus `ANON_PURGE_MAX_PER_RUN=200` comptes anonymes inactifs par requête (aucun compte permanent possible : double garde). Recommandation identique à story 5.2 : IP allowlist VPS dans Traefik avant production.
+
+- **[app/services/anonymous_purge.py:86-104]** Le `await db.rollback()` dans le bloc `except` est un no-op si `delete_user_data` a déjà commité. Il reste utile si `delete_user_data` lève avant son propre `commit()` (les DELETEs en attente sont alors correctement annulés). Code non dangereux mais trompe la lecture : un commentaire serait utile.
+
+### Verdict
+
+SECURE POUR LE MERGE — aucun CRITIQUE. Le WARNING d'état partiel (orphelin Supabase) est non bloquant sur le plan sécurité ; il mérite un suivi RGPD (log explicite + cleanup manuel ou retry). Le WARNING concurrent est de confort opérationnel. L'IP allowlist Traefik reste un prérequis infra avant exposition production, déjà documenté pour run-favorites.
+
+## 2026-10-27 — Story 2-4c : corrections suite à l'audit (ordre de suppression, verrou)
+
+- **[services/anonymous_purge.py]** WARNING « état partiel permanent » **résolu** par l'inversion de l'ordre : `delete_supabase_user` est appelé **avant** `delete_user_data`. Échec Supabase → aucune suppression locale, le candidat reste sélectionné et est rejoué au passage suivant. Échec local après Supabase → `rollback` (utile ici : `delete_user_data` lève avant son propre `commit`), erreur comptée ; au passage suivant, `get_supabase_user` renvoie un 404 `user_not_found` et seule la purge locale est rejouée (auto-réparation, couvert par `test_local_failure_after_supabase_is_repaired_on_the_next_run`). Plus de compte Supabase orphelin possible par ce chemin. Le `rollback` trompeur après un échec Supabase est supprimé.
+- **[services/anonymous_purge.py]** WARNING « exécutions concurrentes » **résolu** : verrou Redis `lock:anon-purge` calqué sur `lock:favorite-alerts` (jeton `uuid4().hex`, `SET NX EX 300`, libération par script Lua compare-et-supprime dans un `finally`, échec de libération loggé sans le jeton). Verrou pris → 200 avec compteurs à 0 et `skipped_locked: 1` (même convention que `run-favorites`). Le dry_run, sans écriture, ne prend pas le verrou. Limite : un passage qui dépasserait 300 s (200 candidats avec Supabase en limite de timeout) perd le verrou ; un second passage peut alors démarrer, sans danger (opérations idempotentes, la libération ne supprime pas le verrou d'un autre run).
+- **[core/security.py]** Message `SupabaseAdminError` distinct pour un 200 au corps invalide (`unexpected body for status 200`), sans identifiant.
+- Reste ouvert (inchangé) : IP allowlist Traefik sur `/internal/*` avant production.

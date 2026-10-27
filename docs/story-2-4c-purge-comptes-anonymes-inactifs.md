@@ -24,9 +24,13 @@ Les données d'une session anonyme perdue (`predictions`, `terrain_validations`,
 - [x] 404 `user_not_found` → purge des données locales et clés quota seulement.
 - [x] Toute autre réponse Supabase (réseau, 5xx, 404 sans marqueur, corps invalide) → `errors`, rien supprimé.
 - [x] `?dry_run=true` : mêmes décisions, aucune suppression.
-- [x] Un échec sur un candidat n'arrête pas les suivants (rollback de la session DB).
+- [x] Un échec sur un candidat n'arrête pas les suivants.
+- [x] Ordre Supabase → local : un échec Supabase ne supprime rien (rejoué au passage suivant) ;
+      un échec local après Supabase est terminé au passage suivant (404 `user_not_found` → local seul).
+- [x] Verrou Redis `lock:anon-purge` (jeton unique, TTL 300 s, libération compare-et-supprime) sur
+      la purge réelle : si déjà pris → 200, compteurs à 0 et `skipped_locked: 1`. Le dry_run ne le prend pas.
 - [x] Réponse et logs : compteurs uniquement (`candidates`, `purged`, `skipped_not_anonymous`,
-      `errors`, `dry_run`), jamais d'identifiant.
+      `errors`, `dry_run`, `skipped_locked`), jamais d'identifiant.
 - [x] Config `ANON_RETENTION_DAYS=30`, `ANON_PURGE_MAX_PER_RUN=200` (+ `.env.example`).
 
 ## Fichiers impactés

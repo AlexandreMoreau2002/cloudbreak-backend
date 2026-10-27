@@ -6,7 +6,12 @@
 POST {{baseUrl}}/internal/maintenance/purge-anonymous?dry_run=true
 X-Cron-Secret: {{cronSecret}}
 
-### Purge réelle (nominal) — 200 {candidates, purged, skipped_not_anonymous, errors, dry_run:false}
+### Purge réelle (nominal) — 200 {candidates, purged, skipped_not_anonymous, errors, dry_run:false, skipped_locked:0}
+POST {{baseUrl}}/internal/maintenance/purge-anonymous
+X-Cron-Secret: {{cronSecret}}
+
+### Purge déjà en cours — 200 {..., "skipped_locked": 1} (lancer les deux requêtes réelles quasi simultanément,
+### ou poser le verrou à la main : docker exec cloudbreak-redis redis-cli SET lock:anon-purge test EX 60)
 POST {{baseUrl}}/internal/maintenance/purge-anonymous
 X-Cron-Secret: {{cronSecret}}
 

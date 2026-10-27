@@ -43,7 +43,14 @@ require_cron_secret ---- secret absent / < 32 car. ----> 503 INTERNAL_JOBS_DISAB
 SUPABASE_URL + SERVICE_ROLE_KEY posés ? -- non --> 503 SERVICE_UNAVAILABLE
    |
    v
-fetch_candidates (UNE requête SQL)
+dry_run ? ── oui ──> pas de verrou (rien n'est écrit) ──────────────┐
+   | non                                                             |
+   v                                                                 |
+SET lock:anon-purge <jeton unique> NX EX 300                         |
+   ├─ déjà pris (une autre purge tourne)                             |
+   |      -> 200 {tout à 0, "skipped_locked": 1}, on s'arrête        |
+   v                                                                 |
+fetch_candidates <───────────────────────────────────────────────────┘ (UNE requête SQL)
    predictions.created_at  ┐
    terrain_validations.validated_at ├─ UNION ALL ─> MAX(date) par user_id
    user_favorites.created_at ┘
@@ -60,18 +67,41 @@ pour chaque candidat ───────────────────�
    ├─ is_anonymous n'est pas strictement true                         |
    |      -> skipped_not_anonymous += 1, on NE TOUCHE À RIEN ─────────┤
    ├─ 404 user_not_found (déjà parti de Supabase)                     |
-   |      -> données locales + clés quota seulement                   |
+   |      -> étape 2 seulement (local)                                |
    └─ is_anonymous == true                                            |
-          -> delete_user_data (DB)                                    |
-          -> QuotaService.delete_user_keys (Redis quota:{id}:*)       |
-          -> delete_supabase_user (compte Supabase)                   |
-          (en dry_run : aucune de ces suppressions, on compte juste)  |
-          une exception ici -> rollback, errors += 1 ─────────────────┘
+          (en dry_run : aucune suppression, on compte juste) ─────────┤
+          1. delete_supabase_user (compte Supabase)                   |
+             échec -> errors += 1, RIEN de local supprimé ────────────┤
+                      (le candidat sera rejoué la nuit suivante)      |
+          2. delete_user_data (DB)                                    |
+             échec -> rollback, errors += 1 ──────────────────────────┤
+                      (nuit suivante : Supabase répond 404            |
+                       user_not_found -> étape 2 seule = réparé)      |
+          3. QuotaService.delete_user_keys (Redis, best-effort)       |
+          purged += 1 ────────────────────────────────────────────────┘
    |
    v
 logger.info("anonymous_purge_done", compteurs)
-200 {"candidates", "purged", "skipped_not_anonymous", "errors", "dry_run"}
+libération du verrou (compare-et-supprime : seulement si c'est encore NOTRE jeton)
+200 {"candidates", "purged", "skipped_not_anonymous", "errors", "dry_run", "skipped_locked"}
 ```
+
+### Pourquoi Supabase d'abord ?
+
+Pense à un déménagement : on rend d'abord les clés au propriétaire (Supabase), puis on vide
+l'appartement (nos tables). Si le propriétaire n'est pas joignable, on ne vide rien et on revient
+demain. Si on a rendu les clés mais que le camion tombe en panne, demain le propriétaire dira
+« ce locataire n'existe plus » (404 `user_not_found`) et on finira de vider : ça se répare tout
+seul. Dans l'ordre inverse, on aurait pu vider l'appartement sans jamais rendre les clés
+(compte Supabase orphelin, plus jamais retrouvé puisqu'il n'a plus de données chez nous).
+
+### Pourquoi un verrou ?
+
+Si le cron et un lancement manuel partent en même temps, les deux traiteraient les mêmes
+candidats et doubleraient les appels à l'API Admin Supabase. Le verrou Redis
+`lock:anon-purge` (jeton unique, 5 min max) laisse passer une seule purge réelle ; l'autre
+répond tout de suite `skipped_locked: 1`. Le verrou est rendu à la fin, même en cas d'erreur, et
+seulement s'il nous appartient encore. Le dry_run ne prend pas le verrou : il n'écrit rien.
 
 Aucun identifiant n'apparaît ni dans la réponse, ni dans les logs : seulement des compteurs.
 
@@ -104,13 +134,15 @@ Aucun identifiant n'apparaît ni dans la réponse, ni dans les logs : seulement 
   n'est donc plus sélectionné ; un compte déjà supprimé chez Supabase (404 `user_not_found`)
   est traité comme « déjà parti » et seules ses données locales sont effacées.
 - **Un échec n'arrête pas les autres** : chaque candidat est traité indépendamment.
-- **Ordre** : données locales d'abord, Supabase ensuite (même ordre que `DELETE /api/v1/user`).
+- **Ordre** : compte Supabase d'abord, données locales ensuite (inverse de `DELETE /api/v1/user`,
+  où l'utilisateur est présent pour rejouer) : un échec n'importe où se répare au passage suivant.
+- **Verrou** `lock:anon-purge` : même mécanique que `lock:favorite-alerts` (SET NX + jeton +
+  libération par script compare-et-supprime), TTL 300 s. Le TTL est un filet de sécurité :
+  un passage très lent (Supabase qui répond en limite de timeout sur 200 candidats) peut le
+  dépasser ; un second passage pourrait alors démarrer, sans risque puisque tout est idempotent.
 
 ## Limites connues
 
-- Si la suppression Supabase échoue *après* l'effacement des données locales, le compte
-  anonyme reste chez Supabase mais n'a plus de données chez nous : il ne sera plus jamais
-  candidat. Aucun risque de données perso chez nous, mais un résidu côté Supabase.
 - Un anonyme qui utilise l'app sans rien écrire (pas de score calculé, pas de favori ajouté)
   pendant 30 jours mais garde des favoris anciens est considéré inactif : ses favoris et son
   compte anonyme sont supprimés, sa session devient invalide (l'app repart sur une nouvelle

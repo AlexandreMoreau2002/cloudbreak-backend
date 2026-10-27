@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     expo_access_token: str = ""
     internal_cron_secret: str = ""
     supabase_service_role_key: str = ""
+    # Purge des comptes anonymes inactifs (POST /internal/maintenance/purge-anonymous).
+    anon_retention_days: int = 30
+    anon_purge_max_per_run: int = 200
     environment: str = "development"
     app_version: str = "1.0.0"
     apple_bundle_id: str = ""

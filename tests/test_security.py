@@ -9,7 +9,12 @@ from fastapi import HTTPException
 from unittest.mock import AsyncMock
 from app.core.errors import ErrorCode
 from tests.helpers import encode_test_jwt
-from app.core.security import decode_supabase_jwt, delete_supabase_user
+from app.core.security import (
+    SupabaseAdminError,
+    get_supabase_user,
+    decode_supabase_jwt,
+    delete_supabase_user,
+)
 
 # Paire de clés ECC P-256 éphémère — tests uniquement
 TEST_PRIVATE_JWK = {
@@ -300,5 +305,94 @@ async def test_delete_supabase_user_404_without_marker_returns_500(
         "code": ErrorCode.INTERNAL_ERROR,
     }
     assert any(r.levelname == "WARNING" for r in caplog.records)
+    assert "user-123" not in caplog.text
+    assert "service-role" not in caplog.text
+
+
+def _install_get_client(monkeypatch: pytest.MonkeyPatch, get_mock: AsyncMock) -> None:
+    class _FakeAsyncClient:
+        def __init__(self, timeout: float) -> None:
+            self.timeout = timeout
+
+        async def __aenter__(self) -> "_FakeAsyncClient":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def get(self, *args: Any, **kwargs: Any) -> _FakeResponse:
+            return await get_mock(*args, **kwargs)
+
+    monkeypatch.setattr("app.core.security.httpx.AsyncClient", _FakeAsyncClient)
+
+
+async def _get_with(monkeypatch: pytest.MonkeyPatch, get_mock: AsyncMock) -> object:
+    _install_get_client(monkeypatch, get_mock)
+    return await get_supabase_user(
+        user_id="user-123",
+        supabase_url="https://supabase.test",
+        service_role_key="service-role",
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_supabase_user_200_returns_body(monkeypatch: pytest.MonkeyPatch) -> None:
+    body = {"id": "user-123", "is_anonymous": True}
+    get_mock = AsyncMock(return_value=_FakeResponse(200, body))
+
+    result = await _get_with(monkeypatch, get_mock)
+
+    assert result == body
+    get_mock.assert_awaited_once_with(
+        "https://supabase.test/auth/v1/admin/users/user-123",
+        headers={"apikey": "service-role", "Authorization": "Bearer service-role"},
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_supabase_user_404_user_not_found_returns_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    result = await _get_with(
+        monkeypatch, AsyncMock(return_value=_FakeResponse(404, _USER_NOT_FOUND))
+    )
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "response",
+    [
+        _FakeResponse(404, invalid_json=True),
+        _FakeResponse(404, {"code": 404, "msg": "Not found"}),
+        _FakeResponse(500, {"msg": "boom"}),
+        _FakeResponse(401, {"msg": "bad key"}),
+        _FakeResponse(200, invalid_json=True),
+        _FakeResponse(200, ["not", "a", "dict"]),
+    ],
+)
+async def test_get_supabase_user_unexpected_response_raises(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    response: _FakeResponse,
+) -> None:
+    with caplog.at_level("DEBUG"), pytest.raises(SupabaseAdminError):
+        await _get_with(monkeypatch, AsyncMock(return_value=response))
+
+    assert any(r.levelname == "WARNING" for r in caplog.records)
+    assert "user-123" not in caplog.text
+    assert "service-role" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_get_supabase_user_network_error_raises(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    get_mock = AsyncMock(side_effect=httpx.ConnectError("down"))
+
+    with caplog.at_level("DEBUG"), pytest.raises(SupabaseAdminError):
+        await _get_with(monkeypatch, get_mock)
+
     assert "user-123" not in caplog.text
     assert "service-role" not in caplog.text

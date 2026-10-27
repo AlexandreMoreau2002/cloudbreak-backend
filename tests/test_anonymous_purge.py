@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 
 from app.core.security import SupabaseAdminError
 from app.services.anonymous_purge import (
+    LOCK_KEY,
     PurgeSummary,
     build_candidates_query,
     fetch_candidates,
@@ -88,7 +89,8 @@ def test_candidates_query_uses_last_activity_and_excludes_provisioned_users() ->
     assert "group by" in sql
     assert "having max(" in sql
     assert "2026-09-27" in sql  # cutoff = now - 30 j
-    assert "order by max(" in sql and "asc" in sql
+    assert "order by max(" in sql
+    assert "asc" in sql
     assert "limit 7" in sql
 
 
@@ -114,6 +116,40 @@ async def test_inactive_anonymous_candidate_is_purged() -> None:
     delete_data.assert_awaited_once_with("anon-1", db)
     delete_keys.assert_awaited_once_with("anon-1")
     delete_supabase.assert_awaited_once_with("anon-1", URL, KEY)
+
+
+@pytest.mark.asyncio
+async def test_supabase_account_is_deleted_before_local_data() -> None:
+    db = _db(["anon-1"])
+    order: list[str] = []
+
+    with (
+        patch(f"{MODULE}.get_supabase_user", new=AsyncMock(return_value={"is_anonymous": True})),
+        patch(
+            f"{MODULE}.delete_supabase_user",
+            new=AsyncMock(side_effect=lambda *a: order.append("supabase")),
+        ),
+        patch(
+            f"{MODULE}.delete_user_data",
+            new=AsyncMock(side_effect=lambda *a: order.append("local")),
+        ),
+        patch(f"{MODULE}.QuotaService") as quota_cls,
+    ):
+        quota_cls.return_value.delete_user_keys = AsyncMock(
+            side_effect=lambda *a: order.append("quota")
+        )
+        await purge_inactive_anonymous_accounts(
+            db,
+            _LockRedis(),
+            retention_days=30,
+            max_per_run=200,
+            dry_run=False,
+            supabase_url=URL,
+            service_role_key=KEY,
+            now=NOW,
+        )
+
+    assert order == ["supabase", "local", "quota"]
 
 
 @pytest.mark.asyncio
@@ -244,9 +280,10 @@ async def test_one_failure_does_not_stop_the_following_candidates() -> None:
         )
 
     assert summary == PurgeSummary(3, 1, 0, 2, False)
-    assert delete_data.await_args_list == [call("fail-delete", db), call("ok", db)]
+    # Supabase a échoué pour « fail-delete » : rien n'est supprimé localement, il sera rejoué.
+    assert delete_data.await_args_list == [call("ok", db)]
     assert delete_supabase.await_count == 2
-    db.rollback.assert_awaited_once()
+    db.rollback.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -272,9 +309,50 @@ async def test_local_deletion_failure_rolls_back_and_continues() -> None:
         )
 
     assert summary == PurgeSummary(2, 1, 0, 1, False)
-    # Données locales non supprimées → Supabase non plus pour ce candidat.
-    delete_supabase.assert_awaited_once_with("b", URL, KEY)
+    # Supabase passe avant le local : les deux comptes Supabase sont supprimés.
+    assert delete_supabase.await_args_list == [call("a", URL, KEY), call("b", URL, KEY)]
     db.rollback.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_local_failure_after_supabase_is_repaired_on_the_next_run() -> None:
+    """1er passage : Supabase supprimé, local en échec. 2e passage : 404 → purge locale."""
+    db = _db(["a"])
+    supabase_state: dict[str, object] = {"a": {"is_anonymous": True}}
+
+    async def _get(user_id: str, *args: object) -> object:
+        return supabase_state[user_id]
+
+    async def _delete_supabase(user_id: str, *args: object) -> None:
+        supabase_state[user_id] = None  # le compte n'existe plus chez Supabase
+
+    with (
+        patch(f"{MODULE}.get_supabase_user", new=AsyncMock(side_effect=_get)),
+        patch(
+            f"{MODULE}.delete_supabase_user", new=AsyncMock(side_effect=_delete_supabase)
+        ) as delete_supabase,
+        patch(
+            f"{MODULE}.delete_user_data", new=AsyncMock(side_effect=[RuntimeError("db"), None])
+        ) as delete_data,
+        patch(f"{MODULE}.QuotaService") as quota_cls,
+    ):
+        quota_cls.return_value.delete_user_keys = AsyncMock()
+        kwargs = dict(
+            retention_days=30,
+            max_per_run=200,
+            dry_run=False,
+            supabase_url=URL,
+            service_role_key=KEY,
+            now=NOW,
+        )
+        first = await purge_inactive_anonymous_accounts(db, _LockRedis(), **kwargs)  # type: ignore[arg-type]
+        second = await purge_inactive_anonymous_accounts(db, _LockRedis(), **kwargs)  # type: ignore[arg-type]
+
+    assert first == PurgeSummary(1, 0, 0, 1, False)
+    assert second == PurgeSummary(1, 1, 0, 0, False)
+    delete_supabase.assert_awaited_once()
+    assert delete_data.await_count == 2
+    quota_cls.return_value.delete_user_keys.assert_awaited_once_with("a")
 
 
 @pytest.mark.asyncio
@@ -301,3 +379,145 @@ async def test_logs_contain_counters_but_never_user_ids(
         rendered = record.getMessage() + repr(record.__dict__)
         assert "secret-id" not in rendered
         assert KEY not in rendered
+
+
+class _LockRedis:
+    """Redis en mémoire : SET NX et compare-et-supprime (équivalent du script Lua)."""
+
+    def __init__(self) -> None:
+        self.store: dict[str, str] = {}
+        self.set_calls: list[tuple[str, str, bool, int | None]] = []
+
+    async def set(self, key: str, value: str, nx: bool = False, ex: int | None = None) -> bool:
+        self.set_calls.append((key, value, nx, ex))
+        if nx and key in self.store:
+            return False
+        self.store[key] = value
+        return True
+
+    async def eval(self, script: str, numkeys: int, key: str, token: str) -> int:
+        assert numkeys == 1
+        if self.store.get(key) == token:
+            del self.store[key]
+            return 1
+        return 0
+
+
+class _ReleaseFailsRedis(_LockRedis):
+    async def eval(self, script: str, numkeys: int, key: str, token: str) -> int:
+        raise ConnectionError("redis down")
+
+
+async def _purge_with(redis: object, *, dry_run: bool = False) -> PurgeSummary:
+    return await purge_inactive_anonymous_accounts(
+        AsyncMock(),
+        redis,  # type: ignore[arg-type]
+        retention_days=30,
+        max_per_run=200,
+        dry_run=dry_run,
+        supabase_url=URL,
+        service_role_key=KEY,
+        now=NOW,
+    )
+
+
+@pytest.mark.asyncio
+async def test_run_is_skipped_when_the_lock_is_held() -> None:
+    redis = _LockRedis()
+    redis.store[LOCK_KEY] = "other-run"
+
+    with patch(f"{MODULE}.fetch_candidates", new=AsyncMock()) as fetch:
+        summary = await _purge_with(redis)
+
+    assert summary == PurgeSummary(skipped_locked=1)
+    fetch.assert_not_awaited()
+    assert redis.store[LOCK_KEY] == "other-run"
+    key, _, nx, ex = redis.set_calls[0]
+    assert key == "lock:anon-purge"
+    assert nx is True
+    assert ex == 300
+
+
+@pytest.mark.asyncio
+async def test_lock_holds_a_unique_token_and_is_released_after_a_normal_run() -> None:
+    redis = _LockRedis()
+    seen: list[str] = []
+
+    async def _fetch(*args: object) -> list[str]:
+        seen.append(redis.store[LOCK_KEY])
+        return []
+
+    with patch(f"{MODULE}.fetch_candidates", new=_fetch):
+        await _purge_with(redis)
+        await _purge_with(redis)
+
+    assert len(seen[0]) == 32
+    assert seen[0] != seen[1]
+    assert LOCK_KEY not in redis.store
+
+
+@pytest.mark.asyncio
+async def test_lock_is_released_even_if_the_run_raises() -> None:
+    redis = _LockRedis()
+
+    with (
+        patch(f"{MODULE}.fetch_candidates", new=AsyncMock(side_effect=RuntimeError("db"))),
+        pytest.raises(RuntimeError),
+    ):
+        await _purge_with(redis)
+
+    assert LOCK_KEY not in redis.store
+
+
+@pytest.mark.asyncio
+async def test_lock_taken_over_by_another_run_is_not_deleted() -> None:
+    redis = _LockRedis()
+
+    async def _fetch(*args: object) -> list[str]:
+        redis.store[LOCK_KEY] = "other-run"  # notre verrou a expiré, un autre run l'a repris
+        return []
+
+    with patch(f"{MODULE}.fetch_candidates", new=_fetch):
+        await _purge_with(redis)
+
+    assert redis.store[LOCK_KEY] == "other-run"
+
+
+@pytest.mark.asyncio
+async def test_dry_run_does_not_take_the_lock() -> None:
+    redis = _LockRedis()
+    redis.store[LOCK_KEY] = "real-run"
+
+    with patch(f"{MODULE}.fetch_candidates", new=AsyncMock(return_value=[])) as fetch:
+        summary = await _purge_with(redis, dry_run=True)
+
+    assert summary == PurgeSummary(dry_run=True)
+    fetch.assert_awaited_once()
+    assert redis.set_calls == []
+    assert redis.store[LOCK_KEY] == "real-run"
+
+
+@pytest.mark.asyncio
+async def test_lock_release_failure_does_not_mask_the_original_error() -> None:
+    with (
+        patch(f"{MODULE}.fetch_candidates", new=AsyncMock(side_effect=RuntimeError("db down"))),
+        pytest.raises(RuntimeError, match="db down"),
+    ):
+        await _purge_with(_ReleaseFailsRedis())
+
+
+@pytest.mark.asyncio
+async def test_lock_release_failure_does_not_break_a_successful_run(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    redis = _ReleaseFailsRedis()
+
+    with (
+        patch(f"{MODULE}.fetch_candidates", new=AsyncMock(return_value=[])),
+        caplog.at_level("ERROR"),
+    ):
+        summary = await _purge_with(redis)
+
+    assert summary.candidates == 0
+    assert any(r.message == "anonymous_purge_lock_release_failed" for r in caplog.records)
+    assert redis.set_calls[0][1] not in caplog.text

@@ -33,7 +33,7 @@ Et avant même de demander à Supabase, il écarte tous les `user_id` qui ont un
 ## Le flux
 
 ```
-cron VPS (04:00 Europe/Paris)
+cron VPS (06:00 Europe/Paris, après la sauvegarde de 03:00 UTC)
    |  POST /internal/maintenance/purge-anonymous[?dry_run=true]
    |  X-Cron-Secret: ****
    v

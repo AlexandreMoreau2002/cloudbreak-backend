@@ -11,10 +11,10 @@
 # User jwt : 
 #   testEmail-jwt
 #   anonymousToken (= CLOUDBREAK_ANONYMOUS_JWT du .env)
-@anonymousToken = {{$dotenv CLOUDBREAK_ANONYMOUS_JWT}}
-
 #   freemiumEmail-jwt
 #   proEmail-jwt
+
+@anonymousToken = {{$dotenv CLOUDBREAK_ANONYMOUS_JWT}}
 
 ###
 # Utilisateur courant -> 200

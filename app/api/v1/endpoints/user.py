@@ -178,6 +178,15 @@ async def delete_user(
     Retourne 204 No Content en cas de succès.
     """
     user_id = str(current_user["id"])
+    try:
+        await RateLimitService(redis).check_delete_account(user_id)
+    except RateLimitExceededException:
+        logger.warning("delete_account_rate_limited", extra={"user_id": user_id})
+        raise ApiError(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Trop de requêtes",
+            ErrorCode.RATE_LIMIT_EXCEEDED,
+        ) from None
     await delete_user_data(user_id, db)
     await QuotaService(redis).delete_user_keys(user_id)
     await delete_supabase_user(user_id, settings.supabase_url, settings.supabase_service_role_key)

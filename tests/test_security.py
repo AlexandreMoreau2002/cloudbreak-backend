@@ -166,8 +166,15 @@ def test_encode_test_jwt_signs_payload_with_dev_secret() -> None:
 
 
 class _FakeResponse:
-    def __init__(self, status_code: int) -> None:
+    def __init__(self, status_code: int, body: Any = None, *, invalid_json: bool = False) -> None:
         self.status_code = status_code
+        self._body = body
+        self._invalid_json = invalid_json
+
+    def json(self) -> Any:
+        if self._invalid_json:
+            raise ValueError("not json")
+        return self._body
 
 
 def _install_async_client(monkeypatch: pytest.MonkeyPatch, delete_mock: AsyncMock) -> None:
@@ -188,7 +195,7 @@ def _install_async_client(monkeypatch: pytest.MonkeyPatch, delete_mock: AsyncMoc
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("status_code", [200, 204, 404])
+@pytest.mark.parametrize("status_code", [200, 204])
 async def test_delete_supabase_user_accepts_success_statuses(
     monkeypatch: pytest.MonkeyPatch, status_code: int
 ) -> None:
@@ -248,3 +255,50 @@ async def test_delete_supabase_user_error_status_returns_500(
         "detail": "Erreur suppression compte",
         "code": ErrorCode.INTERNAL_ERROR,
     }
+
+
+_USER_NOT_FOUND = {"code": 404, "error_code": "user_not_found", "msg": "User not found"}
+
+
+async def _delete_with(monkeypatch: pytest.MonkeyPatch, response: _FakeResponse) -> None:
+    _install_async_client(monkeypatch, AsyncMock(return_value=response))
+    await delete_supabase_user(
+        user_id="user-123",
+        supabase_url="https://supabase.test",
+        service_role_key="service-role",
+    )
+
+
+@pytest.mark.asyncio
+async def test_delete_supabase_user_404_user_not_found_is_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _delete_with(monkeypatch, _FakeResponse(404, _USER_NOT_FOUND))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "response",
+    [
+        _FakeResponse(404, invalid_json=True),
+        _FakeResponse(404, {"code": 404, "msg": "Not found"}),
+        _FakeResponse(404, {"error_code": "other"}),
+        _FakeResponse(404, ["user_not_found"]),
+    ],
+)
+async def test_delete_supabase_user_404_without_marker_returns_500(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    response: _FakeResponse,
+) -> None:
+    with caplog.at_level("WARNING"), pytest.raises(HTTPException) as exc_info:
+        await _delete_with(monkeypatch, response)
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == {
+        "detail": "Erreur suppression compte",
+        "code": ErrorCode.INTERNAL_ERROR,
+    }
+    assert any(r.levelname == "WARNING" for r in caplog.records)
+    assert "user-123" not in caplog.text
+    assert "service-role" not in caplog.text

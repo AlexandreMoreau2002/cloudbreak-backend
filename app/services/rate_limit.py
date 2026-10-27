@@ -11,7 +11,9 @@ ANONYMOUS_SCORE_LIMIT = 60
 SCORE_WEEK_LIMIT = 12
 PUSH_TOKEN_LIMIT = 10
 PUSH_TOKEN_DEV_LIMIT = 1000
+DELETE_ACCOUNT_LIMIT = 5
 WINDOW_SECONDS = 60
+DELETE_ACCOUNT_WINDOW_SECONDS = 3600
 
 INCREMENT_WITH_TTL_SCRIPT = """
 local count = redis.call('INCR', KEYS[1])
@@ -67,3 +69,15 @@ class RateLimitService:
         limit = PUSH_TOKEN_LIMIT if is_production else PUSH_TOKEN_DEV_LIMIT
         if count > limit:
             raise RateLimitExceededException("Push token rate limit exceeded")
+
+    async def check_delete_account(self, user_id: str) -> None:
+        """Autorise au plus 5 tentatives de suppression de compte par utilisateur et par heure."""
+        user_hash = sha256(user_id.encode()).hexdigest()
+        window = int(time.time() // DELETE_ACCOUNT_WINDOW_SECONDS)
+        key = f"rate_limit:delete_account:{user_hash}:{window}"
+        count = await self._redis.eval(  # type: ignore[misc]
+            INCREMENT_WITH_TTL_SCRIPT, 1, key, str(DELETE_ACCOUNT_WINDOW_SECONDS)
+        )
+
+        if count > DELETE_ACCOUNT_LIMIT:
+            raise RateLimitExceededException("Delete account rate limit exceeded")

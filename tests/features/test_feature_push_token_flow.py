@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.dml import Update
 
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, get_redis
 from app.db.session import get_db
 from app.main import app
 from app.schemas.user import UserProfile
@@ -73,7 +73,14 @@ def store() -> Iterator[dict[str, SimpleNamespace]]:
     async def override_db() -> object:
         yield _FakeSession(profiles)
 
+    redis = AsyncMock()
+    redis.eval.return_value = 1
+
+    async def override_redis() -> AsyncMock:
+        return redis
+
     app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[get_redis] = override_redis
     with (
         patch("app.services.user.get_or_create_user", fake_get_or_create),
         patch("app.api.v1.endpoints.user.delete_user_data", fake_delete_user_data),

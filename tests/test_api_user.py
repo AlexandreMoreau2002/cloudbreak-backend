@@ -6,13 +6,23 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.main import app
 from app.db.session import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, get_redis
 
 _FAKE_USER = {"id": "user-123", "email": "t@t.com", "is_anonymous": False}
 
 
 async def _override_db():
     yield AsyncMock()
+
+
+def _redis_with_count(count: int):
+    redis = AsyncMock()
+    redis.eval.return_value = count
+
+    async def _override() -> AsyncMock:
+        return redis
+
+    return _override
 
 
 @patch("app.api.v1.endpoints.user.get_user_profile", new_callable=AsyncMock, return_value=None)
@@ -581,6 +591,26 @@ def test_anonymous_cannot_register_push_token() -> None:
     assert response.json()["detail"]["code"] == "ACCOUNT_REQUIRED"
 
 
+@patch("app.api.v1.endpoints.user.set_push_token", new_callable=AsyncMock)
+def test_push_token_rate_limited_returns_429(mock_set: AsyncMock) -> None:
+    app.dependency_overrides[get_current_user] = lambda: {"id": "u1", "is_anonymous": False}
+    app.dependency_overrides[get_db] = _override_db
+    app.dependency_overrides[get_redis] = _redis_with_count(11)
+    try:
+        with (
+            patch("app.services.rate_limit.settings.environment", "production"),
+            TestClient(app) as client,
+        ):
+            response = client.post(
+                "/api/v1/user/push-token", json={"push_token": "ExponentPushToken[a]"}
+            )
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 429
+    assert response.json()["code"] == "RATE_LIMIT_EXCEEDED"
+    mock_set.assert_not_awaited()
+
+
 def test_push_token_requires_authorization_returns_403() -> None:
     with TestClient(app) as client:
         response = client.post(
@@ -604,6 +634,7 @@ def test_push_token_invalid_payload_returns_422() -> None:
 def test_push_token_registered_returns_204(mock_set: AsyncMock) -> None:
     app.dependency_overrides[get_current_user] = lambda: {"id": "u1", "is_anonymous": False}
     app.dependency_overrides[get_db] = _override_db
+    app.dependency_overrides[get_redis] = _redis_with_count(1)
     try:
         with TestClient(app) as client:
             response = client.post(
@@ -619,6 +650,7 @@ def test_push_token_registered_returns_204(mock_set: AsyncMock) -> None:
 def test_push_token_forwards_locale_to_service(mock_set: AsyncMock) -> None:
     app.dependency_overrides[get_current_user] = lambda: {"id": "u1", "is_anonymous": False}
     app.dependency_overrides[get_db] = _override_db
+    app.dependency_overrides[get_redis] = _redis_with_count(1)
     try:
         with TestClient(app) as client:
             response = client.post(

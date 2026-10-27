@@ -1,13 +1,15 @@
 import logging
+from redis.asyncio import Redis
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.core.config import settings
-from app.core.errors import ErrorCode
+from app.core.errors import ApiError, ErrorCode
 from app.services.analytics import track
 from app.core.security import delete_supabase_user
-from app.core.dependencies import get_current_user, get_permanent_user
+from app.services.rate_limit import RateLimitExceededException, RateLimitService
+from app.core.dependencies import get_current_user, get_permanent_user, get_redis
 from app.schemas.user import (
     UserProfile,
     SurveyUpdate,
@@ -133,9 +135,19 @@ async def notifications(
 async def register_push_token(
     payload: PushTokenUpdate,
     current_user: dict[str, object] = Depends(get_permanent_user),
+    redis: Redis = Depends(get_redis),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Enregistre le token Expo Push de l'appareil (jamais loggué)."""
+    try:
+        await RateLimitService(redis).check_push_token(str(current_user["id"]))
+    except RateLimitExceededException:
+        logger.warning("push_token_rate_limited", extra={"user_id": str(current_user["id"])})
+        raise ApiError(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Trop de requêtes",
+            ErrorCode.RATE_LIMIT_EXCEEDED,
+        ) from None
     await set_push_token(current_user, payload.push_token, db, payload.locale)
     await db.commit()
     logger.info("push_token_registered", extra={"user_id": str(current_user["id"])})

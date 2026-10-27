@@ -131,3 +131,25 @@ class TestRateLimitService:
             mock_redis.eval.return_value = 1001
             with pytest.raises(RateLimitExceededException):
                 await service.check_push_token("user-123")
+
+    @pytest.mark.asyncio
+    async def test_delete_account_uses_hashed_user_key_and_hourly_limit(
+        self, mock_redis: AsyncMock
+    ) -> None:
+        """La suppression de compte est limitée à 5 par heure, sans exposer l'identifiant."""
+        mock_redis.eval.return_value = 5
+
+        with patch("app.services.rate_limit.time.time", return_value=7200.0):
+            await RateLimitService(mock_redis).check_delete_account("user-123")
+
+        args = mock_redis.eval.call_args.args
+        assert args[1] == 1
+        assert args[2].startswith("rate_limit:delete_account:")
+        assert args[2].endswith(":2")
+        assert "user-123" not in args[2]
+        assert args[3] == "3600"
+
+        mock_redis.eval.return_value = 6
+        with patch("app.services.rate_limit.time.time", return_value=7200.0):
+            with pytest.raises(RateLimitExceededException):
+                await RateLimitService(mock_redis).check_delete_account("user-123")

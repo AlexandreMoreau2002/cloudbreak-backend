@@ -19,6 +19,12 @@ def _redis_with_count(count: int):
     redis = AsyncMock()
     redis.eval.return_value = count
 
+    async def _no_keys(*args: object, **kwargs: object):  # type: ignore[no-untyped-def]
+        return
+        yield
+
+    redis.scan_iter = MagicMock(side_effect=_no_keys)
+
     async def _override() -> AsyncMock:
         return redis
 
@@ -505,6 +511,7 @@ def test_delete_user_retourne_204(
     mock_delete_data: AsyncMock, mock_delete_supabase: AsyncMock
 ) -> None:
     app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+    app.dependency_overrides[get_redis] = _redis_with_count(1)
     try:
         with TestClient(app) as client:
             response = client.delete("/api/v1/user/")
@@ -535,6 +542,7 @@ def test_delete_user_supabase_erreur_retourne_500(
         detail={"detail": "Erreur suppression compte", "code": "INTERNAL_ERROR"},
     )
     app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+    app.dependency_overrides[get_redis] = _redis_with_count(1)
     try:
         with TestClient(app) as client:
             response = client.delete("/api/v1/user/")
@@ -550,6 +558,7 @@ def test_delete_user_supprime_donnees_db(
     mock_delete_data: AsyncMock, mock_delete_supabase: AsyncMock
 ) -> None:
     app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+    app.dependency_overrides[get_redis] = _redis_with_count(1)
     try:
         with TestClient(app) as client:
             client.delete("/api/v1/user/")
@@ -568,6 +577,7 @@ def test_delete_user_appelle_track_account_deleted(
     mock_delete_data: AsyncMock, mock_delete_supabase: AsyncMock, mock_track: object
 ) -> None:
     app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+    app.dependency_overrides[get_redis] = _redis_with_count(1)
     try:
         with TestClient(app) as client:
             client.delete("/api/v1/user/")
@@ -783,3 +793,73 @@ def test_anonymous_cannot_reset_survey() -> None:
         app.dependency_overrides.clear()
     assert response.status_code == 403
     assert response.json()["detail"]["code"] == "ACCOUNT_REQUIRED"
+
+
+_ANON_USER = {"id": "anon-1", "email": None, "is_anonymous": True}
+
+
+@patch("app.api.v1.endpoints.user.delete_supabase_user", new_callable=AsyncMock)
+@patch("app.api.v1.endpoints.user.delete_user_data", new_callable=AsyncMock)
+def test_anonymous_can_delete_account_and_quota_keys(
+    mock_delete_data: AsyncMock, mock_delete_supabase: AsyncMock
+) -> None:
+    redis = MagicMock()
+    redis.eval = AsyncMock(return_value=1)
+    redis.delete = AsyncMock()
+
+    async def _scan(*args: object, **kwargs: object):  # type: ignore[no-untyped-def]
+        yield "quota:anon-1:2026-10-27"
+
+    redis.scan_iter = MagicMock(side_effect=_scan)
+    app.dependency_overrides[get_current_user] = lambda: _ANON_USER
+    app.dependency_overrides[get_redis] = lambda: redis
+    try:
+        with TestClient(app) as client:
+            response = client.delete("/api/v1/user/")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 204
+    assert mock_delete_data.call_args[0][0] == "anon-1"
+    mock_delete_supabase.assert_awaited_once()
+    assert mock_delete_supabase.call_args[0][0] == "anon-1"
+    redis.delete.assert_awaited_once_with("quota:anon-1:2026-10-27")
+
+
+@patch("app.api.v1.endpoints.user.delete_supabase_user", new_callable=AsyncMock)
+@patch("app.api.v1.endpoints.user.delete_user_data", new_callable=AsyncMock)
+def test_delete_user_redis_down_still_returns_204(
+    mock_delete_data: AsyncMock, mock_delete_supabase: AsyncMock
+) -> None:
+    redis = MagicMock()
+    redis.eval = AsyncMock(return_value=1)
+    redis.scan_iter = MagicMock(side_effect=ConnectionError("redis down"))
+    app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+    app.dependency_overrides[get_redis] = lambda: redis
+    try:
+        with TestClient(app) as client:
+            response = client.delete("/api/v1/user/")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 204
+    mock_delete_supabase.assert_awaited_once()
+
+
+@patch("app.api.v1.endpoints.user.delete_supabase_user", new_callable=AsyncMock)
+@patch("app.api.v1.endpoints.user.delete_user_data", new_callable=AsyncMock)
+def test_delete_user_rate_limited_returns_429(
+    mock_delete_data: AsyncMock, mock_delete_supabase: AsyncMock
+) -> None:
+    app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+    app.dependency_overrides[get_redis] = _redis_with_count(6)
+    try:
+        with TestClient(app) as client:
+            response = client.delete("/api/v1/user/")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 429
+    assert response.json()["code"] == "RATE_LIMIT_EXCEEDED"
+    mock_delete_data.assert_not_awaited()
+    mock_delete_supabase.assert_not_awaited()

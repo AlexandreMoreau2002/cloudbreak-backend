@@ -50,6 +50,7 @@ async def delete_supabase_user(user_id: str, supabase_url: str, service_role_key
 
     Raises:
         HTTPException(500) si la suppression échoue côté Supabase
+        (404 avec `error_code == "user_not_found"` = déjà supprimé, OK)
     """
     url = f"{supabase_url}/auth/v1/admin/users/{user_id}"
     headers = {
@@ -67,8 +68,23 @@ async def delete_supabase_user(user_id: str, supabase_url: str, service_role_key
                     "code": ErrorCode.SERVICE_UNAVAILABLE,
                 },
             ) from exc
-    if response.status_code not in (200, 204):
-        raise HTTPException(
-            status_code=500,
-            detail={"detail": "Erreur suppression compte", "code": ErrorCode.INTERNAL_ERROR},
-        )
+    if response.status_code in (200, 204):
+        return
+    # 404 : compte déjà supprimé côté Supabase (rejeu) -> idempotent, mais uniquement si le
+    # corps confirme `user_not_found` (un 404 d'URL mal configurée ne doit pas passer).
+    if response.status_code == 404 and _is_user_not_found(response):
+        return
+    logger.warning("supabase_user_deletion_failed", extra={"status_code": response.status_code})
+    raise HTTPException(
+        status_code=500,
+        detail={"detail": "Erreur suppression compte", "code": ErrorCode.INTERNAL_ERROR},
+    )
+
+
+def _is_user_not_found(response: httpx.Response) -> bool:
+    """Vrai si le corps JSON d'un 404 Supabase Admin indique `user_not_found`."""
+    try:
+        body = response.json()
+    except ValueError:
+        return False
+    return isinstance(body, dict) and body.get("error_code") == "user_not_found"

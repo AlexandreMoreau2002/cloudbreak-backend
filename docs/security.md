@@ -712,3 +712,33 @@ Ce verdict ne valide pas la configuration du déploiement ni une identité maté
 - Le cache Redis hebdomadaire de météo dure 30 minutes (1 800 secondes) ; distinct du cache
   mobile AsyncStorage de 3 heures, il ne contient que des données météo
   normalisées. Les nouveaux logs du batch n'enregistrent ni jeton, ni détail de prédiction.
+
+## 2026-10-27 — Suppression de compte : sessions anonymes, events Apple, clés quota (RGPD)
+
+- **[endpoints/user.py]** `DELETE /api/v1/user` n'exige plus un compte permanent : toute session authentifiée, anonyme comprise, peut exercer son droit à l'effacement (`get_current_user` au lieu de `get_permanent_user`). Sans JWT : 403. Supersede l'entrée du 2026-09-05 (qui ne visait que l'exposition accidentelle de l'endpoint à un anonyme). L'action ne concerne que le `sub` du JWT lui-même : pas d'élévation de privilège.
+- **[services/user.py]** La suppression est idempotente : un anonyme jamais provisionné n'a pas de ligne `users`, les `DELETE` sont alors sans effet (pas d'erreur).
+- **[services/user.py]** `apple_subscription_events` est purgée avant `subscriptions` pour les `original_transaction_id` de l'utilisateur ; les events d'autres utilisateurs sont conservés. Les events sans `original_transaction_id` ne sont pas rattachables à un utilisateur et restent (ledger d'idempotence, aucune donnée directement identifiante).
+- **[services/quota.py]** Les clés Redis `quota:{user_id}:*` sont supprimées (SCAN, best-effort : une panne Redis est loggée sans faire échouer la suppression ; TTL minuit UTC en filet de sécurité). Les clés `quota:installation:{hash}:*` sont des hash d'installation non liés au compte et expirent seuls.
+- **[core/security.py]** `delete_supabase_user` traite un 404 comme un succès (rejeu idempotent) **uniquement si** le corps JSON contient `error_code == "user_not_found"`. Un 404 sans ce marqueur (URL mal configurée, corps HTML ou non-JSON, JSON sans `error_code`) lève la même `HTTPException(500)` que les autres échecs, avec un `logger.warning` (statut seul, sans identifiant ni secret). Comportement de l'API Admin pour les utilisateurs anonymes non vérifié sur une instance réelle (ils existent dans `auth.users`, `DELETE /auth/v1/admin/users/{id}` est censé fonctionner).
+- **[services/rate_limit.py, endpoints/user.py]** `DELETE /api/v1/user` est limité à 5 tentatives par heure et par utilisateur (clé Redis `rate_limit:delete_account:{sha256(user_id)}:{fenêtre}`, même mécanique que le push token). Au-delà : 429 `{"detail": "Trop de requêtes", "code": "RATE_LIMIT_EXCEEDED"}` avant toute suppression. Pas de limite par IP (cohérent avec le push token). Si Redis est indisponible, la requête échoue (comme les autres endpoints limités).
+- **[dependencies.py]** Limite connue : le JWT est validé localement (aucun appel Supabase/DB), il reste donc accepté jusqu'à son expiration après la suppression du compte.
+
+## 2026-10-27 Audit sécurité — Story 2-4b : Suppression des comptes anonymes (PR backend#35)
+
+### 🟡 WARNING
+
+- **[services/rate_limit.py:check_delete_account]** Rate limit par `user_id` uniquement, sans limite par IP. Chaque nouvelle session anonyme Supabase démarre avec un bucket neuf : N sessions anonymes créées → N appels possibles à l'API Admin Supabase (`DELETE /auth/v1/admin/users/{id}`) avec la `service_role_key`. La protection effective contre un abus à grande échelle repose sur le rate limiting de création de session côté Supabase (externe, hors contrôle du backend). → Surveiller en production le volume d'appels Admin Supabase ; envisager un rate limit par IP comme couche supplémentaire si des pics anormaux apparaissent.
+- **[services/rate_limit.py:76]** Fenêtre fixe (`window = int(time.time() // 3600)`) : un acteur épuisant 5 appels à 00:58 peut en enchaîner 5 autres à 01:00, soit 10 suppressions en ~2 minutes à la frontière de fenêtre. Risque faible pour la suppression de compte (identique au comportement du push token, déjà accepté). → Accepté en cohérence avec le pattern existant.
+
+### 🔵 INFO
+
+- **[services/quota.py:delete_user_keys]** Suppression des clés `quota:{user_id}:*` correctement isolée par `_escape_glob` sur le user_id (échappe `\*?[]`). Les clés `quota:installation:{hash}:*` ne sont pas touchées et expirent seules — comportement attendu et documenté.
+- **[Quota bypass]** La suppression du compte ne dégrade pas significativement la protection du quota freemium : le contournement par création d'une nouvelle session anonyme + nouvel UUID d'installation (client-contrôlé) était déjà possible avant cette story et est documenté dans l'entrée 2026-09-28. La suppression ne raccourcit pas ce chemin.
+- **[core/security.py:_is_user_not_found]** Filtrage du 404 Supabase correct : seul un corps JSON avec `error_code == "user_not_found"` déclenche le retour silencieux. Corps non-JSON, non-dict ou `error_code` absent ou différent → `HTTPException(500)`. Protection correcte contre une URL mal configurée.
+- **[endpoints/user.py, services/user.py]** Pas d'IDOR : `user_id` extrait exclusivement du JWT validé localement (`current_user["id"]`), jamais d'un paramètre client.
+- **[Logs]** `logger.info("user_deleted", ...)` et `logger.warning("delete_account_rate_limited", ...)` ne portent que l'UUID Supabase — cohérent avec les pratiques existantes. Aucun email, token ni clé `service_role` loggé.
+- **[JWT post-suppression — sessions anonymes]** Pour un token anonyme encore valide après suppression : `POST /user/provision` est bloqué (403 `ACCOUNT_REQUIRED` via `get_permanent_user`) ; `POST/DELETE/GET /user/favorites` idem (403). `GET /score` peut créer une ligne `Prediction` (best-effort), sans recréer de ligne `users`. La phrase de `docs/story-2-4b-suppression-comptes-anonymes.md` ("recréer une ligne via le provisioning") est inexacte pour les sessions anonymes (provision bloqué en 403) ; elle est exacte pour un token permanent post-suppression.
+
+### Verdict
+
+SECURE POUR LE MERGE — aucun CRITIQUE. Les deux WARNING sont non immédiats (amplification Supabase gated par le rate limiting Supabase sur la création de sessions, fenêtre fixe déjà acceptée sur le push token). Les limites résiduelles sont documentées dans `docs/story-2-4b-suppression-comptes-anonymes.md`.

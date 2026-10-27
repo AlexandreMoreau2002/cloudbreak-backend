@@ -36,6 +36,11 @@ return 1
 """
 
 
+def _escape_glob(value: str) -> str:
+    """Échappe les métacaractères glob Redis (`MATCH`) d'une valeur littérale."""
+    return "".join(f"\\{c}" if c in "\\*?[]" else c for c in value)
+
+
 class QuotaExceededException(Exception):
     """Levée quand le quota journalier freemium est dépassé."""
 
@@ -122,3 +127,21 @@ class QuotaService:
         quota_key = self._user_quota_key(user_id, date)
         unlocked_count = await self._redis.scard(quota_key)  # type: ignore[misc]
         return max(0, self._daily_limit - int(unlocked_count))
+
+    async def delete_user_keys(self, user_id: str) -> None:
+        """Supprime les clés quota d'un utilisateur (suppression de compte, RGPD).
+
+        Best-effort : une panne Redis est loggée mais ne fait jamais échouer l'appelant.
+        Les clés `quota:installation:*` (hash d'installation) ne sont pas liées au compte.
+        """
+        try:
+            keys = [
+                key
+                async for key in self._redis.scan_iter(
+                    match=self._user_quota_key(_escape_glob(user_id), "*"), count=100
+                )
+            ]
+            if keys:
+                await self._redis.delete(*keys)
+        except Exception:
+            logger.warning("quota_keys_cleanup_failed", exc_info=True)

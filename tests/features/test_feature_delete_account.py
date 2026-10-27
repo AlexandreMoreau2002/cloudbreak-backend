@@ -2,10 +2,21 @@
 
 from app.main import app
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, patch
-from app.core.dependencies import get_current_user
+from unittest.mock import AsyncMock, MagicMock, patch
+from app.core.dependencies import get_current_user, get_redis
 
 _FAKE_USER = {"id": "user-456", "email": "feature@test.com", "is_anonymous": False}
+
+
+def _fake_redis() -> MagicMock:
+    async def _no_keys(*args: object, **kwargs: object):  # type: ignore[no-untyped-def]
+        return
+        yield
+
+    redis = MagicMock()
+    redis.eval = AsyncMock(return_value=1)
+    redis.scan_iter = MagicMock(side_effect=_no_keys)
+    return redis
 
 
 def test_delete_account_sans_auth_retourne_403() -> None:
@@ -23,6 +34,7 @@ def test_delete_account_flux_complet_retourne_204(
 ) -> None:
     """Flux nominal : auth valide → suppression DB → suppression Supabase → 204."""
     app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+    app.dependency_overrides[get_redis] = _fake_redis
     try:
         with TestClient(app) as client:
             response = client.delete("/api/v1/user/")
@@ -46,6 +58,7 @@ def test_delete_account_ordre_suppression(
     mock_delete_supabase.side_effect = lambda *a, **kw: call_order.append("supabase") or None
 
     app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
+    app.dependency_overrides[get_redis] = _fake_redis
     try:
         with TestClient(app) as client:
             client.delete("/api/v1/user/")
@@ -53,3 +66,26 @@ def test_delete_account_ordre_suppression(
         app.dependency_overrides.clear()
 
     assert call_order == ["db", "supabase"]
+
+
+@patch("app.api.v1.endpoints.user.delete_supabase_user", new_callable=AsyncMock)
+@patch("app.api.v1.endpoints.user.delete_user_data", new_callable=AsyncMock)
+def test_delete_account_anonyme_flux_complet_retourne_204(
+    mock_delete_data: AsyncMock, mock_delete_supabase: AsyncMock
+) -> None:
+    """Une session anonyme exerce son droit à l'effacement : DB puis Supabase, 204."""
+    app.dependency_overrides[get_current_user] = lambda: {
+        "id": "anon-9",
+        "email": None,
+        "is_anonymous": True,
+    }
+    app.dependency_overrides[get_redis] = _fake_redis
+    try:
+        with TestClient(app) as client:
+            response = client.delete("/api/v1/user/")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 204
+    mock_delete_data.assert_called_once()
+    mock_delete_supabase.assert_called_once()

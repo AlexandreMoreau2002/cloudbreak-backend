@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 import asyncio
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -228,3 +228,58 @@ class TestQuotaService:
             f"quota:installation:{'a' * 64}:2026-09-28",
             f"quota:installation:{'b' * 64}:2026-09-28",
         ]
+
+
+def _scan_iter(keys: list[str]):  # type: ignore[no-untyped-def]
+    async def _gen(*args, **kwargs):  # type: ignore[no-untyped-def]
+        for key in keys:
+            yield key
+
+    return _gen
+
+
+class TestDeleteUserKeys:
+    """Purge des clés quota d'un utilisateur à la suppression de compte."""
+
+    @pytest.mark.asyncio
+    async def test_deletes_all_user_keys_with_prefixed_pattern(self) -> None:
+        redis = AsyncMock()
+        redis.scan_iter = MagicMock(side_effect=_scan_iter(["quota:u1:2026-10-27", "quota:u1:x"]))
+
+        await QuotaService(redis).delete_user_keys("u1")
+
+        redis.scan_iter.assert_called_once_with(match="quota:u1:*", count=100)
+        redis.delete.assert_awaited_once_with("quota:u1:2026-10-27", "quota:u1:x")
+
+    @pytest.mark.asyncio
+    async def test_escapes_glob_characters_in_user_id(self) -> None:
+        redis = AsyncMock()
+        redis.scan_iter = MagicMock(side_effect=_scan_iter([]))
+
+        await QuotaService(redis).delete_user_keys("a*b[c]")
+
+        assert redis.scan_iter.call_args.kwargs["match"] == "quota:a\\*b\\[c\\]:*"
+
+    @pytest.mark.asyncio
+    async def test_no_keys_does_not_call_delete(self) -> None:
+        redis = AsyncMock()
+        redis.scan_iter = MagicMock(side_effect=_scan_iter([]))
+
+        await QuotaService(redis).delete_user_keys("u1")
+
+        redis.delete.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_redis_failure_is_swallowed(self) -> None:
+        redis = AsyncMock()
+        redis.scan_iter = MagicMock(side_effect=ConnectionError("down"))
+
+        await QuotaService(redis).delete_user_keys("u1")
+
+    @pytest.mark.asyncio
+    async def test_delete_failure_is_swallowed(self) -> None:
+        redis = AsyncMock()
+        redis.scan_iter = MagicMock(side_effect=_scan_iter(["quota:u1:d"]))
+        redis.delete.side_effect = ConnectionError("down")
+
+        await QuotaService(redis).delete_user_keys("u1")

@@ -10,8 +10,11 @@
 #
 # User jwt : 
 #   testEmail-jwt
+#   anonymousToken (= CLOUDBREAK_ANONYMOUS_JWT du .env)
 #   freemiumEmail-jwt
 #   proEmail-jwt
+
+@anonymousToken = {{$dotenv CLOUDBREAK_ANONYMOUS_JWT}}
 
 ###
 # Utilisateur courant -> 200
@@ -178,3 +181,24 @@ Content-Type: application/json
 {
   "display_name": "Alex"
 }
+
+###
+# Suppression de compte (RGPD) -> 204. Ouverte aux sessions anonymes : purge DB, events Apple liés,
+# clés Redis quota:{user_id}:*, puis compte Supabase. Destructif : utiliser un compte jetable.
+DELETE {{baseUrl}}/api/v1/user
+Authorization: Bearer {{anonymousToken}}
+
+###
+# Suppression de compte, compte permanent -> 204 (destructif)
+DELETE {{baseUrl}}/api/v1/user
+Authorization: Bearer {{testEmail-jwt}}
+
+###
+# Suppression de compte sans token -> 403
+DELETE {{baseUrl}}/api/v1/user
+
+###
+# Suppression de compte, rate-limit -> 429 RATE_LIMIT_EXCEEDED à la 6e tentative en moins d'1 h
+# (même utilisateur ; rejouer 6 fois avec un token dont le compte existe encore côté auth)
+DELETE {{baseUrl}}/api/v1/user
+Authorization: Bearer {{testEmail-jwt}}

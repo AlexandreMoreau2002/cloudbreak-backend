@@ -87,9 +87,47 @@ def test_production_accepts_complete_readable_apple_configuration(tmp_path: Path
         apple_key_id="KEYID",
         apple_issuer_id="issuer-id",
         apple_private_key_path=key_path,
+        expo_access_token="expo-test-token",
     )
 
     assert settings.apple_environment == "Production"
+    assert settings.expo_access_token == "expo-test-token"
+
+
+def _production_settings(key_path: Path, expo_access_token: str) -> Settings:
+    return Settings(
+        _env_file=None,
+        environment="production",
+        apple_environment="Production",
+        apple_bundle_id="com.alexandremoreau.cloudbreak",
+        apple_app_id=123456789,
+        apple_key_id="KEYID",
+        apple_issuer_id="issuer-id",
+        apple_private_key_path=key_path,
+        expo_access_token=expo_access_token,
+    )
+
+
+@pytest.mark.parametrize("token", ["", "   "])
+def test_production_requires_expo_access_token(tmp_path: Path, token: str) -> None:
+    key_path = tmp_path / "AuthKey_TEST.p8"
+    key_path.write_text("private key placeholder")
+
+    with pytest.raises(ValidationError, match="Production requires EXPO_ACCESS_TOKEN"):
+        _production_settings(key_path, token)
+
+
+def test_production_accepts_present_expo_access_token(tmp_path: Path) -> None:
+    key_path = tmp_path / "AuthKey_TEST.p8"
+    key_path.write_text("private key placeholder")
+
+    assert _production_settings(key_path, "expo-test-token").environment == "production"
+
+
+def test_development_allows_empty_expo_access_token() -> None:
+    settings = Settings(_env_file=None, environment="development", expo_access_token="")
+
+    assert settings.expo_access_token == ""
 
 
 def test_apple_environment_rejects_unknown_values() -> None:

@@ -29,12 +29,12 @@ Document de référence sécurité. À mettre à jour à chaque story qui touche
 - Le token n'est jamais renvoyé par l'API (absent de `UserProfile` et de `GET /api/v1/user/me`) et jamais loggué : seuls `user_id` et le nom d'erreur Expo apparaissent dans les logs.
 - Retrait : `DELETE /push-token` à la déconnexion, et suppression de la ligne `users` à la suppression de compte (RGPD).
 - Un token identifie un appareil : si le même token est enregistré par un autre compte, il est purgé chez l'ancien propriétaire pour qu'il ne reçoive pas les alertes du nouvel utilisateur.
-- `send_push_to_user` ne lève jamais (timeout 10 s) ; un ticket `DeviceNotRegistered` passe `push_token_valid` à false (UPDATE ciblé sur le token envoyé, session dédiée ; les receipts ne sont pas lus, voir plus bas). `EXPO_ACCESS_TOKEN` reste optionnel, lu via `app/core/config.py`, jamais loggué.
+- `send_push_to_user` ne lève jamais (timeout 10 s) ; un ticket `DeviceNotRegistered` passe `push_token_valid` à false (UPDATE ciblé sur le token envoyé, session dédiée ; les receipts ne sont pas lus, voir plus bas). `EXPO_ACCESS_TOKEN` est obligatoire en production (validator de config), optionnel ailleurs, lu via `app/core/config.py`, jamais loggué.
 
 ### À traiter avant la release 1.0.0
 
 - (a) ~~Rate limiting sur `POST /api/v1/user/push-token`~~ : fait, 10 requêtes/min par utilisateur (1000 hors production) (Redis, clé hachée `rate_limit:push_token:*`), 429 `RATE_LIMIT_EXCEEDED`.
-- (b) Valider `EXPO_ACCESS_TOKEN` en production (validator de config ou log `CRITICAL` s'il est vide).
+- (b) ~~Valider `EXPO_ACCESS_TOKEN` en production~~ : fait (2026-10-31), validator de config (`Production requires EXPO_ACCESS_TOKEN`), le démarrage échoue si vide ou blanc.
 - (c) TOCTOU théorique sur le transfert de token (purge puis écriture non atomiques entre deux requêtes concurrentes) : accepté en MVP.
 - (d) Le `DELETE /push-token` du logout peut échouer (hors ligne, JWT expiré) : l'ancien compte garde alors le token jusqu'à ce qu'un autre compte l'enregistre ou qu'Expo réponde `DeviceNotRegistered`. Piste : ignorer les utilisateurs inactifs à l'envoi (story 5.2).
 - (e) L'unicité de `push_token` est garantie par un index unique partiel (`WHERE push_token IS NOT NULL`) ; `set_push_token` rejoue purge + affectation une fois sur conflit (deux POST simultanés).

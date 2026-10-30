@@ -51,6 +51,8 @@ class Settings(BaseSettings):
                 pass
         except OSError as error:
             raise ValueError("Production requires a readable private key file") from error
+        if not self.expo_access_token.strip():
+            raise ValueError("Production requires EXPO_ACCESS_TOKEN")
         return self
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}

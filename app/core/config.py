@@ -5,6 +5,9 @@ from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
 
+MIN_CRON_SECRET_LENGTH = 32
+
+
 class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/cloudbreak"
     redis_url: str = "redis://localhost:6379"
@@ -53,7 +56,26 @@ class Settings(BaseSettings):
             raise ValueError("Production requires a readable private key file") from error
         if not self.expo_access_token.strip():
             raise ValueError("Production requires EXPO_ACCESS_TOKEN")
+        self._require_production_infrastructure()
         return self
+
+    def _require_production_infrastructure(self) -> None:
+        """Refuse une config prod héritée des défauts de dev. Ne cite jamais les valeurs."""
+        local_markers = ("localhost", "127.0.0.1")
+        if any(marker in self.database_url.lower() for marker in local_markers):
+            raise ValueError("Production requires a non-local DATABASE_URL")
+        if any(marker in self.redis_url.lower() for marker in local_markers):
+            raise ValueError("Production requires a non-local REDIS_URL")
+        if not self.supabase_url.strip():
+            raise ValueError("Production requires SUPABASE_URL")
+        if not self.supabase_jwt_jwks.strip():
+            raise ValueError("Production requires SUPABASE_JWT_JWKS")
+        if not self.supabase_service_role_key.strip():
+            raise ValueError("Production requires SUPABASE_SERVICE_ROLE_KEY")
+        if len(self.internal_cron_secret) < MIN_CRON_SECRET_LENGTH:
+            raise ValueError(
+                f"Production requires INTERNAL_CRON_SECRET of {MIN_CRON_SECRET_LENGTH}+ characters"
+            )
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 

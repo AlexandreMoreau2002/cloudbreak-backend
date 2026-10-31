@@ -48,7 +48,7 @@ make typecheck   # mypy
 
 ## Mode debug
 
-Logs debug placés aux points clés — silencieux en prod, activables à la demande :
+Logs debug placés aux points clés — silencieux par défaut (le niveau est figé à `INFO` par `logging.basicConfig(level=logging.INFO)` dans `app/main.py`, il n'existe pas de variable `LOG_LEVEL`) :
 
 ```python
 logger.debug("score_detail", extra={"cloud_base": cb, "peak_alt": alt, "score": s})
@@ -56,11 +56,7 @@ logger.debug("cache_result", extra={"key": key, "hit": hit})
 logger.debug("open_meteo_raw", extra={"status": r.status_code, "data": data})
 ```
 
-Activer en dev :
-```bash
-# Dans docker-compose.dev.yml > environment :
-LOG_LEVEL=DEBUG
-```
+Activer en local : passer temporairement ce niveau à `logging.DEBUG` dans `app/main.py`, puis relancer `make dev`. Ne pas committer ce changement.
 
 ---
 
@@ -99,4 +95,5 @@ Après chaque story implémentée, lancer **systématiquement** :
 - Toujours importer les modèles dans `alembic/env.py` pour que l'autogenerate les détecte
 - `PYTHONPATH=.` requis pour que alembic trouve le module `app`
 - `script.py.mako` doit être présent dans `alembic/`
+- Toute migration doit passer sur une **base vide** : le job CI `Migrations (base vide)` (`.github/workflows/backend.yml`) lance Postgres 16 puis `alembic upgrade head`, `downgrade -1` et `upgrade head`. En local : `docker run --rm -e POSTGRES_PASSWORD=x -e POSTGRES_DB=cloudbreak -p 55432:5432 postgres:16` puis `DATABASE_URL=postgresql+asyncpg://postgres:x@localhost:55432/cloudbreak PYTHONPATH=. alembic upgrade head`
 - Supprimer la révision en DB (`DELETE FROM alembic_version`) si migration vide régénérée

@@ -31,21 +31,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
 
 
-app = FastAPI(title="Cloudbreak API", version=settings.app_version, lifespan=lifespan)
-
-app.include_router(peaks_router)
-app.include_router(user_router)
-app.include_router(score_router)
-app.include_router(health_router)
-app.include_router(favorites_router)
-app.include_router(validations_router)
-app.include_router(subscription_router)
-app.include_router(apple_webhook_router)
-app.include_router(internal_notifications_router)
-app.include_router(internal_maintenance_router)
-
-
-@app.exception_handler(ApiError)
 async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
     """Sérialise les erreurs métier avec un code au premier niveau."""
     return JSONResponse(
@@ -54,7 +39,6 @@ async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
     )
 
 
-@app.exception_handler(OperationalError)
 async def db_operational_error_handler(request: Request, exc: OperationalError) -> JSONResponse:
     logger.error(
         "database_unavailable",
@@ -64,3 +48,33 @@ async def db_operational_error_handler(request: Request, exc: OperationalError) 
         status_code=503,
         content={"detail": "Base de données indisponible", "code": "DATABASE_UNAVAILABLE"},
     )
+
+
+def create_app(environment: str) -> FastAPI:
+    """Construit l'application ; Swagger/ReDoc/OpenAPI sont coupés en production."""
+    docs_enabled = environment.lower() != "production"
+    application = FastAPI(
+        title="Cloudbreak API",
+        version=settings.app_version,
+        lifespan=lifespan,
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
+        openapi_url="/openapi.json" if docs_enabled else None,
+    )
+    application.include_router(peaks_router)
+    application.include_router(user_router)
+    application.include_router(score_router)
+    application.include_router(health_router)
+    application.include_router(favorites_router)
+    application.include_router(validations_router)
+    application.include_router(subscription_router)
+    application.include_router(apple_webhook_router)
+    application.include_router(internal_notifications_router)
+    application.include_router(internal_maintenance_router)
+
+    application.add_exception_handler(ApiError, api_error_handler)  # type: ignore[arg-type]
+    application.add_exception_handler(OperationalError, db_operational_error_handler)  # type: ignore[arg-type]
+    return application
+
+
+app = create_app(settings.environment)

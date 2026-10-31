@@ -23,7 +23,18 @@ from app.services.rate_limit import RateLimitService, RateLimitExceededException
 
 logger = logging.getLogger(__name__)
 
-bearer_scheme = HTTPBearer()
+
+class Bearer403(HTTPBearer):
+    """HTTPBearer qui garde le contrat historique : 403 quand Authorization est absent.
+
+    FastAPI >= 0.122 renvoie 401 ; le client mobile et les tests s'appuient sur 403.
+    """
+
+    def make_not_authenticated_error(self) -> HTTPException:
+        return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authenticated")
+
+
+bearer_scheme = Bearer403()
 
 # Redis singleton
 _redis: Redis | None = None

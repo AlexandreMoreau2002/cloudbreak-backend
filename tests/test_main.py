@@ -3,7 +3,7 @@ from fastapi import Request
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 from httpx import ASGITransport, AsyncClient
-from app.main import app, db_operational_error_handler
+from app.main import app, create_app, db_operational_error_handler
 
 
 def test_lifespan_startup() -> None:
@@ -58,3 +58,27 @@ async def test_db_operational_error_handler_via_endpoint() -> None:
     body = response.json()
     assert body["detail"] == "Base de données indisponible"
     assert body["code"] == "DATABASE_UNAVAILABLE"
+
+
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
+def test_documentation_desactivee_en_production(path: str) -> None:
+    prod_app = create_app("production")
+    response = TestClient(prod_app).get(path)
+    assert response.status_code == 404
+
+
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
+def test_documentation_active_hors_production(path: str) -> None:
+    dev_app = create_app("development")
+    response = TestClient(dev_app).get(path)
+    assert response.status_code == 200
+
+
+def test_documentation_desactivee_quelle_que_soit_la_casse_de_production() -> None:
+    response = TestClient(create_app("Production")).get("/docs")
+    assert response.status_code == 404
+
+
+def test_create_app_garde_les_routes_et_les_handlers() -> None:
+    prod_app = create_app("production")
+    assert TestClient(prod_app).get("/health").status_code == 200

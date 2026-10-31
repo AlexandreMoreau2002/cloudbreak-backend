@@ -44,3 +44,36 @@ jobs:
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - name: Pytest
         run: pytest --cov=app --cov-report=term-missing
+
+  migrations:
+    name: Migrations (base vide)
+    runs-on: ubuntu-latest
+    needs: lint
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: cloudbreak
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:ci@localhost:5432/cloudbreak
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - name: Alembic upgrade head (base vide)
+        run: alembic upgrade head
+      - name: Alembic downgrade -1 puis upgrade head
+        run: |
+          alembic downgrade -1
+          alembic upgrade head

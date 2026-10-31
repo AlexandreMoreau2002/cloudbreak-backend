@@ -293,22 +293,55 @@ SECURE — pas de nouvelle surface d'exposition, pattern identique à un endpoin
 
 ## Dépendances
 
-### Audit des dépendances
+### Audit des dépendances (2026-11-01, pré-release 1.0.0)
+
+Méthode : `pip-audit` installé dans un venv jetable (hors projet), appliqué au `pip freeze` du `.venv` du backend :
 
 ```bash
-# Vérifier les vulnérabilités connues
-pip-audit  # à installer : pip install pip-audit
+python3 -m venv /tmp/auditvenv && /tmp/auditvenv/bin/pip install pip-audit
+.venv/bin/pip freeze > /tmp/freeze.txt
+/tmp/auditvenv/bin/pip-audit -r /tmp/freeze.txt --no-deps --disable-pip
 ```
 
-À lancer avant chaque release. Les dépendances actuelles (story 1-2) :
+À relancer avant chaque release.
+
+| | Avis | Détail |
+|---|------|--------|
+| Avant | 44 lignes (9 paquets) | anyio, certifi, ecdsa, idna, mako, pyasn1, pytest, python-jose, starlette (8 avis) |
+| Après | 5 lignes, 3 avis distincts (3 paquets) | voir ci-dessous |
+
+Corrections appliquées (`requirements.txt`) :
+
+- `python-jose[cryptography]` 3.3.0 -> 3.5.0 ; `ecdsa>=0.19.2`, `pyasn1>=0.6.5`, `idna>=3.15`, `mako>=1.3.12`, `anyio>=4.14.2`, `certifi>=2026.10.18` (pins de sécurité sur transitives).
+- `fastapi` 0.115.0 -> 0.162.0, donc Starlette 0.38.6 -> 1.10.0 : les 8 avis Starlette sont résolus. Seul changement de comportement : FastAPI >= 0.122 renvoie 401 au lieu de 403 quand `Authorization` est absent ; `Bearer403` (`app/core/dependencies.py`) conserve le 403 historique pour ne pas casser le contrat mobile. Suite de tests complète verte.
+
+Avis restants (acceptés) :
+
+| Paquet | Avis | Justification |
+|--------|------|---------------|
+| python-jose 3.5.0 | PYSEC-2026-4298 / CVE-2026-85394 (aucun correctif publié) : HMAC acceptant une clé publique DER, forge de jetons HS256 | Non exploitable ici : `decode_supabase_jwt` impose `algorithms=["ES256"]` (`app/core/security.py`), aucun jeton HS256 n'est jamais accepté. À surveiller ; migrer vers PyJWT/authlib si un correctif tarde. |
+| ecdsa 0.19.2 | PYSEC-2026-1325 / CVE-2024-23342 (Minerva, attaque temporelle sur la **signature** P-256 ; le mainteneur ne corrigera pas) | Le backend ne signe jamais avec `ecdsa` : il ne fait que vérifier des JWT ES256 (clé publique JWKS). Risque nul en pratique. |
+| pytest 8.3.0 | PYSEC-2026-1845 (répertoire `/tmp/pytest-of-{user}`, local) | Outil de dev/CI uniquement, absent de l'image Docker (seul `requirements.txt` est installé). `pytest-asyncio` 0.24 impose `pytest<9` ; monter les deux ensemble après la release. |
+
+### Dépendances principales (versions épinglées)
 
 | Package | Version | Notes |
 |---------|---------|-------|
-| fastapi | 0.115.0 | Stable |
+| fastapi | 0.162.0 | Starlette 1.10.0 |
 | sqlalchemy | 2.0.36 | Stable |
 | pydantic | 2.10.0 | Stable |
-| python-jose | 3.3.0 | Pour JWT — surveiller les CVE |
+| python-jose | 3.5.0 | JWT ES256 uniquement, voir avis restants |
 | asyncpg | 0.30.0 | Stable |
+
+### Durcissements de la release 1.0.0
+
+- Swagger/ReDoc/OpenAPI (`/docs`, `/redoc`, `/openapi.json`) désactivés quand `ENVIRONMENT=production` (404).
+- Le démarrage échoue en production si `DATABASE_URL` ou `REDIS_URL` pointent sur localhost/127.0.0.1, si `SUPABASE_URL`, `SUPABASE_JWT_JWKS` ou `SUPABASE_SERVICE_ROLE_KEY` sont vides, ou si `INTERNAL_CRON_SECRET` fait moins de 32 caractères. Les messages ne contiennent jamais les valeurs.
+- Les migrations Alembic sont rejouées sur une base Postgres 16 vide en CI.
+
+### Rate limit invité et sous-réseau Docker/Traefik (à vérifier en prod)
+
+Le conteneur démarre avec `--proxy-headers --forwarded-allow-ips=10.0.1.0/24` (`Dockerfile`) : `X-Forwarded-For` n'est honoré que s'il vient de ce sous-réseau, et `request.client.host` (clé du rate limit des invités sur `GET /api/v1/score`) en dépend. **Avant la MEP**, vérifier sur le VPS que l'IP source de Traefik vers le conteneur est bien dans `10.0.1.0/24` (`sudo docker network inspect <réseau dokploy>` et `sudo docker service inspect <service>`). Si le sous-réseau diffère : soit tous les invités partagent l'IP de Traefik (rate limit global), soit l'en-tête est ignoré ; ajuster `--forwarded-allow-ips` en conséquence. Ne jamais mettre `*`.
 
 ---
 
@@ -323,6 +356,13 @@ pip-audit  # à installer : pip install pip-audit
 - `GET /api/v1/user/favorites` — auth JWT requise, isolation par user_id JWT
 
 - `GET /api/v1/score` — auth JWT requise + quota Redis (check_quota dependency), `peak_id`/`date`/`hour` validés par Pydantic/Query
+- `GET /api/v1/user/me`, `POST /api/v1/user/provision`, `PATCH /api/v1/user/{survey,preferences,display-name,notifications}`, `DELETE /api/v1/user` — auth JWT requise ; les écritures de profil exigent un compte permanent (anonyme : 403 `ACCOUNT_REQUIRED`)
+- `POST` / `DELETE /api/v1/user/push-token` — auth JWT d'un compte permanent, rate limit 10 req/min par utilisateur, format du jeton Expo validé, jeton jamais renvoyé ni loggué
+- `GET /api/v1/user/subscription`, `POST /api/v1/user/subscription/verify` — auth JWT, vérification cryptographique Apple côté serveur
+- `POST /api/v1/webhooks/apple` — **public** (Apple n'envoie pas de JWT) : authentifié par la signature JWS V2, corps limité à 20 Ko, idempotent par `notificationUUID` ; rate limit Traefik/WAF à poser avant la prod (voir ré-audit du 2026-09-30)
+- `POST /internal/notifications/run-favorites` — **public derrière Traefik** mais protégé par `X-Cron-Secret` (`INTERNAL_CRON_SECRET` >= 32 caractères, comparaison à temps constant, 503 sinon, 403 si faux), verrou Redis anti-concurrence
+- `POST /internal/maintenance/purge-anonymous` — même garde `X-Cron-Secret` ; supprime les comptes anonymes inactifs (`ANON_RETENTION_DAYS`, plafond `ANON_PURGE_MAX_PER_RUN`) seulement si Supabase confirme `is_anonymous=true` ; `?dry_run=true` pour tester ; exige `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY`
+- `/docs`, `/redoc`, `/openapi.json` — absents en production (404)
 
 ### Ce qui n'existe pas encore
 - Pas de rate limiting global : la limite actuelle couvre seulement `GET /api/v1/score` des invités

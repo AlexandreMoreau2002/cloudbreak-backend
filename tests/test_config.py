@@ -5,6 +5,15 @@ from pydantic import ValidationError
 
 from app.core.config import Settings
 
+PROD_INFRA = {
+    "database_url": "postgresql+asyncpg://app:pw@db.internal:5432/cloudbreak",
+    "redis_url": "redis://redis.internal:6379",
+    "supabase_url": "https://example.supabase.co",
+    "supabase_jwt_jwks": '{"keys": []}',
+    "supabase_service_role_key": "service-role-test",
+    "internal_cron_secret": "x" * 32,
+}
+
 
 def test_settings_reads_explicit_values() -> None:
     settings = Settings(
@@ -88,6 +97,7 @@ def test_production_accepts_complete_readable_apple_configuration(tmp_path: Path
         apple_issuer_id="issuer-id",
         apple_private_key_path=key_path,
         expo_access_token="expo-test-token",
+        **PROD_INFRA,
     )
 
     assert settings.apple_environment == "Production"
@@ -105,6 +115,7 @@ def _production_settings(key_path: Path, expo_access_token: str) -> Settings:
         apple_issuer_id="issuer-id",
         apple_private_key_path=key_path,
         expo_access_token=expo_access_token,
+        **PROD_INFRA,
     )
 
 
@@ -140,3 +151,67 @@ def test_anonymous_purge_defaults() -> None:
 
     assert settings.anon_retention_days == 30
     assert settings.anon_purge_max_per_run == 200
+
+
+def _prod(key_path: Path, **overrides: str) -> Settings:
+    values = {**PROD_INFRA, **overrides}
+    return Settings(
+        _env_file=None,
+        environment="production",
+        apple_environment="Production",
+        apple_bundle_id="com.alexandremoreau.cloudbreak",
+        apple_app_id=123456789,
+        apple_key_id="KEYID",
+        apple_issuer_id="issuer-id",
+        apple_private_key_path=key_path,
+        expo_access_token="expo-test-token",
+        **values,  # type: ignore[arg-type]
+    )
+
+
+@pytest.fixture
+def key_file(tmp_path: Path) -> Path:
+    path = tmp_path / "AuthKey_TEST.p8"
+    path.write_text("private key placeholder")
+    return path
+
+
+def test_production_accepts_complete_infrastructure(key_file: Path) -> None:
+    assert _prod(key_file).environment == "production"
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("database_url", "postgresql+asyncpg://p:s3cret@localhost:5432/db", "DATABASE_URL"),
+        ("database_url", "postgresql+asyncpg://p:s3cret@127.0.0.1:5432/db", "DATABASE_URL"),
+        ("redis_url", "redis://localhost:6379", "REDIS_URL"),
+        ("redis_url", "redis://127.0.0.1:6379", "REDIS_URL"),
+        ("supabase_url", "", "SUPABASE_URL"),
+        ("supabase_jwt_jwks", "", "SUPABASE_JWT_JWKS"),
+        ("supabase_service_role_key", "", "SUPABASE_SERVICE_ROLE_KEY"),
+        ("internal_cron_secret", "", "INTERNAL_CRON_SECRET"),
+        ("internal_cron_secret", "y" * 31, "INTERNAL_CRON_SECRET"),
+    ],
+)
+def test_production_rejects_unsafe_infrastructure(
+    key_file: Path, field: str, value: str, message: str
+) -> None:
+    with pytest.raises(ValidationError, match=message) as error:
+        _prod(key_file, **{field: value})
+
+    assert value not in str(error.value) or value == ""
+
+
+def test_production_error_never_prints_secret_values(key_file: Path) -> None:
+    with pytest.raises(ValidationError) as error:
+        _prod(key_file, database_url="postgresql+asyncpg://p:s3cretpw@localhost:5432/db")
+
+    assert "s3cretpw" not in str(error.value)
+
+
+def test_development_allows_local_infrastructure() -> None:
+    settings = Settings(_env_file=None, environment="development")
+
+    assert "localhost" in settings.database_url
+    assert settings.internal_cron_secret == ""

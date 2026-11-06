@@ -5,14 +5,20 @@ from uuid import UUID
 import pytest
 
 from app.services.apple_store import (
-    AppleStoreBundleError,
     AppleSignedDataVerifier,
+    AppleStoreBundleError,
     AppleStoreEnvironmentError,
     AppleStoreProductError,
     AppleStoreRevokedError,
     AppleStoreTransactionError,
 )
+from appstoreserverlibrary.models.Environment import Environment
 from appstoreserverlibrary.models.NotificationTypeV2 import NotificationTypeV2
+from appstoreserverlibrary.signed_data_verifier import (
+    SignedDataVerifier,
+    VerificationException,
+    VerificationStatus,
+)
 
 MONTHLY_PRODUCT_ID = "com.alexandremoreau.cloudbreak.premium.monthly"
 ANNUAL_PRODUCT_ID = "com.alexandremoreau.cloudbreak.premium.annual"
@@ -131,3 +137,117 @@ def test_verify_notification_normalizes_library_notification_type_enum() -> None
     notification = verifier(decoded_notification).verify_notification("notification-jws")
 
     assert notification.notification_type == "DID_RENEW"
+
+
+def wrong_environment() -> VerificationException:
+    return VerificationException(VerificationStatus.INVALID_ENVIRONMENT)
+
+
+def production_verifier(
+    production_result: object | Exception,
+    sandbox_result: object | Exception,
+) -> AppleSignedDataVerifier:
+    return AppleSignedDataVerifier(
+        bundle_id="com.alexandremoreau.cloudbreak",
+        environment="Production",
+        app_apple_id=123456789,
+        allowed_product_ids=(MONTHLY_PRODUCT_ID, ANNUAL_PRODUCT_ID),
+        signed_data_verifier=FakeSignedDataVerifier(production_result),
+        sandbox_signed_data_verifier=FakeSignedDataVerifier(sandbox_result),
+    )
+
+
+def test_production_accepts_sandbox_transaction_and_marks_environment() -> None:
+    transaction = production_verifier(wrong_environment(), payload()).verify_transaction("jws" * 5)
+
+    assert transaction.environment == "Sandbox"
+    assert transaction.status == "trial"
+
+
+def test_production_accepts_production_transaction_without_sandbox_fallback() -> None:
+    transaction = production_verifier(
+        payload(environment="Production"),
+        AssertionError("sandbox verifier must not be used"),
+    ).verify_transaction("jws" * 5)
+
+    assert transaction.environment == "Production"
+
+
+def test_production_rejects_invalid_signature_without_sandbox_fallback() -> None:
+    with pytest.raises(AppleStoreTransactionError, match="signature"):
+        production_verifier(
+            VerificationException(VerificationStatus.VERIFICATION_FAILURE),
+            payload(),
+        ).verify_transaction("jws" * 5)
+
+
+def test_production_rejects_wrong_bundle_without_sandbox_fallback() -> None:
+    with pytest.raises(AppleStoreTransactionError):
+        production_verifier(
+            VerificationException(VerificationStatus.INVALID_APP_IDENTIFIER),
+            payload(),
+        ).verify_transaction("jws" * 5)
+
+
+def test_production_rejects_sandbox_jws_invalid_for_sandbox_too() -> None:
+    with pytest.raises(AppleStoreTransactionError, match="signature"):
+        production_verifier(
+            wrong_environment(),
+            VerificationException(VerificationStatus.VERIFICATION_FAILURE),
+        ).verify_transaction("jws" * 5)
+
+
+def test_production_still_rejects_bad_bundle_and_product_on_sandbox_transaction() -> None:
+    with pytest.raises(AppleStoreBundleError):
+        production_verifier(
+            wrong_environment(), payload(bundle_id="com.example.other")
+        ).verify_transaction("jws" * 5)
+    with pytest.raises(AppleStoreProductError):
+        production_verifier(
+            wrong_environment(), payload(product_id="com.example.unlisted")
+        ).verify_transaction("jws" * 5)
+
+
+def test_production_rejects_sandbox_verifier_returning_other_environment() -> None:
+    with pytest.raises(AppleStoreEnvironmentError):
+        production_verifier(
+            wrong_environment(), payload(environment="Production")
+        ).verify_transaction("jws" * 5)
+
+
+def test_sandbox_environment_does_not_accept_production_transaction() -> None:
+    with pytest.raises(AppleStoreTransactionError):
+        verifier(wrong_environment()).verify_transaction("jws" * 5)
+
+
+def test_sandbox_environment_accepts_sandbox_transaction() -> None:
+    assert verifier(payload()).verify_transaction("jws" * 5).environment == "Sandbox"
+
+
+def test_production_notifications_are_verified_for_production_only() -> None:
+    with pytest.raises(AppleStoreTransactionError, match="notification"):
+        production_verifier(wrong_environment(), payload()).verify_notification("jws" * 5)
+
+
+def test_production_builds_real_sandbox_verifier_without_app_apple_id() -> None:
+    production = AppleSignedDataVerifier(
+        bundle_id="com.alexandremoreau.cloudbreak",
+        environment="Production",
+        app_apple_id=123456789,
+        allowed_product_ids=(MONTHLY_PRODUCT_ID, ANNUAL_PRODUCT_ID),
+    )
+
+    assert isinstance(production._sandbox_signed_data_verifier, SignedDataVerifier)
+    assert production._sandbox_signed_data_verifier._environment == Environment.SANDBOX
+    assert production._sandbox_signed_data_verifier._app_apple_id is None
+
+
+def test_sandbox_environment_has_no_sandbox_fallback_verifier() -> None:
+    development = AppleSignedDataVerifier(
+        bundle_id="com.alexandremoreau.cloudbreak",
+        environment="Sandbox",
+        app_apple_id=None,
+        allowed_product_ids=(MONTHLY_PRODUCT_ID, ANNUAL_PRODUCT_ID),
+    )
+
+    assert development._sandbox_signed_data_verifier is None

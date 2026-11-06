@@ -12,7 +12,11 @@ from typing import Any, Literal, Protocol
 from uuid import UUID
 
 from appstoreserverlibrary.models.Environment import Environment
-from appstoreserverlibrary.signed_data_verifier import SignedDataVerifier
+from appstoreserverlibrary.signed_data_verifier import (
+    SignedDataVerifier,
+    VerificationException,
+    VerificationStatus,
+)
 
 
 class AppleStoreVerificationError(Exception):
@@ -93,6 +97,7 @@ class AppleSignedDataVerifier:
         app_apple_id: int | None,
         allowed_product_ids: tuple[str, str],
         signed_data_verifier: SignedDataDecoder | None = None,
+        sandbox_signed_data_verifier: SignedDataDecoder | None = None,
     ) -> None:
         if environment not in (Environment.SANDBOX.value, Environment.PRODUCTION.value):
             raise ValueError(f"Unsupported Apple environment: {environment}")
@@ -109,6 +114,18 @@ class AppleSignedDataVerifier:
             bundle_id,
             app_apple_id,
         )
+        # Apple review and TestFlight pay through Sandbox even against a Production
+        # backend: only Production keeps a second, Sandbox-only verifier as a fallback.
+        # Sandbox (dev) never accepts Production, and the library does not require the
+        # app Apple ID for Sandbox.
+        self._sandbox_signed_data_verifier: SignedDataDecoder | None = None
+        if environment == Environment.PRODUCTION.value:
+            self._sandbox_signed_data_verifier = sandbox_signed_data_verifier or SignedDataVerifier(
+                apple_root_certificates(),
+                True,
+                Environment.SANDBOX,
+                bundle_id,
+            )
 
     def verify_transaction(
         self,
@@ -117,19 +134,14 @@ class AppleSignedDataVerifier:
         allow_inactive: bool = False,
     ) -> VerifiedAppleTransaction:
         """Verify a StoreKit JWS and return a configured Cloudbreak entitlement."""
-        try:
-            payload = self._signed_data_verifier.verify_and_decode_signed_transaction(
-                signed_transaction
-            )
-        except Exception as error:
-            raise AppleStoreTransactionError("Apple transaction signature is invalid") from error
+        payload, expected_environment = self._decode_transaction(signed_transaction)
 
         bundle_id = self._value(payload, "bundleId", "bundle_id")
         if bundle_id != self._bundle_id:
             raise AppleStoreBundleError("Apple transaction bundle does not match Cloudbreak")
 
         environment = self._enum_value(self._value(payload, "environment"))
-        if environment != self._environment:
+        if environment != expected_environment:
             raise AppleStoreEnvironmentError("Apple transaction environment does not match")
 
         product_id = self._value(payload, "productId", "product_id")
@@ -174,6 +186,38 @@ class AppleSignedDataVerifier:
             revoked_at=revoked_at,
             environment=environment,
             status=transaction_status,
+        )
+
+    def _decode_transaction(self, signed_transaction: str) -> tuple[Any, str]:
+        """Decode with the configured environment, falling back to Sandbox in Production.
+
+        The fallback only applies when Apple's library reports INVALID_ENVIRONMENT, which it
+        raises after the signature and certificate chain were verified and the bundle matched.
+        Any other failure (signature, chain, bundle) is final.
+        """
+        try:
+            payload = self._signed_data_verifier.verify_and_decode_signed_transaction(
+                signed_transaction
+            )
+            return payload, self._environment
+        except Exception as error:
+            if self._sandbox_signed_data_verifier is None or not self._is_wrong_environment(error):
+                raise AppleStoreTransactionError(
+                    "Apple transaction signature is invalid"
+                ) from error
+        try:
+            payload = self._sandbox_signed_data_verifier.verify_and_decode_signed_transaction(
+                signed_transaction
+            )
+        except Exception as error:
+            raise AppleStoreTransactionError("Apple transaction signature is invalid") from error
+        return payload, Environment.SANDBOX.value
+
+    @staticmethod
+    def _is_wrong_environment(error: Exception) -> bool:
+        return (
+            isinstance(error, VerificationException)
+            and error.status == VerificationStatus.INVALID_ENVIRONMENT
         )
 
     def verify_notification(self, signed_payload: str) -> VerifiedAppleNotification:

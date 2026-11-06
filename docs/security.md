@@ -2,6 +2,14 @@
 
 Document de référence sécurité. À mettre à jour à chaque story qui touche auth, réseau, données ou dépendances.
 
+## 2026-11-06 — Transactions Apple Sandbox acceptées en production
+
+- **Décision d'Alex (2026-11-06)** : un backend `APPLE_ENVIRONMENT=Production` accepte aussi les transactions StoreKit Sandbox, nécessaires à la review Apple et à TestFlight. Sans cela, l'achat de review échouait (risque de rejet App Review).
+- **Mécanisme** : `AppleSignedDataVerifier` (`app/services/apple_store.py`) garde le vérificateur Production, plus un second vérificateur Sandbox (sans `app_apple_id`, non requis en Sandbox). Le repli n'a lieu que si la librairie lève `VerificationException` avec `INVALID_ENVIRONMENT`, levée après vérification de la signature, de la chaîne de certificats et du bundle. Toute autre erreur (signature, chaîne, bundle) reste définitive. Bundle et produit sont recontrôlés sur le résultat Sandbox.
+- **Dev inchangé** : `APPLE_ENVIRONMENT=Sandbox` n'accepte que Sandbox, jamais un JWS Production.
+- **Risque assumé** : un compte Sandbox ou TestFlight peut obtenir Premium gratuitement sur la production. Atténuation : ces transactions sont stockées avec `subscriptions.apple_environment = "Sandbox"` et restent identifiables et auditables.
+- **Webhook** `POST /api/v1/webhooks/apple` : non élargi. L'enveloppe de la notification est vérifiée par la librairie pour l'environnement configuré uniquement ; en production, une notification Sandbox est rejetée (400). Les notifications Sandbox sont envoyées à l'URL Sandbox d'App Store Connect (dev), pas à la production. Les transactions Sandbox en production ne reçoivent donc pas de renouvellement ni de révocation par notification.
+
 ## 2026-10-12 Story 5.2 — Alertes push favoris (endpoint interne)
 
 - `POST /internal/notifications/run-favorites` est déclenché par un cron, jamais par l'app. Il est joignable publiquement derrière Traefik, mais protégé par le header `X-Cron-Secret` : sans `INTERNAL_CRON_SECRET` configuré, ou avec un secret de moins de 32 caractères (traité comme absent), il répond 503 `INTERNAL_JOBS_DISABLED` (fail closed) ; secret absent ou faux : 403 `INTERNAL_AUTH_FAILED`. Un JWT utilisateur ne suffit pas.

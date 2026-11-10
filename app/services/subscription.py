@@ -1,5 +1,6 @@
 """Persistence rules for current Apple subscription entitlements and lifecycle events."""
 
+from uuid import UUID
 from datetime import datetime
 from typing import Any, Literal, cast
 
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.entitlement import effective_plan
 from app.models.apple_subscription_event import AppleSubscriptionEvent
 from app.models.subscription import Subscription
+from app.models.user import User
 from app.schemas.subscription import SubscriptionPlan, SubscriptionResponse, SubscriptionStatus
 from app.services.apple_store import VerifiedAppleNotification, VerifiedAppleTransaction
 
@@ -20,6 +22,11 @@ class SubscriptionOwnershipConflict(Exception):
 
 class AppleNotificationInvalid(Exception):
     """A cryptographically verified notification lacks safe entitlement data."""
+
+
+async def account_exists(user_id: UUID, db: AsyncSession) -> bool:
+    """Tell whether a Cloudbreak account still exists (a deleted one frees its Apple ID)."""
+    return await db.get(User, str(user_id)) is not None
 
 
 def _current_apple_period_end(subscription: Subscription) -> datetime | None:

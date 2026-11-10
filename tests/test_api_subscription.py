@@ -1,4 +1,5 @@
 from uuid import UUID, uuid4
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -273,3 +274,62 @@ def test_verify_logs_account_token_mismatch_without_identifiers(
     assert record.token_present is True
     assert record.environment == "Sandbox"
     assert "transaction-123" not in caplog.text
+
+
+def _verify_with_mismatched_token(
+    *, token: UUID | None, owner_still_exists: bool
+) -> tuple[int, AsyncMock]:
+    user_id = str(uuid4())
+    verifier = MagicMock()
+    verifier.verify_transaction.return_value = replace(
+        _transaction(app_account_token=uuid4()), app_account_token=token
+    )
+    persisted = MagicMock()
+    persisted.plan = "premium"
+    persisted.status = "trial"
+    persisted.expires_at = datetime.now(UTC) + timedelta(days=7)
+    app.dependency_overrides[get_permanent_user] = lambda: {"id": user_id, "is_anonymous": False}
+    app.dependency_overrides[get_db] = _override_db
+    app.dependency_overrides[get_apple_signed_data_verifier] = lambda: verifier
+    with (
+        patch(
+            "app.api.v1.endpoints.subscription.account_exists",
+            new_callable=AsyncMock,
+            return_value=owner_still_exists,
+        ),
+        patch(
+            "app.api.v1.endpoints.subscription.apply_verified_transaction",
+            new_callable=AsyncMock,
+            return_value=persisted,
+        ) as apply,
+    ):
+        try:
+            with TestClient(app) as client:
+                response = client.post(
+                    "/api/v1/user/subscription/verify",
+                    json={"signed_transaction": "not-a-real-jws-but-long-enough"},
+                )
+        finally:
+            app.dependency_overrides.clear()
+    return response.status_code, apply
+
+
+def test_verify_rebinds_entitlement_when_original_account_was_deleted() -> None:
+    status_code, apply = _verify_with_mismatched_token(token=uuid4(), owner_still_exists=False)
+
+    assert status_code == 200
+    apply.assert_awaited_once()
+
+
+def test_verify_still_rejects_when_original_account_exists() -> None:
+    status_code, apply = _verify_with_mismatched_token(token=uuid4(), owner_still_exists=True)
+
+    assert status_code == 400
+    apply.assert_not_awaited()
+
+
+def test_verify_rejects_transaction_without_account_token() -> None:
+    status_code, apply = _verify_with_mismatched_token(token=None, owner_still_exists=False)
+
+    assert status_code == 400
+    apply.assert_not_awaited()

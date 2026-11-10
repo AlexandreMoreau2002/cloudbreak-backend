@@ -238,10 +238,11 @@ def test_verify_logs_reason_and_cause_when_signature_is_refused(
     with caplog.at_level("WARNING", logger="app.api.v1.endpoints.subscription"):
         assert _post_verify(verifier) == 400
 
-    record = next(r for r in caplog.records if r.getMessage() == "apple_verify_rejected")
+    record = next(r for r in caplog.records if r.getMessage().startswith("apple_verify_rejected"))
     assert record.reason == "AppleStoreTransactionError"
     assert record.cause == "ValueError"
     assert "signature" in record.detail
+    assert "cause=ValueError" in caplog.text
 
 
 def test_verify_logs_reason_when_transaction_is_unsupported(
@@ -253,7 +254,7 @@ def test_verify_logs_reason_when_transaction_is_unsupported(
     with caplog.at_level("WARNING", logger="app.api.v1.endpoints.subscription"):
         assert _post_verify(verifier) == 400
 
-    record = next(r for r in caplog.records if r.getMessage() == "apple_verify_rejected")
+    record = next(r for r in caplog.records if r.getMessage().startswith("apple_verify_rejected"))
     assert record.reason == "AppleStoreProductError"
     assert record.cause is None
 
@@ -267,7 +268,7 @@ def test_verify_logs_account_token_mismatch_without_identifiers(
     with caplog.at_level("WARNING", logger="app.api.v1.endpoints.subscription"):
         assert _post_verify(verifier) == 400
 
-    record = next(r for r in caplog.records if r.getMessage() == "apple_verify_rejected")
+    record = next(r for r in caplog.records if r.getMessage().startswith("apple_verify_rejected"))
     assert record.reason == "account_token_mismatch"
     assert record.token_present is True
     assert record.environment == "Sandbox"

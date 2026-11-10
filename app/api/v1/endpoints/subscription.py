@@ -65,13 +65,20 @@ async def get_subscription(
 def _log_verify_rejection(error: Exception) -> None:
     """Record why Apple data was refused, without logging tokens or identifiers."""
     cause = error.__cause__
+    reason = type(error).__name__
+    cause_name = type(cause).__name__ if cause else None
+    cause_status = str(getattr(cause, "status", None)) if cause else None
     logger.warning(
-        "apple_verify_rejected",
+        "apple_verify_rejected reason=%s detail=%s cause=%s cause_status=%s",
+        reason,
+        str(error),
+        cause_name,
+        cause_status,
         extra={
-            "reason": type(error).__name__,
+            "reason": reason,
             "detail": str(error),
-            "cause": type(cause).__name__ if cause else None,
-            "cause_status": str(getattr(cause, "status", None)) if cause else None,
+            "cause": cause_name,
+            "cause_status": cause_status,
         },
     )
 
@@ -110,11 +117,16 @@ async def verify_subscription(
             ErrorCode.APPLE_TRANSACTION_INVALID,
         ) from None
     if transaction.app_account_token != user_id:
+        token_present = transaction.app_account_token is not None
         logger.warning(
-            "apple_verify_rejected",
+            "apple_verify_rejected reason=account_token_mismatch token_present=%s "
+            "environment=%s product_id=%s",
+            token_present,
+            transaction.environment,
+            transaction.product_id,
             extra={
                 "reason": "account_token_mismatch",
-                "token_present": transaction.app_account_token is not None,
+                "token_present": token_present,
                 "environment": transaction.environment,
                 "product_id": transaction.product_id,
             },

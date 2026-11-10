@@ -1,5 +1,6 @@
 """Authenticated StoreKit 2 entitlement read and verification routes."""
 
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
@@ -33,6 +34,8 @@ from app.services.subscription import (
     record_apple_notification,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/v1/user/subscription", tags=["subscription"])
 webhook_router = APIRouter(prefix="/api/v1/webhooks", tags=["apple-webhooks"])
 
@@ -59,6 +62,20 @@ async def get_subscription(
     return await get_subscription_response(str(current_user["id"]), db)
 
 
+def _log_verify_rejection(error: Exception) -> None:
+    """Record why Apple data was refused, without logging tokens or identifiers."""
+    cause = error.__cause__
+    logger.warning(
+        "apple_verify_rejected",
+        extra={
+            "reason": type(error).__name__,
+            "detail": str(error),
+            "cause": type(cause).__name__ if cause else None,
+            "cause_status": str(getattr(cause, "status", None)) if cause else None,
+        },
+    )
+
+
 @router.post("/verify", response_model=SubscriptionResponse)
 async def verify_subscription(
     payload: SubscriptionVerifyRequest,
@@ -69,13 +86,15 @@ async def verify_subscription(
     """Verify a StoreKit-signed transaction then atomically persist its entitlement."""
     try:
         transaction = verifier.verify_transaction(payload.signed_transaction)
-    except (AppleStoreProductError, AppleStoreBundleError, AppleStoreEnvironmentError):
+    except (AppleStoreProductError, AppleStoreBundleError, AppleStoreEnvironmentError) as error:
+        _log_verify_rejection(error)
         raise ApiError(
             status.HTTP_400_BAD_REQUEST,
             "Transaction Apple non prise en charge",
             ErrorCode.APPLE_TRANSACTION_UNSUPPORTED,
         ) from None
-    except AppleStoreTransactionError:
+    except AppleStoreTransactionError as error:
+        _log_verify_rejection(error)
         raise ApiError(
             status.HTTP_400_BAD_REQUEST,
             "Transaction Apple invalide",
@@ -91,6 +110,15 @@ async def verify_subscription(
             ErrorCode.APPLE_TRANSACTION_INVALID,
         ) from None
     if transaction.app_account_token != user_id:
+        logger.warning(
+            "apple_verify_rejected",
+            extra={
+                "reason": "account_token_mismatch",
+                "token_present": transaction.app_account_token is not None,
+                "environment": transaction.environment,
+                "product_id": transaction.product_id,
+            },
+        )
         raise ApiError(
             status.HTTP_400_BAD_REQUEST,
             "Transaction Apple non liée à ce compte",

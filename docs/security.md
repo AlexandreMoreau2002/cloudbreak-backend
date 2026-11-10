@@ -2,6 +2,13 @@
 
 Document de référence sécurité. À mettre à jour à chaque story qui touche auth, réseau, données ou dépendances.
 
+## 2026-11-10 — Abonnement Apple rattaché au nouveau compte après suppression de l'ancien
+
+- **Constat** (test de fumée prod) : un Apple ID garde son abonnement quand on supprime son compte Cloudbreak. La transaction porte l'`appAccountToken` de l'ancien compte ; `POST /user/subscription/verify` la refusait (400) pour tout nouveau compte, y compris via « Restaurer un achat ». Un utilisateur payant restait en Free, ce que la review Apple peut tester (suppression de compte puis recréation).
+- **Décision** : si le jeton pointe vers un compte qui **n'existe plus** (`users` sans ligne), l'abonnement est rattaché au compte courant. Si ce compte existe encore, le refus est inchangé (400). Un jeton absent reste refusé.
+- **Garde-fous conservés** : signature Apple, bundle et produit toujours vérifiés ; `apply_verified_transaction` renvoie toujours 409 si la lignée d'abonnement appartient à un autre compte existant.
+- **Observabilité** : `apple_verify_rejected` (motif, cause, statut Apple ; jamais de jeton ni d'identifiant de transaction) et `apple_verify_rebound_after_deletion`.
+
 ## 2026-11-06 — Transactions Apple Sandbox acceptées en production
 
 - **Décision d'Alex (2026-11-06)** : un backend `APPLE_ENVIRONMENT=Production` accepte aussi les transactions StoreKit Sandbox, nécessaires à la review Apple et à TestFlight. Sans cela, l'achat de review échouait (risque de rejet App Review).

@@ -26,6 +26,7 @@ from app.services.apple_store import (
 from app.services.subscription import (
     AppleNotificationInvalid,
     SubscriptionOwnershipConflict,
+    account_exists,
     apply_apple_notification,
     apply_verified_transaction,
     build_subscription_response,
@@ -117,24 +118,33 @@ async def verify_subscription(
             ErrorCode.APPLE_TRANSACTION_INVALID,
         ) from None
     if transaction.app_account_token != user_id:
-        token_present = transaction.app_account_token is not None
-        logger.warning(
-            "apple_verify_rejected reason=account_token_mismatch token_present=%s "
-            "environment=%s product_id=%s",
-            token_present,
+        token = transaction.app_account_token
+        # Same Apple ID, new Cloudbreak account: the original account was deleted, so
+        # the entitlement is free to follow the Apple ID. A live owner stays protected.
+        if token is None or await account_exists(token, db):
+            token_present = token is not None
+            logger.warning(
+                "apple_verify_rejected reason=account_token_mismatch token_present=%s "
+                "environment=%s product_id=%s",
+                token_present,
+                transaction.environment,
+                transaction.product_id,
+                extra={
+                    "reason": "account_token_mismatch",
+                    "token_present": token_present,
+                    "environment": transaction.environment,
+                    "product_id": transaction.product_id,
+                },
+            )
+            raise ApiError(
+                status.HTTP_400_BAD_REQUEST,
+                "Transaction Apple non liée à ce compte",
+                ErrorCode.APPLE_TRANSACTION_INVALID,
+            )
+        logger.info(
+            "apple_verify_rebound_after_deletion environment=%s product_id=%s",
             transaction.environment,
             transaction.product_id,
-            extra={
-                "reason": "account_token_mismatch",
-                "token_present": token_present,
-                "environment": transaction.environment,
-                "product_id": transaction.product_id,
-            },
-        )
-        raise ApiError(
-            status.HTTP_400_BAD_REQUEST,
-            "Transaction Apple non liée à ce compte",
-            ErrorCode.APPLE_TRANSACTION_INVALID,
         )
 
     try:

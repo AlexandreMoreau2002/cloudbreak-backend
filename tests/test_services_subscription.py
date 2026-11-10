@@ -824,3 +824,15 @@ def test_build_subscription_response_matches_get_response_rules() -> None:
     response = build_subscription_response(_stored_subscription("premium", "active", expiry))
 
     assert (response.plan, response.status, response.expires_at) == ("premium", "active", expiry)
+
+
+@pytest.mark.asyncio
+async def test_account_exists_reflects_presence_of_the_user_row() -> None:
+    from app.services.subscription import account_exists
+
+    db = AsyncMock()
+    db.get.return_value = object()
+    assert await account_exists(uuid4(), db) is True
+
+    db.get.return_value = None
+    assert await account_exists(uuid4(), db) is False

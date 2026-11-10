@@ -1,5 +1,6 @@
 """Authenticated StoreKit 2 entitlement read and verification routes."""
 
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
@@ -25,6 +26,7 @@ from app.services.apple_store import (
 from app.services.subscription import (
     AppleNotificationInvalid,
     SubscriptionOwnershipConflict,
+    account_exists,
     apply_apple_notification,
     apply_verified_transaction,
     build_subscription_response,
@@ -32,6 +34,8 @@ from app.services.subscription import (
     is_entitlement_notification,
     record_apple_notification,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/user/subscription", tags=["subscription"])
 webhook_router = APIRouter(prefix="/api/v1/webhooks", tags=["apple-webhooks"])
@@ -59,6 +63,27 @@ async def get_subscription(
     return await get_subscription_response(str(current_user["id"]), db)
 
 
+def _log_verify_rejection(error: Exception) -> None:
+    """Record why Apple data was refused, without logging tokens or identifiers."""
+    cause = error.__cause__
+    reason = type(error).__name__
+    cause_name = type(cause).__name__ if cause else None
+    cause_status = str(getattr(cause, "status", None)) if cause else None
+    logger.warning(
+        "apple_verify_rejected reason=%s detail=%s cause=%s cause_status=%s",
+        reason,
+        str(error),
+        cause_name,
+        cause_status,
+        extra={
+            "reason": reason,
+            "detail": str(error),
+            "cause": cause_name,
+            "cause_status": cause_status,
+        },
+    )
+
+
 @router.post("/verify", response_model=SubscriptionResponse)
 async def verify_subscription(
     payload: SubscriptionVerifyRequest,
@@ -69,13 +94,15 @@ async def verify_subscription(
     """Verify a StoreKit-signed transaction then atomically persist its entitlement."""
     try:
         transaction = verifier.verify_transaction(payload.signed_transaction)
-    except (AppleStoreProductError, AppleStoreBundleError, AppleStoreEnvironmentError):
+    except (AppleStoreProductError, AppleStoreBundleError, AppleStoreEnvironmentError) as error:
+        _log_verify_rejection(error)
         raise ApiError(
             status.HTTP_400_BAD_REQUEST,
             "Transaction Apple non prise en charge",
             ErrorCode.APPLE_TRANSACTION_UNSUPPORTED,
         ) from None
-    except AppleStoreTransactionError:
+    except AppleStoreTransactionError as error:
+        _log_verify_rejection(error)
         raise ApiError(
             status.HTTP_400_BAD_REQUEST,
             "Transaction Apple invalide",
@@ -91,10 +118,33 @@ async def verify_subscription(
             ErrorCode.APPLE_TRANSACTION_INVALID,
         ) from None
     if transaction.app_account_token != user_id:
-        raise ApiError(
-            status.HTTP_400_BAD_REQUEST,
-            "Transaction Apple non liée à ce compte",
-            ErrorCode.APPLE_TRANSACTION_INVALID,
+        token = transaction.app_account_token
+        # Same Apple ID, new Cloudbreak account: the original account was deleted, so
+        # the entitlement is free to follow the Apple ID. A live owner stays protected.
+        if token is None or await account_exists(token, db):
+            token_present = token is not None
+            logger.warning(
+                "apple_verify_rejected reason=account_token_mismatch token_present=%s "
+                "environment=%s product_id=%s",
+                token_present,
+                transaction.environment,
+                transaction.product_id,
+                extra={
+                    "reason": "account_token_mismatch",
+                    "token_present": token_present,
+                    "environment": transaction.environment,
+                    "product_id": transaction.product_id,
+                },
+            )
+            raise ApiError(
+                status.HTTP_400_BAD_REQUEST,
+                "Transaction Apple non liée à ce compte",
+                ErrorCode.APPLE_TRANSACTION_INVALID,
+            )
+        logger.info(
+            "apple_verify_rebound_after_deletion environment=%s product_id=%s",
+            transaction.environment,
+            transaction.product_id,
         )
 
     try:

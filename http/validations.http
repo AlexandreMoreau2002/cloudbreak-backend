@@ -1,0 +1,66 @@
+# Validation terrain — tests manuels
+#
+# Prérequis dans .vscode/settings.json > rest-client.environmentVariables > local :
+#   "baseUrl": "http://localhost:8000"
+#   "jwt": "<token Supabase — copié depuis les logs mobile>"
+#
+# ⚠️ remplacer <PREDICTION_ID> par un prediction_id réel obtenu via GET /api/v1/score
+#    (voir score.http) — le champ prediction_id est présent dans la réponse JSON.
+
+
+###
+# ✅ Validation nominale — mer de nuage confirmée
+POST {{baseUrl}}/api/v1/validations
+Authorization: Bearer {{jwt}}
+Content-Type: application/json
+
+{
+  "prediction_id": "<PREDICTION_ID>",
+  "result": true,
+  "lat": 45.83,
+  "lng": 6.86
+}
+
+###
+# ✅ Validation nominale — mer de nuage infirmée
+POST {{baseUrl}}/api/v1/validations
+Authorization: Bearer {{jwt}}
+Content-Type: application/json
+
+{
+  "prediction_id": "<PREDICTION_ID>",
+  "result": false
+}
+
+###
+# ❌ Sans JWT → 403
+POST {{baseUrl}}/api/v1/validations
+Content-Type: application/json
+
+{
+  "prediction_id": "<PREDICTION_ID>",
+  "result": true,
+  "lat": 45.83,
+  "lng": 6.86
+}
+
+###
+# ❌ Payload invalide (result manquant) → 422
+POST {{baseUrl}}/api/v1/validations
+Authorization: Bearer {{jwt}}
+Content-Type: application/json
+
+{
+  "prediction_id": "<PREDICTION_ID>"
+}
+
+###
+# ❌ prediction_id inconnu → 404
+POST {{baseUrl}}/api/v1/validations
+Authorization: Bearer {{jwt}}
+Content-Type: application/json
+
+{
+  "prediction_id": "00000000-0000-0000-0000-000000000000",
+  "result": true
+}

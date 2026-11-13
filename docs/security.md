@@ -1,0 +1,850 @@
+# Security — cloudbreak-backend
+
+Document de référence sécurité. À mettre à jour à chaque story qui touche auth, réseau, données ou dépendances.
+
+## 2026-11-10 — Abonnement Apple rattaché au nouveau compte après suppression de l'ancien
+
+- **Constat** (test de fumée prod) : un Apple ID garde son abonnement quand on supprime son compte Cloudbreak. La transaction porte l'`appAccountToken` de l'ancien compte ; `POST /user/subscription/verify` la refusait (400) pour tout nouveau compte, y compris via « Restaurer un achat ». Un utilisateur payant restait en Free, ce que la review Apple peut tester (suppression de compte puis recréation).
+- **Décision** : si le jeton pointe vers un compte qui **n'existe plus** (`users` sans ligne), l'abonnement est rattaché au compte courant. Si ce compte existe encore, le refus est inchangé (400). Un jeton absent reste refusé.
+- **Garde-fous conservés** : signature Apple, bundle et produit toujours vérifiés ; `apply_verified_transaction` renvoie toujours 409 si la lignée d'abonnement appartient à un autre compte existant.
+- **Observabilité** : `apple_verify_rejected` (motif, cause, statut Apple ; jamais de jeton ni d'identifiant de transaction) et `apple_verify_rebound_after_deletion`.
+
+## 2026-11-06 — Transactions Apple Sandbox acceptées en production
+
+- **Décision d'Alex (2026-11-06)** : un backend `APPLE_ENVIRONMENT=Production` accepte aussi les transactions StoreKit Sandbox, nécessaires à la review Apple et à TestFlight. Sans cela, l'achat de review échouait (risque de rejet App Review).
+- **Mécanisme** : `AppleSignedDataVerifier` (`app/services/apple_store.py`) garde le vérificateur Production, plus un second vérificateur Sandbox (sans `app_apple_id`, non requis en Sandbox). Le repli n'a lieu que si la librairie lève `VerificationException` avec `INVALID_ENVIRONMENT`, levée après vérification de la signature, de la chaîne de certificats et du bundle. Toute autre erreur (signature, chaîne, bundle) reste définitive. Bundle et produit sont recontrôlés sur le résultat Sandbox.
+- **Dev inchangé** : `APPLE_ENVIRONMENT=Sandbox` n'accepte que Sandbox, jamais un JWS Production.
+- **Risque assumé** : un compte Sandbox ou TestFlight peut obtenir Premium gratuitement sur la production. Atténuation : ces transactions sont stockées avec `subscriptions.apple_environment = "Sandbox"` et restent identifiables et auditables.
+- **Webhook** `POST /api/v1/webhooks/apple` : non élargi. L'enveloppe de la notification est vérifiée par la librairie pour l'environnement configuré uniquement ; en production, une notification Sandbox est rejetée (400). Les notifications Sandbox sont envoyées à l'URL Sandbox d'App Store Connect (dev), pas à la production. Les transactions Sandbox en production ne reçoivent donc pas de renouvellement ni de révocation par notification.
+
+## 2026-10-12 Story 5.2 — Alertes push favoris (endpoint interne)
+
+- `POST /internal/notifications/run-favorites` est déclenché par un cron, jamais par l'app. Il est joignable publiquement derrière Traefik, mais protégé par le header `X-Cron-Secret` : sans `INTERNAL_CRON_SECRET` configuré, ou avec un secret de moins de 32 caractères (traité comme absent), il répond 503 `INTERNAL_JOBS_DISABLED` (fail closed) ; secret absent ou faux : 403 `INTERNAL_AUTH_FAILED`. Un JWT utilisateur ne suffit pas.
+- Le secret est comparé à temps constant (`hmac.compare_digest`) et n'est jamais loggué (un secret trop court déclenche seulement un WARNING `internal_cron_secret_too_weak`, une fois, sans la valeur).
+- Pas de rate limiting sur cet endpoint : un secret fort (32 caractères minimum, `openssl rand -hex 32`) est jugé suffisant. Un verrou Redis (`lock:favorite-alerts`, jeton unique, TTL 600 s, libération compare-et-supprime) empêche deux exécutions simultanées.
+- Le payload du push ne contient aucune donnée personnelle ni position : titre/texte localisé (nom et score du sommet) et `data = {type, slug, peak_id}`. Le token push n'est jamais loggué ; les logs ne portent que `user_id`, `peak_id` et un nom d'erreur.
+- Les alertes ne partent que pour un Premium actif (`is_entitlement_active`, filtré aussi en SQL) ayant `notif_favorites` actif et un token valide.
+
+### Risques résiduels (acceptés ou à traiter avant la 1.0.0)
+
+- Troncature à `MAX_ROWS = 2000` couples favori/utilisateur sans pagination (WARNING `favorite_alerts_truncated`) : prévoir une pagination keyset avant de dépasser ce volume.
+- La clé de déduplication est posée avant l'envoi : un crash du process entre les deux perd l'alerte du jour (sémantique « au plus une fois »). Un échec d'envoi, lui, relâche la clé.
+- La session DB reste ouverte pendant tout l'envoi (jusqu'à 500 push séquentiels).
+- `target_alert_date` = jour Paris + 1 : le cron doit tourner en soirée, avant minuit Europe/Paris.
+- Restriction réseau de l'endpoint (Traefik, liste d'IP) possible en durcissement, hors code (Task 7).
+- `weather_service` est importé depuis l'endpoint score (couplage au singleton) : dette notée.
+- Dépendances mobile, en PR séparées : envoi de la langue avec le token push, et gestion du tap sur une notification `favorite_alert`.
+- Les receipts Expo ne sont toujours pas lus (partie B du plan, voir 5.1 point f).
+
+---
+
+## 2026-10-09 Story 5.1 — Token push
+
+- `users.push_token` (Expo Push, `VARCHAR(255)`) et `users.push_token_valid` sont stockés en base ; seul un compte permanent authentifié peut les modifier via `POST`/`DELETE /api/v1/user/push-token` (anonyme : 403 `ACCOUNT_REQUIRED`, sans JWT : 403). Le format `ExponentPushToken[...]` / `ExpoPushToken[...]` est validé côté serveur (422 sinon).
+- Le token n'est jamais renvoyé par l'API (absent de `UserProfile` et de `GET /api/v1/user/me`) et jamais loggué : seuls `user_id` et le nom d'erreur Expo apparaissent dans les logs.
+- Retrait : `DELETE /push-token` à la déconnexion, et suppression de la ligne `users` à la suppression de compte (RGPD).
+- Un token identifie un appareil : si le même token est enregistré par un autre compte, il est purgé chez l'ancien propriétaire pour qu'il ne reçoive pas les alertes du nouvel utilisateur.
+- `send_push_to_user` ne lève jamais (timeout 10 s) ; un ticket `DeviceNotRegistered` passe `push_token_valid` à false (UPDATE ciblé sur le token envoyé, session dédiée ; les receipts ne sont pas lus, voir plus bas). `EXPO_ACCESS_TOKEN` est obligatoire en production (validator de config), optionnel ailleurs, lu via `app/core/config.py`, jamais loggué.
+
+### À traiter avant la release 1.0.0
+
+- (a) ~~Rate limiting sur `POST /api/v1/user/push-token`~~ : fait, 10 requêtes/min par utilisateur (1000 hors production) (Redis, clé hachée `rate_limit:push_token:*`), 429 `RATE_LIMIT_EXCEEDED`.
+- (b) ~~Valider `EXPO_ACCESS_TOKEN` en production~~ : fait (2026-10-31), validator de config (`Production requires EXPO_ACCESS_TOKEN`), le démarrage échoue si vide ou blanc.
+- (c) TOCTOU théorique sur le transfert de token (purge puis écriture non atomiques entre deux requêtes concurrentes) : accepté en MVP.
+- (d) Le `DELETE /push-token` du logout peut échouer (hors ligne, JWT expiré) : l'ancien compte garde alors le token jusqu'à ce qu'un autre compte l'enregistre ou qu'Expo réponde `DeviceNotRegistered`. Piste : ignorer les utilisateurs inactifs à l'envoi (story 5.2).
+- (e) L'unicité de `push_token` est garantie par un index unique partiel (`WHERE push_token IS NOT NULL`) ; `set_push_token` rejoue purge + affectation une fois sur conflit (deux POST simultanés).
+- (f) Story 5.2 : lire les receipts Expo (stocker `ticket.id`, `/push/getReceipts`) pour invalider les tokens morts : `DeviceNotRegistered` arrive surtout dans les receipts, pas dans le ticket.
+- (g) Un compte permanent connaissant le token d'un autre appareil peut se l'approprier (le token Expo n'est pas devinable) : risque accepté.
+
+---
+
+## 2026-10-08 Story 2.9 — Nom d'usage
+
+- `users.display_name` est une donnée personnelle facultative. Seul un compte permanent authentifié peut la modifier via `PATCH /api/v1/user/display-name` ; une session anonyme ou sans JWT reçoit 403.
+- Le serveur retire les espaces aux extrémités puis accepte 1 à 24 caractères ou `null` ; une chaîne vide après nettoyage devient `null` et efface le nom. 25 caractères donnent 422 avant toute écriture. La colonne est limitée à `VARCHAR(24)`. Tous les caractères Unicode sont permis, sauf contrôle, séparateurs de ligne, non assignés et surcharges bidirectionnelles (422) ; le nom est stocké brut, jamais interprété comme HTML, et doit être échappé par tout futur affichage web.
+- Le nom d'usage est exposé uniquement dans les réponses de l'API utilisateur (`UserProfile` et `GET /api/v1/user/me`). Il n'est ni journalisé ni envoyé à l'analytics.
+- L'effacement explicite envoie `null`. La suppression du compte efface aussi le nom d'usage avec la ligne `users` ; les sauvegardes Postgres restent soumises à leur rétention existante.
+
+---
+
+## 2026-10-06 Story 4.3 — Ré-audit des notifications serveur Apple
+
+### Correctif de classement des périodes — en attente de déploiement
+
+- La nouvelle colonne nullable `apple_period_expires_at` garde la fin de la période payée issue de la transaction Apple vérifiée. `expires_at` reste la fin effective du droit et prend `revocationDate` lors d'une révocation. La migration ne modifie aucune ligne existante et n'a pas encore été appliquée en environnement déployé.
+- Le service compare les fins de période pour écarter du droit un remboursement d'une ancienne période, même s'il est signé après le renouvellement. Une révocation d'une période plus récente est projetée même si son identifiant de transaction diffère du courant. Le contrôle de `signedDate` protège ensuite cette même période contre un renouvellement livré en retard ; la vérification client ne rétablit pas une période courante révoquée.
+- Les anciennes lignes non révoquées utilisent temporairement leur `expires_at` comme repère. Pour une ancienne ligne révoquée sans repère, la date effective de révocation n'est pas interprétée comme fin de période payée.
+
+### Constats initiaux, résolus dans la branche
+
+- **[app/services/subscription.py:apply_apple_notification]** Le ré-audit initial a trouvé qu'un `REFUND` ou `REVOKE` signé pour une ancienne transaction pouvait arriver après un renouvellement récent. Le service compare désormais les fins de périodes Apple vérifiées ; un remboursement de période antérieure reste dans le ledger sans modifier le droit actif.
+
+### 🔵 INFO
+
+- **[docs/apple-server-notifications.md ; docs/apple-server-notifications/guide-test.md]** La livraison réelle V2, le callback 204 et une projection d'abonnement ne sont pas présentés comme observés. La configuration et le `GET /health` sont distingués de ces preuves manquantes.
+
+### Verdict
+
+Le défaut applicatif de classement des périodes est corrigé dans cette branche, avec migration encore à déployer. Le scénario de remboursement tardif et la révocation d'une nouvelle période sont couverts par les tests ciblés.
+
+Un remboursement ancien reste dans le ledger avec `signed_date=None`; la requête du dernier `signed_date` filtre les valeurs nulles avant le tri descendant. L'événement ancien est ainsi exclu du curseur d'ordre. Une révocation d'une période plus récente projette même si son ID de transaction est nouveau. Les tests couvrent aussi un renouvellement retardé de cette même période et une vérification client d'une période déjà révoquée.
+
+---
+
+## 2026-10-06 — Notifications serveur Apple, état DEV / Sandbox
+
+### Protections vérifiées dans le code
+
+- Le webhook public `POST /api/v1/webhooks/apple` vérifie le JWS extérieur avec les racines publiques Apple incluses, puis vérifie séparément la transaction signée avant toute projection de droit. Le vérificateur contraint bundle, environnement Sandbox et produit autorisé.
+- Le ledger `apple_subscription_events` utilise `notificationUUID` pour rendre les doublons sans effet. La lignée d'achat reste liée à un seul compte par `appAccountToken` et les événements anciens ne doivent pas régresser l'état courant.
+- `DID_CHANGE_RENEWAL_PREF`, `DID_FAIL_TO_RENEW` et `GRACE_PERIOD_EXPIRED` sont consignés uniquement dans le ledger et acquittés en 204 selon le code ; ils ne changent pas immédiatement `subscriptions`. Le backend ne stocke pas la cadence mensuelle/annuelle.
+
+### Preuve opérationnelle et décision
+
+- Configuration DEV/Sandbox contrôlée ; URL Sandbox enregistrée et relue dans App Store Connect : `https://dev-api.cloudbreak-app.com/api/v1/webhooks/apple`. Le `GET /health` DEV a répondu 200, avec service à 1/1 réplique. Production est restée sans URL.
+- La sélection **Version 2** dans App Store Connect est **non prouvée** : le dialogue consulté n'exposait pas ce contrôle.
+- **Notification de test acquittée en 204 : non prouvé.** Aucune fonction d'envoi n'était disponible dans l'interface consultée ; aucun callback de test Apple n'a été observé.
+- **Événement modifiant `subscriptions` rejoué et ligne observée en lecture seule : non prouvé.** Aucun rejeu Sandbox n'a été effectué et aucune interrogation DB n'a été exécutée.
+
+Verdict : le backend DEV est disponible et l'URL Sandbox est enregistrée, mais la livraison réelle V2 et la projection d'un droit restent à valider. Avant release, exécuter sur iPhone réel les scénarios achat, renouvellement, expiration, remboursement et restauration du [guide manuel](apple-server-notifications/guide-test.md). Conserver le prérequis de limitation de débit Traefik/Dokploy avant exposition Production indiqué dans le ré-audit du 2026-09-30.
+
+---
+
+## 2026-10-05 — Colonne `users.email` (pont Supabase ↔ base applicative)
+
+### 🟡 WARNING
+
+- **Nouvelle donnée personnelle stockée** : l'email du compte est copié depuis le claim `email` du JWT
+  Supabase (déjà validé localement) dans `users.email`, pour pouvoir relier une ligne (UUID) à un compte
+  lisible. Aucun appel Supabase supplémentaire. Colonne nullable (comptes anonymes sans email) ; remplie
+  au premier appel `provision` / `survey` / `preferences` / `notifications`, puis mise à jour si l'email change.
+- **Non exposée par l'API** : absente de `UserProfile` et de `GET /user/me`.
+- **Jamais loggée** (ni dans `extra`, ni dans les messages).
+- **RGPD** : supprimée avec le compte (`DELETE /api/v1/user` supprime la ligne `users`) ; elle figure dans
+  les sauvegardes Postgres (rétention 14 j). La politique de confidentialité (`ops/src/content/`) doit
+  mentionner que l'email est conservé par le backend en plus de Supabase.
+
+### Verdict
+
+Acceptable, à condition de mettre à jour la politique de confidentialité avant la 1.0.0.
+
+## 2026-09-29 Story 4.3 — Abonnements Apple StoreKit 2
+
+### 🟢 PROTECTIONS EN PLACE
+
+- **JWS Apple** : le backend utilise `app-store-server-library` (plancher `>=3.1.2,<4`) et les certificats racines Apple versionnés comme ressources publiques. Il ne décode jamais un JWS client sans vérification cryptographique préalable.
+- **Périmètre strict** : signature valide ne suffit pas ; bundle ID, environnement App Store et product ID doivent correspondre à Cloudbreak et aux deux produits explicitement autorisés.
+- **Propriété** : l'`appAccountToken` doit correspondre au UUID du JWT du compte permanent. Une lignée `original_transaction_id` déjà liée à un autre compte donne un conflit, jamais un transfert d'entitlement.
+- **Webhook** : `POST /api/v1/webhooks/apple` n'utilise pas de JWT client car Apple ne peut pas en fournir ; la signature V2 est l'authentification. `notificationUUID` rend le traitement idempotent dans la base.
+- **Droits** : le quota exige simultanément plan Premium/ancien Pro, statut `trial` ou `active` et expiration future. Expiration et révocation réappliquent donc le quota côté serveur même si l'app est hors ligne.
+- **Secrets et journaux** : clé IAP et chemin de clé viennent de Dokploy ; ni JWS, ni token, identifiant de transaction, ni UUID Supabase non masqué ne doivent être journalisés. Les erreurs publiques restent catégorisées.
+
+### 🟡 RISQUES À GARDER SOUS CONTRÔLE
+
+- Maintenir les certificats racines Apple et la dépendance de vérification à jour ; suivre les advisories de la bibliothèque Apple avant chaque release.
+- Avant production, réaliser et consigner sur appareil réel le Sandbox purchase/restore et le test App Store Server Notifications V2. Les tests automatisés ne remplacent pas la signature et le réseau Apple réels.
+
+### Verdict
+
+À REVOIR APRÈS TEST SANDBOX — la conception ferme la validation client, le rejeu inter-compte et le webhook non signé ; la preuve opérationnelle Apple reste une condition de release.
+
+---
+
+## 2026-09-29 Story 4.3 — Audit final complémentaire StoreKit 2
+
+### 🔴 CRITIQUE
+
+- **[app/services/subscription.py:_NOTIFICATION_STATUSES]** Le type V2 Apple `REVOKE`
+  (perte du droit reçu par Partage familial) n'est pas projeté vers l'état `revoked`. Il est
+  vérifié puis seulement écrit dans le ledger via `record_apple_notification`, tandis que la
+  souscription conserve `active` et son expiration future ; l'ancien membre de la famille garde
+  alors le bypass Premium jusqu'à expiration. → Ajouter `"REVOKE": "revoked"`, exiger la
+  `revocationDate` déjà contrôlée par `apply_apple_notification`, et couvrir ce cas par test
+  API/service avant merge. Apple documente explicitement `REVOKE` comme perte d'accès Family
+  Sharing pour les abonnements auto-renouvelables.
+
+### 🟡 WARNING
+
+- **[app/services/subscription.py:_NOTIFICATION_STATUSES]** `REFUND_REVERSED` et
+  `RENEWAL_EXTENDED` sont eux aussi seulement acquittés dans le ledger. Après une contestation
+  favorable ou une extension Apple, le droit en DB peut rester révoqué ou expirer avant le droit
+  Apple réel. → Projeter le `signedTransactionInfo` vérifié lorsque présent, avec les mêmes
+  protections d'ordre/idempotence ; ajouter les scénarios de tests correspondants.
+- **[app/api/v1/endpoints/subscription.py:apple_webhook]** L'endpoint public doit vérifier une
+  signature JWS avant de rejeter un payload. La limite Pydantic à 20 ko réduit la surface, mais
+  une rafale de JWS invalides peut encore consommer CPU/IO de vérification. → Mettre une limite
+  de débit/WAF ciblée au reverse proxy, calibrée pour les plages Apple, avant exposition prod.
+
+### 🔵 INFO
+
+- **[app/api/v1/endpoints/subscription.py; app/services/apple_store.py]** La vérification
+  cryptographique serveur précède toute mutation ; `bundleId`, environnement et produits sont
+  contrôlés, et `appAccountToken` est lié au `sub` JWT d'un compte non anonyme. Aucun client ne
+  peut s'accorder Premium par un état local ou un JWS arbitraire.
+- **[app/services/subscription.py]** Les contraintes uniques sur la lignée d'achat et le ledger
+  `notificationUUID`, complétées par les verrous SQL, empêchent le rejeu inter-compte et les
+  doublons de webhooks concurrents.
+
+### Verdict
+
+CORRECTIONS REQUISES AVANT MERGE — traiter `REVOKE` au minimum. Les deux warnings de
+réconciliation Apple doivent être décidés et tracés avant la release App Store.
+
+---
+
+## 2026-09-30 Story 4.3 — Ré-audit après réconciliation des événements Apple
+
+### 🔵 INFO
+
+- **[app/services/subscription.py:_NOTIFICATION_STATUSES]** `REVOKE` est désormais projeté vers
+  `revoked`. `apply_apple_notification` exige une `revocationDate` vérifiée, l'utilise comme
+  expiration effective et conserve le ledger idempotent ; un ancien membre de Partage familial
+  perd donc immédiatement le bypass Premium.
+- **[app/services/subscription.py:_NOTIFICATION_STATUSES]** `REFUND_REVERSED` et
+  `RENEWAL_EXTENDED` projettent maintenant le `signedTransactionInfo` vérifié (statut et date
+  d'expiration Apple), avec le même contrôle d'ordre par `signedDate` que les autres événements.
+  Un ancien webhook ne peut pas régresser un entitlement plus récent.
+- **[tests/test_services_subscription.py; tests/test_api_apple_webhook.py]** Les tests couvrent
+  les projections `REVOKE`, `REFUND_REVERSED` et `RENEWAL_EXTENDED`, ainsi que le passage du
+  webhook `REVOKE` par la vérification de transaction avec `allow_inactive=True`.
+
+### 🟡 WARNING
+
+- **[app/api/v1/endpoints/subscription.py:apple_webhook]** Le corps est limité à 20 Ko et la
+  signature est vérifiée avant toute mutation, mais une rafale de JWS invalides peut toujours
+  consommer le CPU de vérification. **Action infra obligatoire avant exposition production :**
+  configurer dans Traefik/Dokploy une limite de débit et, si disponible, une protection WAF
+  ciblées sur `POST /api/v1/webhooks/apple`, sans filtrage IP exclusif (les adresses Apple peuvent
+  évoluer). Cette action n'est pas implémentable dans ce dépôt backend.
+
+### Verdict
+
+SECURE POUR LA PR — aucun risque CRITIQUE ni WARNING applicatif restant sur le diff ré-audité.
+Le rate-limit Traefik documenté ci-dessus reste un prérequis d'infrastructure avant mise en
+production publique ; le test Sandbox réel reste un prérequis de release.
+
+## 2026-09-15 Story 2.2 — Préférences de notifications
+
+### 🔵 INFO
+- **[user.py]** Nouvel endpoint `PATCH /api/v1/user/notifications` — même garde que
+  `/preferences` (403 `ACCOUNT_REQUIRED` pour une session anonyme, JWT permanent requis). Aucune
+  donnée sensible transitée (3 booléens).
+
+### Verdict
+SECURE — pas de nouvelle surface d'exposition, pattern identique à un endpoint déjà audité.
+
+---
+
+## État actuel (story 1-2 — squelette)
+
+### Ports exposés
+
+| Port | Service | Exposé où | Risque |
+|------|---------|-----------|--------|
+| 8001 | FastAPI (dev) | localhost uniquement | ✅ Aucun |
+| 5432 | PostgreSQL | localhost uniquement | ✅ Aucun |
+| 6379 | Redis | localhost uniquement | ✅ Aucun |
+
+> En prod : seul Traefik (intégré à Dokploy) expose les ports 80/443. L'API, PostgreSQL et Redis ne sont **jamais** exposés directement à internet — ils communiquent via le réseau Docker interne.
+
+---
+
+## Secrets & variables d'environnement
+
+- Les secrets sont dans `.env` — **jamais commité** (dans `.gitignore`)
+- `.env.example` fourni sans valeurs sensibles — commité comme template
+- En prod : variables injectées via l'UI Dokploy, stockées sur le VPS uniquement
+- **À ne jamais faire** : hardcoder une clé dans le code, même en dev
+
+### Secrets à rotation régulière
+
+| Secret | Fréquence rotation recommandée |
+|--------|-------------------------------|
+| `WEATHER_API_KEY` | Si leak détecté |
+| `SUPABASE_KEY` | Si leak détecté |
+| `POSTHOG_API_KEY` | Si leak détecté |
+| Clé SSH VPS | Tous les 12 mois |
+
+---
+
+## Authentification
+
+**État actuel** : implémentée (story 2-1).
+
+- JWT Supabase validé **localement** via clé publique ECC P-256 (JWKS)
+- Zéro appel réseau Supabase par requête
+- Dependency FastAPI `get_current_user` injectée sur chaque route protégée
+- `/health` et les lectures publiques des sommets (`GET /api/v1/peaks/search`, `GET /api/v1/peaks/{slug}`) sont accessibles sans auth ; les routes utilisateur restent protégées
+
+### Configuration Supabase — dev vs prod
+
+| Paramètre | Dev | Prod |
+|-----------|-----|------|
+| Confirm email | **désactivé** | **activé** |
+
+> La confirmation email est désactivée en dev pour fluidifier les tests. À réactiver dans le dashboard Supabase avant la release 1.0.0 : Authentication → Providers → Email → "Confirm email" → ON.
+
+---
+
+## Transport & chiffrement
+
+| Contexte | Statut |
+|----------|--------|
+| Dev local | HTTP (localhost) — acceptable |
+| Prod | HTTPS TLS automatique via Traefik (Dokploy) + Let's Encrypt |
+| DB → API | Réseau Docker interne (non chiffré mais isolé) |
+| Redis → API | Réseau Docker interne (non chiffré mais isolé) |
+
+---
+
+## Données utilisateur & RGPD
+
+- Hébergement Supabase région **EU (Frankfurt)** — pas de transfert hors UE
+- Endpoint `DELETE /api/v1/user` implémenté (droit à l'effacement, story 2.4)
+- Géolocalisation : consentement explicite requis, refus sans blocage de l'app
+- Paiements : StoreKit 2 uniquement — **aucun numéro de carte stocké côté backend**
+
+---
+
+## Dépendances
+
+### Audit des dépendances (2026-11-01, pré-release 1.0.0)
+
+Méthode : `pip-audit` installé dans un venv jetable (hors projet), appliqué au `pip freeze` du `.venv` du backend :
+
+```bash
+python3 -m venv /tmp/auditvenv && /tmp/auditvenv/bin/pip install pip-audit
+.venv/bin/pip freeze > /tmp/freeze.txt
+/tmp/auditvenv/bin/pip-audit -r /tmp/freeze.txt --no-deps --disable-pip
+```
+
+À relancer avant chaque release.
+
+| | Avis | Détail |
+|---|------|--------|
+| Avant | 44 lignes (9 paquets) | anyio, certifi, ecdsa, idna, mako, pyasn1, pytest, python-jose, starlette (8 avis) |
+| Après | 5 lignes, 3 avis distincts (3 paquets) | voir ci-dessous |
+
+Corrections appliquées (`requirements.txt`) :
+
+- `python-jose[cryptography]` 3.3.0 -> 3.5.0 ; `ecdsa>=0.19.2`, `pyasn1>=0.6.5`, `idna>=3.15`, `mako>=1.3.12`, `anyio>=4.14.2`, `certifi>=2026.10.18` (pins de sécurité sur transitives).
+- `fastapi` 0.115.0 -> 0.162.0, donc Starlette 0.38.6 -> 1.10.0 : les 8 avis Starlette sont résolus. Seul changement de comportement : FastAPI >= 0.122 renvoie 401 au lieu de 403 quand `Authorization` est absent ; `Bearer403` (`app/core/dependencies.py`) conserve le 403 historique pour ne pas casser le contrat mobile. Suite de tests complète verte.
+
+Avis restants (acceptés) :
+
+| Paquet | Avis | Justification |
+|--------|------|---------------|
+| python-jose 3.5.0 | PYSEC-2026-4298 / CVE-2026-85394 (aucun correctif publié) : HMAC acceptant une clé publique DER, forge de jetons HS256 | Non exploitable ici : `decode_supabase_jwt` impose `algorithms=["ES256"]` (`app/core/security.py`), aucun jeton HS256 n'est jamais accepté. À surveiller ; migrer vers PyJWT/authlib si un correctif tarde. |
+| ecdsa 0.19.2 | PYSEC-2026-1325 / CVE-2024-23342 (Minerva, attaque temporelle sur la **signature** P-256 ; le mainteneur ne corrigera pas) | Le backend ne signe jamais avec `ecdsa` : il ne fait que vérifier des JWT ES256 (clé publique JWKS). Risque nul en pratique. |
+| pytest 8.3.0 | PYSEC-2026-1845 (répertoire `/tmp/pytest-of-{user}`, local) | Outil de dev/CI uniquement, absent de l'image Docker (seul `requirements.txt` est installé). `pytest-asyncio` 0.24 impose `pytest<9` ; monter les deux ensemble après la release. |
+
+### Dépendances principales (versions épinglées)
+
+| Package | Version | Notes |
+|---------|---------|-------|
+| fastapi | 0.162.0 | Starlette 1.10.0 |
+| sqlalchemy | 2.0.36 | Stable |
+| pydantic | 2.10.0 | Stable |
+| python-jose | 3.5.0 | JWT ES256 uniquement, voir avis restants |
+| asyncpg | 0.30.0 | Stable |
+
+### Durcissements de la release 1.0.0
+
+- Swagger/ReDoc/OpenAPI (`/docs`, `/redoc`, `/openapi.json`) désactivés quand `ENVIRONMENT=production` (404).
+- Le démarrage échoue en production si `DATABASE_URL` ou `REDIS_URL` pointent sur localhost/127.0.0.1, si `SUPABASE_URL`, `SUPABASE_JWT_JWKS` ou `SUPABASE_SERVICE_ROLE_KEY` sont vides, ou si `INTERNAL_CRON_SECRET` fait moins de 32 caractères. Les messages ne contiennent jamais les valeurs.
+- Les migrations Alembic sont rejouées sur une base Postgres 16 vide en CI.
+
+### Rate limit invité et sous-réseau Docker/Traefik (à vérifier en prod)
+
+Le conteneur démarre avec `--proxy-headers --forwarded-allow-ips=10.0.1.0/24` (`Dockerfile`) : `X-Forwarded-For` n'est honoré que s'il vient de ce sous-réseau, et `request.client.host` (clé du rate limit des invités sur `GET /api/v1/score`) en dépend. **Avant la MEP**, vérifier sur le VPS que l'IP source de Traefik vers le conteneur est bien dans `10.0.1.0/24` (`sudo docker network inspect <réseau dokploy>` et `sudo docker service inspect <service>`). Si le sous-réseau diffère : soit tous les invités partagent l'IP de Traefik (rate limit global), soit l'en-tête est ignoré ; ajuster `--forwarded-allow-ips` en conséquence. Ne jamais mettre `*`.
+
+---
+
+## Surface d'attaque actuelle
+
+### Ce qui existe
+- `GET /health` — endpoint public, pas de donnée sensible, pas de risque
+- `GET /api/v1/peaks/search` — **public depuis story 7.1** (onboarding pré-login), q min_length=2 validé par Pydantic/FastAPI
+- `GET /api/v1/peaks/{slug}` — **public depuis story 7.1** (onboarding pré-login), slug passé en path param (ORM only)
+- `POST /api/v1/user/favorites` — auth JWT requise, user_id extrait du JWT uniquement
+- `DELETE /api/v1/user/favorites/{peak_id}` — auth JWT requise, isolation par user_id JWT
+- `GET /api/v1/user/favorites` — auth JWT requise, isolation par user_id JWT
+
+- `GET /api/v1/score` — auth JWT requise + quota Redis (check_quota dependency), `peak_id`/`date`/`hour` validés par Pydantic/Query
+- `GET /api/v1/user/me`, `POST /api/v1/user/provision`, `PATCH /api/v1/user/{survey,preferences,display-name,notifications}`, `DELETE /api/v1/user` — auth JWT requise ; les écritures de profil exigent un compte permanent (anonyme : 403 `ACCOUNT_REQUIRED`)
+- `POST` / `DELETE /api/v1/user/push-token` — auth JWT d'un compte permanent, rate limit 10 req/min par utilisateur, format du jeton Expo validé, jeton jamais renvoyé ni loggué
+- `GET /api/v1/user/subscription`, `POST /api/v1/user/subscription/verify` — auth JWT, vérification cryptographique Apple côté serveur
+- `POST /api/v1/webhooks/apple` — **public** (Apple n'envoie pas de JWT) : authentifié par la signature JWS V2, corps limité à 20 Ko, idempotent par `notificationUUID` ; rate limit Traefik/WAF à poser avant la prod (voir ré-audit du 2026-09-30)
+- `POST /internal/notifications/run-favorites` — **public derrière Traefik** mais protégé par `X-Cron-Secret` (`INTERNAL_CRON_SECRET` >= 32 caractères, comparaison à temps constant, 503 sinon, 403 si faux), verrou Redis anti-concurrence
+- `POST /internal/maintenance/purge-anonymous` — même garde `X-Cron-Secret` ; supprime les comptes anonymes inactifs (`ANON_RETENTION_DAYS`, plafond `ANON_PURGE_MAX_PER_RUN`) seulement si Supabase confirme `is_anonymous=true` ; `?dry_run=true` pour tester ; exige `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY`
+- `/docs`, `/redoc`, `/openapi.json` — absents en production (404)
+
+### Ce qui n'existe pas encore
+- Pas de rate limiting global : la limite actuelle couvre seulement `GET /api/v1/score` des invités
+- Pas de limite sur le nombre de favoris par utilisateur (à prévoir avant prod)
+
+---
+
+## 2026-03-22 Story 3-3 — Recherche de Sommet & Favoris
+
+### INFO
+- **[peaks.py]** Isolation correcte des favoris : `user_id` extrait de `current_user["id"]` (JWT) sur les trois endpoints favoris — jamais passé en paramètre client
+- **[peaks.py]** Toutes les requêtes passent par SQLAlchemy ORM (`select(Peak).where(...)`, `select(Favorite).where(...)`) — aucun SQL brut, risque d'injection SQL nul
+- **[peaks.py]** Paramètre `q` de recherche contraint à `min_length=2` via `Annotated[str, Query(min_length=...)]` — rejeté 422 si trop court
+- **[peaks.py]** Paramètre `q` interpolé via `Peak.name.ilike(f"%{q}%")` — le `%` est un wildcard SQL valide mais la valeur est passée comme paramètre SQLAlchemy lié (bind parameter), pas concaténée dans le SQL brut — pas d'injection possible
+- **[favorite.py]** Contrainte `UniqueConstraint("user_id", "peak_id", name="uq_user_peak")` définie au niveau DB — doublon impossible même en cas de race condition applicative
+- **[favorite.py]** `ondelete="CASCADE"` sur `peak_id` FK — suppression d'un sommet nettoie les favoris associés, pas d'orphelins
+- **[peaks.py]** Auth JWT vérifiée sur tous les endpoints (y compris `/peaks/search` et `/peaks/{slug}`) via `Depends(get_current_user)`
+- **[peaks.py]** Logs `logger.info` sur les mutations (add/remove) et `logger.debug` sur les lectures — aucune donnée sensible loggée (pas de token, pas d'email)
+- **[schemas/favorite.py]** `FavoriteCreate` contient uniquement `peak_id: str` — pas de `user_id` accepté depuis le client
+
+### WARNING
+- **[favorite.py]** `user_id` est de type `String` (non UUID) dans le modèle `Favorite`, alors que l'ID Supabase est un UUID. Le type est cohérent avec `Peak.id` (String) mais une contrainte de format UUID côté schéma Pydantic (`FavoriteCreate`) serait plus stricte — recommandation : ajouter une validation `UUID` sur `peak_id` dans `FavoriteCreate` pour rejeter 422 les IDs malformés avant la requête DB
+- **[peaks.py]** Pas de limite sur le nombre de favoris par utilisateur — un utilisateur pourrait créer un très grand nombre de favoris, entraînant des requêtes `SELECT` lourdes sur `GET /user/favorites` — à limiter (ex: 200 favoris max) avant prod
+- **[peaks.py]** `DELETE /api/v1/user/favorites/{peak_id}` accepte un `peak_id` de type `str` en path param sans validation de format — un attaquant authentifié peut envoyer des valeurs arbitraires longues ; SQLAlchemy les gère correctement mais une validation `min_length`/`max_length` ou pattern UUID serait défensive
+
+---
+
+## 2026-03-23 Story 3-4 — Ecran Principal ScoreCard
+
+### WARNING
+- **[fetchService.ts:51]** `apiFetch` propage `body?.detail` de l'API comme message d'erreur brut dans le `Error` thrown. Ce message remonte dans `useScore` (ligne 33) et est stocké verbatim dans `scoreState.error`. L'ecran `index.tsx` filtre correctement avant affichage (lignes 59-62), mais le message brut reste accessible dans l'objet d'etat — tout futur consommateur qui rendrait directement `scoreState.error` pourrait exposer des details internes du backend (ex: message Pydantic, code d'erreur interne). Recommandation : sanitiser a la sortie de `useScore` plutot qu'au niveau de chaque ecran consommateur — remplacer le message brut par une cle i18n generique avant de le stocker dans le state `error`.
+
+### INFO
+- **[useScore.ts:22]** Token JWT logue uniquement comme booleen (`token: !!token`) en mode DEBUG — la valeur brute n'est jamais loggee. Pattern correct.
+- **[fetchService.ts:36]** URL complete loggee en mode DEBUG mais le token est dans le header `Authorization`, jamais dans l'URL ni dans les logs. Pas de fuite possible.
+- **[devConfig.ts:13]** `DEBUG = __DEV__ && true` — `__DEV__` est `false` en build de production Expo/Metro, tous les `console.debug` sont morts en prod. Comportement verifie.
+- **[SelectedPeakContext.tsx]** Context stocke uniquement en memoire React state (id, name, slug, lat, lng, altitude) — pas d'AsyncStorage, pas de SecureStore, pas de persistence. Aucune donnee sensible dans ce context.
+- **[index.tsx:18]** Token extrait de `session?.access_token` issu du SDK Supabase — le SDK gere son propre stockage securise, le token n'est pas manipule directement par l'app. Correct.
+- **[index.tsx:59-62]** Messages d'erreur filtres via cle i18n avant affichage (`home.serviceUnavailable` / `home.errorGeneric`) — le message brut de l'API n'est jamais rendu dans l'UI sur cet ecran.
+- **[ScoreCard.tsx]** Composant purement presentationnel — affiche uniquement `peak_name`, `peak_altitude`, `score`, `verdict` (donnees non-sensibles). Aucune logique auth, aucun acces token.
+- **[api/score.ts:23]** `peak_id` passe comme query param valide par le backend via SQLAlchemy ORM — pas d'injection possible.
+
+---
+
+---
+
+## 2026-05-15 Story 4-1 — Quota freemium backend (Redis QuotaService)
+
+### WARNING
+
+- **[dependencies.py:122]** `peak_id` lu depuis `request.query_params.get("peak_id", "")` sans validation de longueur ni de format. La chaîne vide est rejetée par le `if not peak_id` immédiatement après, mais une valeur arbitrairement longue (ex: 10 000 caractères) ou contenant des caractères spéciaux (`\n`, `:`, espaces) passe et est insérée comme membre dans le SET Redis, polluant la clé `quota:{user_id}:{date}`. Le `peak_id` vient ensuite de la DB via le routeur FastAPI sur l'endpoint score (validé ORM), mais `check_quota` est une dependency générique qui n'a pas ce contexte. Recommandation : ajouter `max_length=255` et optionnellement un pattern `^[a-zA-Z0-9_-]+$` sur `peak_id` dans la dependency avant l'appel `check_and_increment`.
+- **[health.py]** L'endpoint `GET /health` est public (pas d'auth). Il expose l'état de Redis et PostgreSQL (`"ok"` / `"unavailable"`). En prod derrière Traefik (Dokploy), cet endpoint est accessible depuis Internet — un attaquant peut déduire si la DB ou Redis est en panne pour optimiser une tentative d'attaque. Recommandation : soit restreindre par IP dans Traefik (middleware allow interne uniquement), soit ne retourner que `{"status": "ok"|"degraded"}` sans détailler quel service est indisponible.
+- **[seed_test_users.py]** Trois UUIDs Supabase réels sont hardcodés dans `app/db/seed_test_users.py` (lignes 31, 37, 43) avec leurs emails associés (`freemium@cloudbreak.app`, `pro@cloudbreak.app`, `test@cloudbreak.app`). Ces UUIDs correspondent à des comptes Supabase existants sur l'environnement de dev. Ils sont commités dans le repo. Si le repo devient public ou si un tiers accède au code, ces comptes sont identifiés. Recommandation : déplacer ces valeurs dans une variable d'environnement `TEST_USER_IDS` ou un fichier `.env.test` non commité ; utiliser des UUIDs fictifs dans le code.
+
+### INFO
+
+- **[dependencies.py:106-109]** Vérification expiry subscription correcte : la condition `subscription.expires_at is not None` précède `subscription.expires_at > datetime.now(...)` dans une chaîne `and` — Python court-circuite, pas de risque d'`AttributeError` sur `None.tzinfo`. Logique correcte.
+- **[quota.py:82-87]** `sadd` et `expire` exécutés via `async with self._redis.pipeline() as pipe` suivi de `await pipe.execute()` — atomicité garantie par le pipeline Redis. Pas de race condition TTL.
+- **[main.py:35]** L'exception handler `OperationalError` logue `type(exc).__name__` (non `str(exc)`) — le `DATABASE_URL` ne peut pas fuiter dans les logs via cette voie. Correct.
+- **[dependencies.py:121]** Date calculée via `datetime.now(UTC).strftime(...)` — `UTC` importé de `datetime` Python 3.11+, pas de `datetime.utcnow()` déprécié. Correct.
+- **[quota.py]** Clés Redis correctement préfixées `quota:{user_id}:{date}` — aucune collision possible avec `weather:*` ou `cache:*`. Schéma conforme aux conventions Cloudbreak.
+- **[quota.py]** TTL calculé jusqu'à minuit UTC via pipeline Redis — reset automatique correct, pas de fuite mémoire.
+- **[dependencies.py]** `user_id` extrait exclusivement du JWT validé (`payload.get("sub")`) — jamais passé en paramètre client sur l'endpoint score. Isolation correcte.
+- **[dependencies.py]** `get_user_subscription` utilise `select(Subscription).where(Subscription.user_id == user_id)` — requête SQLAlchemy paramétrée, aucun SQL brut, pas d'injection possible.
+- **[main.py]** Exception handler `OperationalError` retourne `{"detail": "Base de données indisponible", "code": "DATABASE_UNAVAILABLE"}` — aucune stack trace, aucun message interne exposé au client.
+- **[tests/helpers.py]** `encode_test_jwt` avec `dev-secret-key` hardcodé est isolé dans `tests/helpers.py` — absent de `app/core/security.py`. Aucun endpoint de production ne peut l'importer. Pattern correct.
+- **[quota.py:78]** Message de `QuotaExceededException` contient `user_id` et `date`. Ce message est catchéd dans `dependencies.py` et ne remonte pas au client. Sans risque dans l'état actuel — surveiller si le catch est retiré.
+- **[score.py]** Deux instances Redis indépendantes : `get_redis` singleton dans `dependencies.py` et `_redis` module-level dans `score.py`. Pas de risque de sécurité mais doublon de connexions Redis en prod — à consolider via `get_redis` dans une prochaine story.
+
+---
+
+## 2026-05-16 Story 2-4 — Suppression compte et données personnelles (RGPD)
+
+### INFO
+
+- **[security.py]** `delete_supabase_user()` utilise la clé `service_role_key` uniquement côté backend — jamais exposée dans les réponses API ni dans les logs
+- **[security.py]** Appel Supabase Admin API via `httpx.AsyncClient` — connexion HTTPS, pas de persistance du client (nouvelle connexion par appel). Acceptable en MVP.
+- **[user.py]** Suppression DB ordonnée : `user_favorites` puis `subscriptions` avant suppression du compte Supabase — évite un état où le compte Supabase est supprimé mais les données locales persistent
+- **[endpoints/user.py]** `user_id` extrait exclusivement du JWT validé (`current_user["id"]`) — jamais passé en paramètre client. Isolation correcte.
+- **[endpoints/user.py]** Route protégée par `get_current_user` (HTTPBearer) — retourne 403 sans header `Authorization`
+
+### WARNING
+
+- **[security.py]** `delete_supabase_user()` ne logue pas le statut Supabase en cas de succès (200 ou 204) — si Supabase renvoie 200 avec un body d'erreur non standard, l'erreur est silencieuse. Recommandation : logger le status code en DEBUG même en cas de succès.
+- **[config.py]** `supabase_service_role_key: str = ""` — valeur par défaut vide string. En dev sans cette variable, l'appel Supabase échouera avec 401 mais retournera une `HTTPException(500)` opaque. Recommandation : valider que la clé est non-vide au démarrage (validator Pydantic) en environment `production`.
+- **[endpoints/user.py]** Pas de vérification que l'utilisateur a bien un abonnement ou des données avant suppression — un utilisateur peut appeler l'endpoint plusieurs fois sans effet de bord (idempotent), ce qui est correct, mais chaque appel déclenche une tentative de suppression Supabase potentiellement inutile après la première.
+
+### Secrets ajoutés
+
+| Secret | Fichier | Exposé client | Rotation |
+|--------|---------|---------------|---------|
+| `SUPABASE_SERVICE_ROLE_KEY` | `.env` backend + `docker-compose.dev.yml` | Jamais | Si leak détecté |
+
+---
+
+## 2026-05-16 Story 2-4 — Suppression compte et données personnelles RGPD
+
+### WARNING
+
+- **[security.py:45-46]** `httpx.AsyncClient().delete()` appelé sans timeout explicite. Si l'API Admin Supabase est lente ou bloque, la coroutine FastAPI peut rester suspendue indéfiniment, épuisant le pool de workers Gunicorn. Recommandation : `httpx.AsyncClient(timeout=10.0)` — 10s est largement suffisant pour un appel Admin Supabase, et la gestion du `TimeoutException` doit lever une `HTTPException(503)` ou `500` avec le code `INTERNAL_ERROR` existant.
+- **[security.py:47]** En cas d'échec Supabase (`response.status_code not in (200, 204)`), les données DB ont déjà été supprimées (`delete_user_data` est appelé en premier dans `user.py:31`). L'utilisateur se retrouve dans un état incohérent : données locales effacées, compte Supabase toujours actif. Le JWT reste valide jusqu'à expiration, permettant des appels API sans données associées. Recommandation : soit inverser l'ordre (supprimer Supabase en premier, puis DB sur succès), soit implémenter un soft-delete DB avec nettoyage asynchrone en cas d'échec Supabase.
+- **[config.py:15]** `supabase_service_role_key: str = ""` — valeur par défaut vide sans validation au démarrage. Si la variable est absente du `.env`, la clé sera une chaîne vide ; `delete_supabase_user` appellera l'API Admin avec `Authorization: Bearer ` vide, recevra un 401 Supabase, et retournera une `HTTPException(500)`. L'app démarre sans avertissement malgré une clé critique manquante. Recommandation : valider au startup (`lifespan`) que `settings.supabase_service_role_key` est non-vide, sinon logger un `CRITICAL` et refuser les requêtes de suppression.
+- **[.env.example]** `SUPABASE_SERVICE_ROLE_KEY` absent du fichier `.env.example`. Un développeur qui clone le repo ne saura pas que cette variable est requise pour `DELETE /api/v1/user`. Recommandation : ajouter `SUPABASE_SERVICE_ROLE_KEY=` au `.env.example` avec un commentaire `# Service role — jamais exposé côté client`.
+
+### INFO
+
+- **[user.py:30]** `user_id = str(current_user["id"])` — `current_user` est le retour direct de `get_current_user` qui extrait `sub` du JWT validé localement. Aucune possibilité d'IDOR : un utilisateur authentifié ne peut supprimer que son propre compte. Isolation correcte.
+- **[security.py:40]** URL Admin Supabase construite avec `f"{supabase_url}/auth/v1/admin/users/{user_id}"` — `user_id` est le `sub` extrait du JWT validé, pas un paramètre client. Pas de path traversal possible.
+- **[security.py:41-44]** `service_role_key` utilisé uniquement dans les headers HTTP côté serveur — jamais sérialisé dans les logs, jamais retourné dans une réponse. Aucune fuite côté client.
+- **[user.py:33]** `logger.info("user_deleted", extra={"user_id": user_id})` — seul l'UUID (non sensible en soi) est loggé. Pas d'email, pas de token, pas de données personnelles dans ce log.
+- **[AuthContext.tsx:79-80]** Après suppression backend réussie, `supabase.auth.signOut()` est appelé côté mobile pour invalider la session locale, puis `AsyncStorage.clear()` efface l'intégralité du stockage AsyncStorage. Scope correct : AsyncStorage est isolé par app sur iOS, donc l'effacement est complet pour Cloudbreak. Aucune donnée résiduelle dans le cache local.
+- **[DeleteAccountModal.tsx:19]** Vérification email côté client uniquement (`emailInput.trim() === userEmail`) — cette vérification est une UX de protection contre la suppression accidentelle, pas un contrôle de sécurité. L'autorisation réelle est assurée par le JWT côté backend. C'est l'architecture correcte : le client peut contourner ce check (jailbreak), mais cela n'aboutit qu'à supprimer son propre compte, ce qui est l'opération demandée.
+- **[user.py:23-24]** Suppressions via `delete(Favorite).where(...)` et `delete(Subscription).where(...)` — SQLAlchemy paramétré, aucun SQL brut, pas d'injection. `user_id` provient du JWT, pas d'un paramètre de requête.
+- **[user.py:16-18]** Le commentaire documente explicitement que `predictions`, `terrain_validations` et `events` sont ignorées silencieusement car les tables n'existent pas encore. À revoir avant release 1.0.0 pour garantir la complétude RGPD lorsque ces tables seront créées.
+
+---
+
+## 2026-07-19 Story 7-1 — Recherche et détail des sommets rendus publics
+
+### Contexte
+L'onboarding mobile (story 7.1) doit permettre à un utilisateur de chercher et choisir un sommet **avant connexion** (pré-login). `GET /api/v1/peaks/search` et `GET /api/v1/peaks/{slug}` ne peuvent donc plus exiger de JWT.
+
+### INFO
+- **[peaks.py]** `Depends(get_current_user)` retiré des deux endpoints — plus aucune dépendance d'auth sur `search_peaks` et `get_peak`
+- **[peaks.py]** Aucune donnée utilisateur exposée par ces endpoints : `Peak` contient uniquement des données OSM publiques (nom, slug, altitude, coordonnées, région) — pas de PII, pas de lien vers `users`/`favorites`/`predictions`
+- **[peaks.py]** Énumération non sensible : parcourir les slugs de sommets ne révèle rien de confidentiel (données déjà publiques sur OpenStreetMap/IGN)
+- **[peaks.py]** `POST/DELETE/GET /api/v1/user/favorites` restent protégés par JWT — seuls les endpoints de lecture pure (recherche + détail) sont ouverts
+- Rate limiting global (à implémenter avant prod, cf. checklist) reste la seule protection anti-abus sur ces routes désormais publiques — pas de dégradation supplémentaire du risque puisqu'aucun rate limiting n'existait déjà pour les routes authentifiées
+
+### WARNING
+- **[peaks.py]** Ces endpoints étant maintenant appelables sans compte, un attaquant peut scripter des appels `GET /peaks/search` en boucle sans coût d'authentification préalable — renforce l'importance du rate limiting global (checklist prod) qui n'est toujours pas implémenté
+
+---
+
+## 2026-07-21 Story 1-7 — Taxonomie & instrumentation events (backend)
+
+### Contexte
+Nouveau module `app/services/analytics.py` (`track()`) : stub `logger.debug` uniquement, aucun appel réseau (PostHog sera branché derrière cette interface plus tard). Appelé depuis `score.py` (`score_calculated`), `core/dependencies.py` (`quota_bypassed`/`quota_exceeded`), `favorites.py` (`favorite_added`/`removed`), `user.py` (`account_deleted`).
+
+### INFO
+- **[app/services/analytics.py]** Stub sans réseau confirmé — aucune fuite possible tant que PostHog n'est pas branché ; `user_id` loggé est bien l'UUID Supabase (`sub` du JWT), jamais l'email ni le token
+- **[score.py:111-115]** Properties `peak_id`/`verdict`/`score` — aucune donnée sensible
+- **[core/dependencies.py:119,136]** Properties `plan`/`peak_id` — aucune donnée sensible
+- **[favorites.py:74,114]** Properties `peak_id` uniquement
+- **[user.py:35]** `account_deleted` tracké sans property — cohérent avec RGPD (pas de donnée résiduelle après suppression)
+- Aucune duplication détectée avec les events mobile pour une même action (ex : mobile trace l'intention `delete_account_initiated`, le backend trace l'issue `account_deleted` — un seul propriétaire par étape du flux)
+
+### WARNING
+- **[app/services/analytics.py]** Le stub logue `user_id` en clair au niveau DEBUG — s'assurer que `LOG_LEVEL=DEBUG` ne soit jamais actif en prod (déjà couvert par la checklist "Logs ne contiennent aucun secret ou donnée personnelle" plus bas, mais à re-vérifier explicitement quand PostHog sera branché : ne pas envoyer `user_id` brut à PostHog sans le passer par un identifiant anonymisé/hashé si l'usage prévu est de l'analytics agrégée)
+
+---
+
+## 2026-07-24 Story 6-1 — Validation Terrain (Confirmation/Infirmation)
+
+### Contexte
+Nouveau flux : `GET /api/v1/score` persiste désormais une `Prediction` (best-effort) à chaque calcul, et `POST /api/v1/validations` permet à l'utilisateur de confirmer/infirmer une prédiction depuis le terrain, avec `lat`/`lng` optionnels.
+
+### INFO
+- **[terrain_validation.py]** Première fois que le backend persiste une **géolocalisation réelle** de l'utilisateur (`lat`/`lng` en `Float`, nullable). Jusqu'ici le projet ne lisait que le *statut de permission* de géolocalisation côté mobile (`docs/security.md` App Privacy — "Localisation précise... opt-in"), jamais de coordonnées effectives stockées où que ce soit. `lat`/`lng` restent optionnels côté schéma (`TerrainValidationCreate`) : un utilisateur qui refuse la permission peut valider sans coordonnées.
+- **[prediction.py / terrain_validation.py]** `user_id` stocké en `String` (pas de type UUID contraint) — cohérent avec le pattern déjà en place sur `favorites`/`subscriptions` (voir WARNING story 3-3 plus haut sur `Favorite.user_id`), pas une nouvelle divergence introduite par cette story.
+- **[validations.py]** `user_id` extrait exclusivement de `current_user["id"]` (JWT validé) — jamais passé en paramètre client. Isolation correcte, même pattern que les endpoints précédents.
+- **[validations.py]** Requête `select(Prediction).where(Prediction.id == body.prediction_id)` — SQLAlchemy ORM paramétré, pas de SQL brut, pas d'injection possible.
+- **[score.py]** La persistance de `Prediction` est enveloppée dans un `try/except` : un échec DB n'empêche pas l'endpoint score de répondre (best-effort), et ne fuite pas de détail interne au client — seul `logger.error("prediction_persist_failed", ...)` est loggé côté serveur.
+- Aucun nouveau secret ni variable d'environnement introduit par cette story.
+
+### WARNING
+- **[terrain_validation.py]** `photo_url` existe déjà en colonne (`nullable`) mais est toujours forcé à `null` côté endpoint — non exploitable en l'état, mais **story 6.2** (upload photo) devra faire l'objet d'une revue sécurité dédiée : validation du type de fichier, limite de taille, contrôle d'accès au stockage (éviter qu'un `photo_url` pointe vers une ressource accessible sans auth ou qu'un utilisateur puisse écraser/lire la photo d'un autre), et scan éventuel de contenu.
+
+### Corrections appliquées dans cette branche
+- **[validations.py — commit 4ea86c8]** CORRIGÉ : ownership check ajouté — `select(Prediction).where(Prediction.id == body.prediction_id, Prediction.user_id == user_id)` → 404 si la prédiction appartient à un autre utilisateur (sans distinguer "inexistante" de "appartient à un tiers", évitant une fuite d'information sur l'existence de prédictions d'autrui).
+- **[user.py — commit 603eeb9]** CORRIGÉ : RGPD cascade-delete complété — `delete_user_data` supprime désormais `TerrainValidation` et `Prediction` par `user_id` avant les favoris et subscriptions. La dette signalée en story 2-4 est soldée.
+- **[schemas/validation.py — commit c284e65]** CORRIGÉ : `TerrainValidationCreate.prediction_id` typé `uuid.UUID` (au lieu de `str`) — Pydantic rejette désormais toute valeur malformée en 422 avant toute requête DB.
+
+---
+
+## Checklist avant mise en prod
+
+- [ ] Variables `.env` renseignées sur le VPS (jamais en clair dans le code)
+- [ ] PostgreSQL et Redis non exposés (pas de port mappé publiquement — réseau Docker interne géré par Dokploy)
+- [ ] Traefik HTTPS opérationnel (Let's Encrypt via Dokploy)
+- [ ] Rate limiting activé sur les endpoints publics
+- [x] JWT validation opérationnelle sur toutes les routes protégées
+- [ ] Confirm email réactivé dans Supabase (avant release 1.0.0)
+- [ ] `DEBUG=False` / `ENVIRONMENT=production`
+- [ ] Logs ne contiennent aucun secret ou donnée personnelle
+- [ ] `pip-audit` passé sans vulnérabilité critique
+- [ ] Accès SSH VPS par clé uniquement (password auth désactivé)
+- [ ] Firewall VPS : seuls ports 22, 80, 443 ouverts
+
+---
+
+## App Privacy Apple — données déclarées (App Store Connect)
+
+Story 4.4 (AC6) — checklist à reporter dans **App Store Connect → App Privacy** avant soumission. Chaque SDK intégré dans l'app doit être déclaré avec les données exactes qu'il collecte.
+
+### Checklist App Privacy — données déclarées
+
+| Donnée | SDK | Usage | Lié à l'identité ? |
+|--------|-----|-------|-------------------|
+| Email | Supabase | Auth | Oui |
+| Identifiant utilisateur | Supabase | Fonctionnalité app | Oui |
+| Données d'utilisation | PostHog | Analytics | Non (anonymisé) |
+| Localisation précise | expo-location | Fonctionnalité opt-in | Non |
+| Crashs | Expo | Debugging | Non |
+
+### Points de vigilance spécifiques Cloudbreak
+
+1. **PostHog** — déclarer "données d'utilisation" pour "analytics", pas pour ciblage publicitaire
+2. **Supabase** — déclarer "email" et "identifiant utilisateur" liés à l'identité
+3. **expo-location** — déclarer "localisation précise" avec usage "fonctionnalité app" et opt-in explicite
+4. **Pas de pub, pas de tracking tiers** → section "Tracking" App Store Connect = vide
+
+> ⚠️ **Déclarer honnêtement** — une fausse déclaration App Privacy est une cause de bannissement Apple.
+
+---
+
+## 2026-09-05 Stories 2.5 / 2.6 / 2.8 — Parcours compte invité, Apple et sondage
+
+### CRITIQUE
+
+- **[Supabase dev / mobile/docs/story-2-5-manual-test-guide.md:15,20]** Anonymous Auth et le provider Apple sont désactivés (`external.anonymous_users: false`, `external.apple: false`). L’application ne peut donc pas créer la session invitée nécessaire au quota et le parcours Sign in with Apple ne peut pas fonctionner. → Activer les deux providers sur l’instance dev ciblée, puis refaire une preuve sur build native avant merge.
+- **[Supabase dev / mobile/docs/story-2-5-manual-test-guide.md:16-18]** `mailer_autoconfirm: true` et aucun template OTP/type `verifyOtp` n’ont été validés. Le parcours e-mail implémenté utilise provisoirement `verifyOtp.type: 'email_change'`; il est impossible de garantir la vérification d’adresse ou la conversion de la session anonyme. → Activer Confirm email, vérifier le template `{{ .Token }}` et confirmer le type OTP ainsi que l’UUID avant/après sur une boîte de test avant d’autoriser la mise en production.
+- **[mobile/src/services/supabaseClient.ts:3,8]** La session Supabase, qui contient le JWT d’accès, est persistée dans `AsyncStorage`, stockage non chiffré. Le nouveau flux introduit en plus des sessions anonymes et des conversions de compte, ce qui augmente l’impact d’une extraction du stockage local. → Migrer le storage Supabase vers `expo-secure-store` avant release/merge de l’authentification.
+
+### WARNING
+
+- **[mobile/src/contexts/AuthContext.tsx:165-177; mobile/docs/story-2-5-manual-test-guide.md:17-19]** Le code OTP et le type `email_change` sont câblés sans preuve de compatibilité avec la configuration Supabase actuelle; le guide confirme que le type, la réception et la conservation de l’UUID restent non déterminés. → Ne valider le contrat qu’après un flow réel avec code erroné, expiration et renvoi.
+- **[backend/app/core/config.py:8-15; backend/app/main.py:25-27]** Les paramètres critiques (`supabase_jwt_jwks`, `supabase_url`, `supabase_service_role_key`) ont encore une valeur vide par défaut et ne sont pas validés au démarrage. Un déploiement mal configuré démarre puis échoue sur l’auth/provisioning/suppression. → Refuser le démarrage en production si ces secrets/configurations sont absents ou invalides; conserver des clés dev/prod distinctes.
+- **[RÉSOLU — backend/app/api/v1/endpoints/user.py]** Le sondage persiste `newsletter_opt_in` de façon terminale, mais `PATCH /api/v1/user/preferences` (JWT permanent requis) permet désormais de retirer **ou** ré-accorder le consentement newsletter à tout moment, dans les deux sens (RGPD art. 7-3). Reste à câbler l'effet réel côté collecte/ESP quand la newsletter sera branchée.
+
+### INFO
+
+- **[backend/app/core/dependencies.py:47-79; backend/app/api/v1/endpoints/favorites.py:37,89,116]** Le JWT est validé localement, l’identité provient de `sub`, et les comptes anonymes sont refusés pour les favoris; aucun `user_id` client n’est accepté.
+- **[backend/app/api/v1/endpoints/user.py:43-63; backend/app/schemas/user.py:22-45]** Provisioning et sondage sont protégés par JWT et valident les champs via Pydantic (`extra="forbid"`, enums, booléen); les requêtes de service utilisent SQLAlchemy.
+- **[mobile/src/contexts/AccountGateContext.tsx:41-60; mobile/src/app/verify.tsx:11-15]** Les credentials e-mail restent en mémoire React et sont effacés à la fin/annulation du parcours; aucune écriture du mot de passe dans AsyncStorage n’a été introduite.
+
+### Corrections et compléments d’audit (2026-09-05 — cloudbreak-security)
+
+**Correction du CRITIQUE 2 :** `beginEmailUpgrade`, `completeEmailUpgrade` et `resendEmailUpgrade` dans `AuthContext.tsx` sont entièrement stubés et retournent immédiatement `EMAIL_UPGRADE_UNAVAILABLE`. Le chemin qui appelle `gate.setEmailUpgradeCredentials` dans `account.tsx` n’est donc jamais atteint (l’erreur est retournée avant le `router.push(‘/verify’)`). La préoccupation OTP/`email_change` du CRITIQUE 2 et du WARNING 1 est sans objet dans l’implémentation actuelle — à ré-auditer lors de l’activation réelle du flux email.
+
+**WARNING supplémentaire :**
+- **[backend/app/api/v1/endpoints/user.py:68]** `DELETE /api/v1/user` utilise `get_current_user` sans appel à `_require_permanent`. Un JWT anonyme valide peut donc déclencher cet endpoint, qui appelera l’API Admin Supabase (`delete_supabase_user`) pour supprimer le compte anonyme. Il n’y a pas d’IDOR (le `user_id` est extrait du JWT), mais le chemin appelle inutilement la `service_role_key` pour des comptes éphémères. Si la suppression de comptes anonymes est volontairement supportée, documenter ce choix. Sinon, ajouter `_require_permanent` au même titre que `/provision` et `/survey`.
+
+**INFO supplémentaires :**
+- **[mobile/src/contexts/AuthContext.tsx:185-207]** Sign in with Apple : nonce généré depuis 32 octets cryptographiques (`Crypto.getRandomBytesAsync(32)`), SHA-256 envoyé à Apple (`hashedNonce`), nonce brut (`rawNonce`) envoyé à Supabase. Ni l’un ni l’autre n’est loggé ni stocké dans AsyncStorage. Pattern conforme aux exigences Apple et résistant au rejeu.
+- **[backend/app/core/security.py:23-24]** Les erreurs de décodage JWT (`JWTError` de python-jose) sont encapsulées dans `ValueError` puis interceptées en `except ValueError` dans `dependencies.py`, qui retourne `"Token invalide ou expiré"` au client — aucun détail interne de l’erreur jose n’est exposé.
+- **[backend/app/models/user.py; alembic/versions/f2a3b4c5d6e7]** La table `users` ne stocke aucun champ email, téléphone ou mot de passe — uniquement `supabase_user_id` (UUID PK), `auth_provider`, timestamps et réponses sondage. Pas de duplication de PII depuis Supabase auth.
+- **[backend/http/user-provisioning.http; backend/http/auth.http]** Aucun token réel commité : les fichiers `.http` utilisent `{{$dotenv CLOUDBREAK_JWT}}` et `{{testEmail}}`/`{{password}}` — variables d’environnement VS Code REST Client, jamais de valeur en dur.
+- **[backend/app/services/user.py:72-83]** `update_user_survey` est idempotent : la mise à jour est un no-op si `survey_completed_at` ou `survey_skipped_at` est déjà renseigné — aucun écrasement cross-user possible puisque `user_id` provient du JWT.
+- **[backend/app/services/user.py — `update_user_preferences`]** N'écrit que `newsletter_opt_in`, `user_id` issu du JWT (pas d'IDOR), JWT permanent exigé via `get_permanent_user`. Schéma `PreferencesUpdate` en `extra="forbid"` : tout champ inconnu → `422`.
+
+---
+
+## 2026-09-06 Session additions — Keychain iOS + consentement newsletter
+
+### RÉSOLU
+
+- **[CRITIQUE 3 — mobile/src/services/supabaseClient.ts]** La session Supabase (JWT access + refresh token) est désormais rangée dans le **Keychain iOS** via `expo-secure-store`. L'adaptateur `secureSessionStorage` fragmente la valeur par blocs de 1 536 octets (limite ~2 048 octets de SecureStore) et migre au premier accès une session héritée d'AsyncStorage (recopie dans le Keychain puis suppression du plaintext). Plus aucun token en clair dans AsyncStorage. Plugin `expo-secure-store` déclaré dans `app.config.ts`. Rebuild natif requis avant le prochain test sur simulateur.
+- **[WARNING 2026-09-05 — backend/app/api/v1/endpoints/user.py:76]** `DELETE /api/v1/user` utilisait `get_current_user` et pouvait être déclenché par un JWT anonyme. Corrigé dans cette session : l'endpoint utilise désormais `get_permanent_user` (même garde que `/provision`, `/survey`, `/preferences`). Un JWT anonyme reçoit maintenant `403 ACCOUNT_REQUIRED`.
+
+### WARNING
+
+- **[mobile/src/services/secureSessionStorage.ts:83-86]** `setItem` appelle `writeChunked` mais n'efface pas le pendant AsyncStorage. Si un crash survient entre `writeChunked` et `AsyncStorage.removeItem` dans le chemin de migration (`getItem`), les appels ultérieurs à `setItem` (ex : rafraîchissement du token) mettront à jour le Keychain mais laisseront le token en clair résiduel dans AsyncStorage jusqu'à la prochaine déconnexion (`removeItem`). Recommandation : ajouter `await AsyncStorage.removeItem(key)` dans `setItem` juste après `writeChunked` pour purger tout résidu de migration :\n  ```ts\n  async setItem(key, value) {\n    await writeChunked(key, value);\n    await AsyncStorage.removeItem(key); // purge résidu migration\n  }\n  ```
+
+### INFO
+
+- **[backend/app/api/v1/endpoints/user.py; app/schemas/user.py; app/services/user.py]** `PATCH /api/v1/user/preferences` : aucun IDOR — `user_id` extrait exclusivement du JWT via `get_permanent_user`. `PreferencesUpdate` en `extra="forbid"` : tout champ inconnu → `422`. Seul `newsletter_opt_in` (booléen) est persisté — pas de PII supplémentaire.
+- **[backend/app/api/v1/endpoints/user.py:22-35]** `GET /api/v1/user/me` : retourne `newsletter_opt_in: null` pour les utilisateurs anonymes (profil non provisionné → `profile = None`) — pas d'exposition de données d'un autre compte.
+- **[mobile/src/hooks/useNewsletterConsent.ts:20,24-26]** La logique de load court-circuite sur `anonymous || !token` : aucun appel réseau pour un compte anonyme. Le toggle vérifie `state.status !== 'success'` avant d'agir — pas d'action possible si le chargement initial a échoué.
+
+---
+
+## 2026-09-12 Session additions — Durcissement post-merge auth (JWT issuer/audience)
+
+### RÉSOLU
+
+- **[CRITIQUE — backend/app/core/security.py]** `decode_supabase_jwt()` décodait sans vérifier `aud` (`verify_aud: False`) ni `iss`. Un JWT signé par la même paire de clés ECC mais destiné à un autre contexte (autre projet Supabase, autre audience) aurait été accepté. Corrigé : `jwt.decode(..., audience="authenticated", options={"require_aud": True})` (le `require_aud` explicite est nécessaire — sans lui, python-jose n'exige pas la présence de la réclamation `aud`, il ne la valide que si elle est présente), puis vérification manuelle `payload.get("iss") == f"{supabase_url}/auth/v1"` qui lève `ValueError` sinon. `decode_supabase_jwt` prend désormais un 3ᵉ paramètre `supabase_url`, passé par `dependencies.py:53` depuis `settings.supabase_url`. Le comportement des sessions réelles (y compris Anonymous Auth) n'est pas affecté : Supabase émet toujours `aud: "authenticated"`.
+
+### INFO
+
+- **[backend/app/core/security.py]** `options={"require_aud": True}` est bien un option reconnue par python-jose 3.3.0 (défaut `False`) — oblige la présence de la réclamation `aud` dans le token indépendamment du paramètre `audience`. Combiné avec `audience="authenticated"`, les deux conditions sont strictement vérifiées : présence ET valeur exacte.
+- **[backend/tests/test_security.py]** Couverture ajoutée : `aud` incorrect, `iss` incorrect, `iss` absent, `aud` absent — 4 nouveaux tests de rejet, tous vérifient `ValueError`. 13/13 tests passent.
+- **[backend/app/core/security.py]** Trailing slash sur `supabase_url` corrigé : `expected_issuer = f"{supabase_url.rstrip('/')}/auth/v1"` — une valeur `.env` avec ou sans slash final produit désormais le même issuer attendu. Logs debug ajoutés (`jwt_decode_ok`, `jwt_issuer_mismatch`), silencieux en prod. Test de non-régression : `test_decode_accepts_trailing_slash_in_supabase_url`. Détails : `docs/fix-durcissement-jwt-issuer-audience.md`.
+
+---
+
+## 2026-09-28 — Quota invité et rate limit de `/score`
+
+### RÉSOLU — P0 atténuée
+
+Un invité ne peut plus contourner le quota journalier en créant simplement un nouveau JWT
+Supabase. Pour une session anonyme freemium, `GET /api/v1/score` exige un
+`X-Cloudbreak-Installation-Id` UUID v4, le hache, puis applique le quota sur cette installation
+avant le quota lié au JWT. Un nouveau JWT sur la même installation et un nouveau sommet reçoit
+donc `429 QUOTA_EXCEEDED`.
+
+La route limite également les invités à 60 demandes par adresse IP et par fenêtre fixe de
+60 secondes. La 61e demande renvoie `429 RATE_LIMIT_EXCEEDED`. Les identifiants d'installation et
+les IP ne sont pas conservés en clair dans les clés Redis utilisées par ces contrôles.
+
+### Limites et suite nécessaire
+
+- Le client reste sous le contrôle de l'utilisateur : une application modifiée peut générer un
+  autre UUID v4 et se présenter comme une nouvelle installation.
+- Une limite IP est une défense de rafale, pas une identité fiable : l'IP peut changer, être
+  partagée (NAT) ou être masquée derrière un proxy/VPN.
+- **À prévoir : App Attest iOS.** Une attestation d'application doit apporter un signal lié à une
+  app authentique et rendre la falsification du signal d'installation plus coûteuse. Elle complète
+  ces contrôles Redis ; elle ne doit pas être présentée comme une garantie absolue.
+
+---
+
+## 2026-09-28 Story quota-invite — Audit final du quota invité et du rate limit
+
+Périmètre : backend `aaeaa55..25bc22d`, mobile `3725b07..76e359b`. Lors de cet audit initial,
+seul le code local a été inspecté ; la configuration effective de Traefik/Dokploy n'a pas été
+inspectée sur le serveur. Elle a ensuite été vérifiée en lecture seule le 2026-09-29 pour clôturer
+le warning réseau ci-dessous.
+
+### 🔴 CRITIQUE
+
+- Aucun nouveau risque critique démontré dans ce périmètre.
+
+### 🟡 WARNING
+
+- **[app/services/quota.py:85-94]** Le TTL utilise `int()` : dans la dernière seconde avant
+  minuit UTC, il devient zéro et `EXPIRE key 0` supprime immédiatement le quota nouvellement
+  créé. Plusieurs sommets peuvent alors être autorisés dans cette seconde. Ce calcul préexistait
+  pour le quota utilisateur et est réutilisé pour l'installation. → Arrondir au supérieur avec
+  une borne minimale de 1 seconde, ou employer une expiration absolue à minuit ; tester
+  explicitement `23:59:59.500000 UTC`.
+
+### ✅ RÉSOLU
+
+- **[Dockerfile:12; app/core/dependencies.py:194]** La confiance des forwarded headers est
+  limitée au sous-réseau `10.0.1.0/24` de l'overlay Dokploy `dokploy-network`. L'inspection du
+  VPS a confirmé que seul `dokploy-traefik` publie les ports 80/443, que le service backend
+  `app-reboot-primary-circuit-vmgb6t` n'a aucun port publié, et que le service dynamique Traefik
+  joint le backend sur le port 8000 via `dokploy-network`. Un pair immédiat hors de ce CIDR ne
+  peut donc pas fournir de forwarded headers de confiance à Uvicorn. → Re-vérifier ce CIDR si
+  Dokploy recrée l'overlay réseau.
+  Références : [Uvicorn](https://www.uvicorn.org/settings/),
+  [Traefik](https://doc.traefik.io/traefik/reference/install-configuration/entrypoints/).
+
+### 🔵 INFO
+
+- **[mobile/src/services/installationId.ts:8-30; app/core/dependencies.py:35-50]** UUID v4
+  cryptographique conservé dans SecureStore, initialisation concurrente partagée, validation et
+  canonicalisation serveur avant hachage. Le signal reste falsifiable par un client modifié :
+  cette limite et la suite App Attest sont correctement documentées.
+- **[app/services/quota.py:24-36; app/services/rate_limit.py:11-17]** Chaque script Lua rend
+  atomiques la vérification et l'écriture de sa propre clé avec TTL. Les deux quotas sont
+  appliqués successivement : il ne s'agit pas d'une transaction commune. Un rejet du quota
+  utilisateur peut laisser consommé le quota installation, sans autoriser un sommet supplémentaire.
+- **[app/core/dependencies.py:159-175]** Le bypass Premium/Pro repose sur la souscription en base
+  du `sub` JWT et son expiration ; aucune valeur de plan provenant du client n'est acceptée.
+- **[app/services/rate_limit.py:35-37]** SHA-256 évite les IP en clair dans Redis, mais ne les
+  anonymise pas : l'espace IPv4 reste énumérable. La fenêtre fixe autorise jusqu'à 120 appels
+  autour d'une frontière de minute ; ce n'est pas une limite glissante ni une défense globale
+  contre le déni de service.
+- **[app/core/dependencies.py:173,228; app/services/analytics.py:17-21;
+  app/core/security.py:39]** Aucun JWT ni UUID d'installation brut ajouté aux logs. Les logs
+  DEBUG préexistants d'analytics et de décodage JWT gardent toutefois le `user_id`/`sub` brut :
+  le hachage des logs de quota ne constitue pas un assainissement global des logs.
+
+Vérification ciblée : 48 tests backend et 33 tests mobile passent. Redis est simulé dans ces
+tests ; ils ne valident ni l'exécution réelle de Lua ni la chaîne réseau Traefik/Uvicorn.
+
+### Verdict
+
+SECURE dans le périmètre de l'atténuation étage 1, avec les warnings ci-dessus à traiter.
+Ce verdict ne valide pas la configuration du déploiement ni une identité matérielle de l'invité.
+
+---
+
+## 2026-10-13 — Batch hebdomadaire de score
+
+### Garde-fous vérifiés
+
+- `GET /api/v1/score/week` reste protégé par JWT. `start_date` est validée avant toute mutation
+  Redis ou appel météo et limitée à aujourd'hui UTC ± 1 jour.
+- Une identité authentifiée est limitée à 12 lectures hebdomadaires par fenêtre fixe de 60 secondes.
+  La clé Redis emploie le hachage SHA-256 de l'identité, sans identifiant brut dans la clé.
+- Le quota freemium et le rate limit conservent leurs codes métier distincts :
+  `QUOTA_EXCEEDED` et `RATE_LIMIT_EXCEEDED`. Le mobile ne transforme donc pas un rate limit en
+  paywall.
+- Le cache Redis hebdomadaire de météo dure 30 minutes (1 800 secondes) ; distinct du cache
+  mobile AsyncStorage de 3 heures, il ne contient que des données météo
+  normalisées. Les nouveaux logs du batch n'enregistrent ni jeton, ni détail de prédiction.
+
+## 2026-10-27 — Suppression de compte : sessions anonymes, events Apple, clés quota (RGPD)
+
+- **[endpoints/user.py]** `DELETE /api/v1/user` n'exige plus un compte permanent : toute session authentifiée, anonyme comprise, peut exercer son droit à l'effacement (`get_current_user` au lieu de `get_permanent_user`). Sans JWT : 403. Supersede l'entrée du 2026-09-05 (qui ne visait que l'exposition accidentelle de l'endpoint à un anonyme). L'action ne concerne que le `sub` du JWT lui-même : pas d'élévation de privilège.
+- **[services/user.py]** La suppression est idempotente : un anonyme jamais provisionné n'a pas de ligne `users`, les `DELETE` sont alors sans effet (pas d'erreur).
+- **[services/user.py]** `apple_subscription_events` est purgée avant `subscriptions` pour les `original_transaction_id` de l'utilisateur ; les events d'autres utilisateurs sont conservés. Les events sans `original_transaction_id` ne sont pas rattachables à un utilisateur et restent (ledger d'idempotence, aucune donnée directement identifiante).
+- **[services/quota.py]** Les clés Redis `quota:{user_id}:*` sont supprimées (SCAN, best-effort : une panne Redis est loggée sans faire échouer la suppression ; TTL minuit UTC en filet de sécurité). Les clés `quota:installation:{hash}:*` sont des hash d'installation non liés au compte et expirent seuls.
+- **[core/security.py]** `delete_supabase_user` traite un 404 comme un succès (rejeu idempotent) **uniquement si** le corps JSON contient `error_code == "user_not_found"`. Un 404 sans ce marqueur (URL mal configurée, corps HTML ou non-JSON, JSON sans `error_code`) lève la même `HTTPException(500)` que les autres échecs, avec un `logger.warning` (statut seul, sans identifiant ni secret). Comportement de l'API Admin pour les utilisateurs anonymes non vérifié sur une instance réelle (ils existent dans `auth.users`, `DELETE /auth/v1/admin/users/{id}` est censé fonctionner).
+- **[services/rate_limit.py, endpoints/user.py]** `DELETE /api/v1/user` est limité à 5 tentatives par heure et par utilisateur (clé Redis `rate_limit:delete_account:{sha256(user_id)}:{fenêtre}`, même mécanique que le push token). Au-delà : 429 `{"detail": "Trop de requêtes", "code": "RATE_LIMIT_EXCEEDED"}` avant toute suppression. Pas de limite par IP (cohérent avec le push token). Si Redis est indisponible, la requête échoue (comme les autres endpoints limités).
+- **[dependencies.py]** Limite connue : le JWT est validé localement (aucun appel Supabase/DB), il reste donc accepté jusqu'à son expiration après la suppression du compte.
+
+## 2026-10-27 Audit sécurité — Story 2-4b : Suppression des comptes anonymes (PR backend#35)
+
+### 🟡 WARNING
+
+- **[services/rate_limit.py:check_delete_account]** Rate limit par `user_id` uniquement, sans limite par IP. Chaque nouvelle session anonyme Supabase démarre avec un bucket neuf : N sessions anonymes créées → N appels possibles à l'API Admin Supabase (`DELETE /auth/v1/admin/users/{id}`) avec la `service_role_key`. La protection effective contre un abus à grande échelle repose sur le rate limiting de création de session côté Supabase (externe, hors contrôle du backend). → Surveiller en production le volume d'appels Admin Supabase ; envisager un rate limit par IP comme couche supplémentaire si des pics anormaux apparaissent.
+- **[services/rate_limit.py:76]** Fenêtre fixe (`window = int(time.time() // 3600)`) : un acteur épuisant 5 appels à 00:58 peut en enchaîner 5 autres à 01:00, soit 10 suppressions en ~2 minutes à la frontière de fenêtre. Risque faible pour la suppression de compte (identique au comportement du push token, déjà accepté). → Accepté en cohérence avec le pattern existant.
+
+### 🔵 INFO
+
+- **[services/quota.py:delete_user_keys]** Suppression des clés `quota:{user_id}:*` correctement isolée par `_escape_glob` sur le user_id (échappe `\*?[]`). Les clés `quota:installation:{hash}:*` ne sont pas touchées et expirent seules — comportement attendu et documenté.
+- **[Quota bypass]** La suppression du compte ne dégrade pas significativement la protection du quota freemium : le contournement par création d'une nouvelle session anonyme + nouvel UUID d'installation (client-contrôlé) était déjà possible avant cette story et est documenté dans l'entrée 2026-09-28. La suppression ne raccourcit pas ce chemin.
+- **[core/security.py:_is_user_not_found]** Filtrage du 404 Supabase correct : seul un corps JSON avec `error_code == "user_not_found"` déclenche le retour silencieux. Corps non-JSON, non-dict ou `error_code` absent ou différent → `HTTPException(500)`. Protection correcte contre une URL mal configurée.
+- **[endpoints/user.py, services/user.py]** Pas d'IDOR : `user_id` extrait exclusivement du JWT validé localement (`current_user["id"]`), jamais d'un paramètre client.
+- **[Logs]** `logger.info("user_deleted", ...)` et `logger.warning("delete_account_rate_limited", ...)` ne portent que l'UUID Supabase — cohérent avec les pratiques existantes. Aucun email, token ni clé `service_role` loggé.
+- **[JWT post-suppression — sessions anonymes]** Pour un token anonyme encore valide après suppression : `POST /user/provision` est bloqué (403 `ACCOUNT_REQUIRED` via `get_permanent_user`) ; `POST/DELETE/GET /user/favorites` idem (403). `GET /score` peut créer une ligne `Prediction` (best-effort), sans recréer de ligne `users`. La phrase de `docs/story-2-4b-suppression-comptes-anonymes.md` ("recréer une ligne via le provisioning") est inexacte pour les sessions anonymes (provision bloqué en 403) ; elle est exacte pour un token permanent post-suppression.
+
+### Verdict
+
+SECURE POUR LE MERGE — aucun CRITIQUE. Les deux WARNING sont non immédiats (amplification Supabase gated par le rate limiting Supabase sur la création de sessions, fenêtre fixe déjà acceptée sur le push token). Les limites résiduelles sont documentées dans `docs/story-2-4b-suppression-comptes-anonymes.md`.
+
+## 2026-10-27 — Purge automatique des comptes anonymes inactifs (story 2-4c)
+
+**Surface ajoutée** : endpoint interne `POST /internal/maintenance/purge-anonymous?dry_run=` (router `internal_maintenance.py`, tag `internal`), appelé par un cron du VPS ; nouvel appel sortant `GET {SUPABASE_URL}/auth/v1/admin/users/{id}` avec la `service_role_key`.
+
+- **[endpoints/internal_maintenance.py]** Protégé par `require_cron_secret` (header `X-Cron-Secret`, comparaison à temps constant, fail closed : secret absent ou < 32 car. → 503, faux ou JWT seul → 403). Aucun paramètre client ne désigne un utilisateur : pas d'IDOR possible, seul `dry_run` (bool, 422 sinon) est accepté. 503 `SERVICE_UNAVAILABLE` si `SUPABASE_URL` ou `SUPABASE_SERVICE_ROLE_KEY` manque (aucun appel sortant vers une URL relative).
+- **[services/anonymous_purge.py]** Double garde contre la suppression d'un compte permanent : préfiltre SQL (aucune ligne `users`) **et** confirmation Supabase `is_anonymous is True` (comparaison stricte : `"true"`, `1`, champ absent → non supprimé, compté `skipped_not_anonymous`). Sélection en une requête ORM paramétrée (union des tables d'activité, `LIMIT`), pas de SQL brut.
+- **[core/security.py:get_supabase_user]** Fail safe : seul un 200 avec corps JSON objet ou un 404 confirmé `error_code == "user_not_found"` est exploité ; réseau, 5xx, 401, 404 sans marqueur, corps non JSON → `SupabaseAdminError`, le candidat est compté en `errors` et **rien** n'est supprimé. Un `SUPABASE_URL` mal configuré ne peut donc pas déclencher de purge. Logs : statut HTTP ou type d'exception seulement, ni identifiant ni clé.
+- **[Plafond]** `ANON_PURGE_MAX_PER_RUN` (200) borne le nombre d'appels Admin Supabase et la durée de l'appel ; un secret cron compromis ne peut purger que des comptes réellement anonymes et inactifs depuis `ANON_RETENTION_DAYS`, au rythme du plafond.
+- **[Logs / réponse]** Compteurs uniquement (`anonymous_purge_done`), aucun `user_id`. Limite connue : `delete_user_data` émet un `logger.debug("user_data_deleted", user_id)` préexistant, silencieux au niveau `INFO` figé en prod.
+- **[dry_run]** Effectue les mêmes lectures Supabase que la purge réelle (appels Admin en lecture seule), sans aucune écriture.
+- **Risques résiduels** : purge d'un anonyme qui redevient actif dans la fenêtre sélection → suppression (secondes) ; si la suppression Supabase échoue après l'effacement local, un compte anonyme vide reste chez Supabase (aucune donnée chez nous). Rétention 30 jours à valider juridiquement et à publier dans la politique de confidentialité.
+
+---
+
+## 2026-10-27 Audit sécurité — Story 2-4c : Purge automatique des comptes anonymes inactifs (feature/purge-inactive-anonymous)
+
+Périmètre : diff `feature/account-deletion-gdpr..feature/purge-inactive-anonymous`. Fichiers audités : `app/services/anonymous_purge.py`, `app/core/security.py` (ajout `get_supabase_user`/`SupabaseAdminError`), `app/api/v1/endpoints/internal_maintenance.py`, `app/core/config.py` (ajout `ANON_*`).
+
+### 🔴 CRITIQUE
+
+Aucun.
+
+### 🟡 WARNING
+
+- **[app/services/anonymous_purge.py:86-104]** État partiel permanent si `delete_supabase_user` échoue après `delete_user_data`. `delete_user_data` appelle `await db.commit()` en interne avant de retourner ; si `delete_supabase_user` lève ensuite, le `await db.rollback()` dans le bloc `except` est un no-op (la transaction est déjà fermée). Résultat : données locales supprimées de façon permanente, compte Supabase toujours actif et orphelin. Comme le candidat n'a plus de données dans nos tables d'activité, il ne réapparaîtra pas dans les passes suivantes : l'orphelin Supabase est permanent. Ce n'est pas un risque de sécurité direct (aucune donnée perso dans notre système) mais une non-conformité RGPD partielle (le compte Supabase subsiste). Recommandation : a) distinguer l'erreur pré-commit (rollback correct) de l'erreur post-commit avec un log `WARNING` explicite `"anonymous_purge_supabase_orphan"` ; b) envisager un mécanisme de retry ou un topic de dead-letter pour rejouer la suppression Supabase.
+
+- **[app/api/v1/endpoints/internal_maintenance.py]** Pas de verrou Redis contre les exécutions concurrentes (contrairement à `lock:favorite-alerts` de l'endpoint run-favorites). Deux déclenchements simultanés (cron mal configuré + déclenchement manuel) traitent les mêmes candidats : les opérations sont idempotentes (`delete_user_data` supporte les re-runs car commit déjà fait, Redis no-op, Supabase 404 géré), mais cela double les appels Admin Supabase (`GET` + éventuellement `DELETE`) et peut heurter le rate limit Supabase côté admin. Recommandation : ajouter un verrou Redis `lock:anon-purge` (jeton unique, TTL 300 s) en tête d'endpoint, retourner 200 `{dry_run: false, candidates: 0, ...}` si le verrou est pris.
+
+### 🔵 INFO
+
+- **[app/core/security.py:get_supabase_user]** Gestion exhaustive des cas Supabase : réseau, 5xx, 401, 200 sans corps JSON-objet (corps non-JSON → `ValueError` attrapé → `body = None` → `SupabaseAdminError`), 404 sans marqueur `user_not_found` → tous lèvent `SupabaseAdminError` → candidat compté en erreur, rien supprimé. La suppression n'a lieu que sur un 200 JSON-objet confirmant `is_anonymous is True`, ou sur un 404 `user_not_found` (nettoyage des données locales seulement). Conception fail-safe correcte.
+
+- **[app/services/anonymous_purge.py:90]** `supabase_user.get("is_anonymous") is not True` traite les cas `False`, `None`, et champ absent comme non-anonyme (skip). La suppression n'a lieu que si le champ est explicitement booléen `True`. Correct et conservateur.
+
+- **[app/services/anonymous_purge.py:build_candidates_query]** Les trois tables d'activité utilisent `DateTime(timezone=True)` et le cutoff est `datetime.now(UTC)` (timezone-aware). Pas de comparaison naïve possible. UNION `HAVING max(at) < cutoff` avec `ORDER BY last_activity ASC, user_id ASC` et `LIMIT` : tri déterministe et plafond respectés.
+
+- **[Traefik / exposition publique]** L'endpoint `/internal/maintenance/purge-anonymous` hérite de la même exposition que `/internal/notifications/run-favorites` (Traefik porte 443, pas de restriction IP dans le code). Protection : cron secret seul. Avec un secret compromis, l'attaquant peut purger au plus `ANON_PURGE_MAX_PER_RUN=200` comptes anonymes inactifs par requête (aucun compte permanent possible : double garde). Recommandation identique à story 5.2 : IP allowlist VPS dans Traefik avant production.
+
+- **[app/services/anonymous_purge.py:86-104]** Le `await db.rollback()` dans le bloc `except` est un no-op si `delete_user_data` a déjà commité. Il reste utile si `delete_user_data` lève avant son propre `commit()` (les DELETEs en attente sont alors correctement annulés). Code non dangereux mais trompe la lecture : un commentaire serait utile.
+
+### Verdict
+
+SECURE POUR LE MERGE — aucun CRITIQUE. Le WARNING d'état partiel (orphelin Supabase) est non bloquant sur le plan sécurité ; il mérite un suivi RGPD (log explicite + cleanup manuel ou retry). Le WARNING concurrent est de confort opérationnel. L'IP allowlist Traefik reste un prérequis infra avant exposition production, déjà documenté pour run-favorites.
+
+## 2026-10-27 — Story 2-4c : corrections suite à l'audit (ordre de suppression, verrou)
+
+- **[services/anonymous_purge.py]** WARNING « état partiel permanent » **résolu** par l'inversion de l'ordre : `delete_supabase_user` est appelé **avant** `delete_user_data`. Échec Supabase → aucune suppression locale, le candidat reste sélectionné et est rejoué au passage suivant. Échec local après Supabase → `rollback` (utile ici : `delete_user_data` lève avant son propre `commit`), erreur comptée ; au passage suivant, `get_supabase_user` renvoie un 404 `user_not_found` et seule la purge locale est rejouée (auto-réparation, couvert par `test_local_failure_after_supabase_is_repaired_on_the_next_run`). Plus de compte Supabase orphelin possible par ce chemin. Le `rollback` trompeur après un échec Supabase est supprimé.
+- **[services/anonymous_purge.py]** WARNING « exécutions concurrentes » **résolu** : verrou Redis `lock:anon-purge` calqué sur `lock:favorite-alerts` (jeton `uuid4().hex`, `SET NX EX 300`, libération par script Lua compare-et-supprime dans un `finally`, échec de libération loggé sans le jeton). Verrou pris → 200 avec compteurs à 0 et `skipped_locked: 1` (même convention que `run-favorites`). Le dry_run, sans écriture, ne prend pas le verrou. Limite : un passage qui dépasserait 300 s (200 candidats avec Supabase en limite de timeout) perd le verrou ; un second passage peut alors démarrer, sans danger (opérations idempotentes, la libération ne supprime pas le verrou d'un autre run).
+- **[core/security.py]** Message `SupabaseAdminError` distinct pour un 200 au corps invalide (`unexpected body for status 200`), sans identifiant.
+- Reste ouvert (inchangé) : IP allowlist Traefik sur `/internal/*` avant production.

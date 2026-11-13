@@ -1,0 +1,107 @@
+# ────────────────────────────────────────────────
+#  Cloudbreak Backend — commandes de développement
+#  Usage : make <commande>
+# ────────────────────────────────────────────────
+
+.PHONY: help validate lint format typecheck test dev down logs migrate migration install seed seed-test unseed-test clean-subscriptions reset-db
+
+help:
+	@echo ""
+	@echo "  Cloudbreak Backend"
+	@echo ""
+	@echo "  Qualité"
+	@echo "    make validate    ruff + mypy + pytest --cov (à lancer avant chaque commit)"
+	@echo "    make lint        ruff check uniquement"
+	@echo "    make format      ruff format (corrige les fichiers)"
+	@echo "    make typecheck   mypy uniquement"
+	@echo "    make test        pytest avec coverage"
+	@echo ""
+	@echo "  Infra locale"
+	@echo "    make dev         lance api + db + redis (Docker)"
+	@echo "    make down        arrête les containers"
+	@echo "    make logs        suit les logs en temps réel"
+	@echo ""
+	@echo "  Base de données"
+	@echo "    make migrate            applique les migrations"
+	@echo "    make migration          génère une nouvelle migration (autogenerate)"
+	@echo "    make seed               insère les sommets initiaux"
+	@echo "    make seed-test          insère les users de test (freemium, pro, admin)"
+	@echo "    make unseed-test        supprime les users de test"
+	@echo "    make clean-subscriptions vide juste la table subscriptions"
+	@echo "    make reset-db           reset complet (drop tables + recreate)"
+	@echo ""
+	@echo "  Dépendances"
+	@echo "    make install     pip install requirements"
+	@echo ""
+
+# Valide tout avant de commiter — à lancer obligatoirement
+validate:
+	ruff check .
+	ruff format --check .
+	mypy app/
+	pytest --cov=app --cov-report=term-missing
+
+# Qualité individuelle
+lint:
+	ruff check .
+
+format:
+	ruff format .
+
+typecheck:
+	mypy app/
+
+test:
+	pytest --cov=app --cov-report=term-missing
+
+# Infra locale (db + redis)
+dev:
+	docker compose -f docker-compose.dev.yml up -d
+
+down:
+	docker compose -f docker-compose.dev.yml down
+
+logs:
+	docker compose -f docker-compose.dev.yml logs -f
+
+# Migrations
+migrate:
+	PYTHONPATH=. alembic upgrade head
+
+migration:
+	@read -p "Description de la migration : " desc; \
+	PYTHONPATH=. alembic revision --autogenerate -m "$$desc"
+
+# Seed données initiales (sommets)
+seed:
+	python -m app.db.seed
+
+# Seed users de test (freemium, pro, admin)
+seed-test:
+	python -m app.db.seed_test_users seed
+
+unseed-test:
+	python -m app.db.seed_test_users unseed
+
+# Vider juste la table subscriptions
+clean-subscriptions:
+	docker exec cloudbreak-db psql -U postgres -d cloudbreak -c \
+	  "TRUNCATE TABLE subscriptions;"
+	@echo "✅ Table subscriptions vidée"
+
+# Reset complète BD (danger : drop tables)
+reset-db:
+	@echo "⚠️  Attention : ceci va DROP toutes les tables et les recréer"
+	@read -p "Confirmer (y/n) : " confirm; \
+	if [ "$$confirm" = "y" ]; then \
+		PYTHONPATH=. alembic downgrade base; \
+		PYTHONPATH=. alembic upgrade head; \
+		python -m app.db.seed; \
+		echo "✅ BD reset complète et seed inséré"; \
+	else \
+		echo "❌ Annulé"; \
+	fi
+
+# Dépendances
+install:
+	pip install -r requirements.txt -r requirements-dev.txt

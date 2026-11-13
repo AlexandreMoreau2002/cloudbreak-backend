@@ -4,8 +4,12 @@ __pycache__/
 *.pyo
 .env
 .DS_Store
+.vscode/settings.json
 *.log
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
 htmlcov/
+.coverage
+.tmp/
+app/db/peaks_data_new.json

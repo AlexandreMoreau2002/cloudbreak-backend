@@ -1,0 +1,36 @@
+# Auth - signup + token
+#
+#
+# testEmail
+# freemiumEmail
+# proEmail
+
+###
+# Creer une session invitee (le JWT retourne contient is_anonymous: true)
+POST {{supabaseUrl}}/auth/v1/signup
+Content-Type: application/json
+apikey: {{supabaseKey}}
+
+{}
+
+###
+# Creer un compte
+POST {{supabaseUrl}}/auth/v1/signup
+Content-Type: application/json
+apikey: {{supabaseKey}}
+
+{
+  "email": "{{testEmail}}",
+  "password": "{{password}}"
+}
+
+###
+# Se connecter et recuperer access_token dans la reponse
+POST {{supabaseUrl}}/auth/v1/token?grant_type=password
+Content-Type: application/json
+apikey: {{supabaseKey}}
+
+{
+  "email": "{{testEmail}}",
+  "password": "{{password}}"
+}

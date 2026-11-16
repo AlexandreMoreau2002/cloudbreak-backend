@@ -11,6 +11,8 @@ def _strip_sensitive_data(event: Event, _hint: Hint) -> Event:
     event.pop("extra", None)
     event.pop("logentry", None)
     event.pop("message", None)
+    # The SDK copies incoming baggage from the trace context into envelope headers.
+    event.get("contexts", {}).pop("trace", None)
     if "exception" in event:
         for exception in event["exception"]["values"]:
             exception.pop("value", None)

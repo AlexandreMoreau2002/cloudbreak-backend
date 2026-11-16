@@ -72,7 +72,7 @@ def test_sentry_keeps_exception_type_and_stack_without_request_or_error_values()
     }
 
 
-def test_fastapi_error_envelope_excludes_incoming_sentry_baggage() -> None:
+def test_fastapi_does_not_send_incoming_sentry_baggage() -> None:
     # Sentry patches FastAPI and Starlette globally, so exercise the real SDK in a fresh process.
     script = dedent("""
         import asyncio
@@ -80,12 +80,13 @@ def test_fastapi_error_envelope_excludes_incoming_sentry_baggage() -> None:
 
         import sentry_sdk
         from fastapi import FastAPI
-        from httpx import ASGITransport, Request
+        from httpx import ASGITransport, AsyncClient, MockTransport, Request, Response
         from sentry_sdk.transport import Transport
 
         from app.core.sentry import initialize_sentry
 
         envelopes = []
+        upstream_requests = []
 
         class MemoryTransport(Transport):
             def capture_envelope(self, envelope):
@@ -101,8 +102,14 @@ def test_fastapi_error_envelope_excludes_incoming_sentry_baggage() -> None:
 
         app = FastAPI()
 
+        def upstream(request):
+            upstream_requests.append(request)
+            return Response(200)
+
         @app.get("/failure")
         async def failure():
+            async with AsyncClient(transport=MockTransport(upstream)) as client:
+                await client.get("https://api.vendor.invalid")
             raise ValueError("controlled error")
 
         # Bypass HTTPX client instrumentation so the incoming headers reach the ASGI boundary.
@@ -114,6 +121,13 @@ def test_fastapi_error_envelope_excludes_incoming_sentry_baggage() -> None:
         response = asyncio.run(transport.handle_async_request(request))
 
         assert response.status_code == 500
+        [upstream_request] = upstream_requests
+        leaked_headers = {
+            name: upstream_request.headers[name]
+            for name in ("sentry-trace", "baggage")
+            if name in upstream_request.headers
+        }
+        assert not leaked_headers, leaked_headers
         [envelope] = envelopes
         [item] = envelope.items
         assert item.type == "event"

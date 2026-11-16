@@ -32,6 +32,7 @@ def initialize_sentry(dsn: str, environment: str, release: str) -> None:
         include_local_variables=False,
         max_breadcrumbs=0,
         traces_sample_rate=None,
+        trace_propagation_targets=[],
         profile_session_sample_rate=0.0,
         auto_session_tracking=False,
         disabled_integrations=[LoggingIntegration],

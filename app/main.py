@@ -8,6 +8,7 @@ from sqlalchemy.exc import OperationalError
 
 from app.core.errors import ApiError
 from app.core.config import settings
+from app.core.sentry import initialize_sentry
 from app.api.v1.endpoints.user import router as user_router
 from app.api.v1.endpoints.peaks import router as peaks_router
 from app.api.v1.endpoints.score import router as score_router
@@ -77,4 +78,5 @@ def create_app(environment: str) -> FastAPI:
     return application
 
 
+initialize_sentry(settings.sentry_dsn, settings.environment, settings.app_version)
 app = create_app(settings.environment)

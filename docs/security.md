@@ -886,3 +886,23 @@ CORRECTIONS REQUISES AVANT MERGE — l'exfiltration de `baggage` vers les dépen
 ### Verdict
 
 APPROUVÉ POUR LE CODE — le branchement réel reste conditionné à `SENTRY_DSN` dans Dokploy et à une vérification contrôlée en environnement de développement.
+
+---
+
+## 2026-11-16 — PostHog backend, analytics explicite seulement
+
+- **[app/services/analytics.py]** Le client PostHog ne s'initialise que si `POSTHOG_API_KEY` et
+  `POSTHOG_HOST` sont fournis par Dokploy. Une valeur absente laisse `track()` sans client, sans
+  appel réseau et sans effet sur les routes métier.
+- **[Données]** Une liste blanche contrôle les événements métier et chacune de leurs propriétés.
+  Les valeurs libres, PII, corps HTTP, jetons, messages d'erreur et événements inconnus sont
+  ignorés sans lever d'exception. Le `distinct_id` est un identifiant pseudonyme reçu par
+  l'appelant ; aucun profil de personne n'est demandé.
+- **[Périmètre]** Autocapture, replay, erreurs, logs, feature flags et person profiles PostHog ne
+  sont pas utilisés. Le projet actuel est limité au dev/TestFlight ; aucune clé de production n'est
+  créée ni documentée.
+
+### Verdict
+
+APPROUVÉ POUR LE CODE — ne poser les variables que dans Dokploy dev pour la recette contrôlée. Un
+projet PostHog de production séparé et une nouvelle validation sont requis avant trafic public.

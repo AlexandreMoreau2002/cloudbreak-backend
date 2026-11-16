@@ -848,3 +848,41 @@ SECURE POUR LE MERGE — aucun CRITIQUE. Le WARNING d'état partiel (orphelin Su
 - **[services/anonymous_purge.py]** WARNING « exécutions concurrentes » **résolu** : verrou Redis `lock:anon-purge` calqué sur `lock:favorite-alerts` (jeton `uuid4().hex`, `SET NX EX 300`, libération par script Lua compare-et-supprime dans un `finally`, échec de libération loggé sans le jeton). Verrou pris → 200 avec compteurs à 0 et `skipped_locked: 1` (même convention que `run-favorites`). Le dry_run, sans écriture, ne prend pas le verrou. Limite : un passage qui dépasserait 300 s (200 candidats avec Supabase en limite de timeout) perd le verrou ; un second passage peut alors démarrer, sans danger (opérations idempotentes, la libération ne supprime pas le verrou d'un autre run).
 - **[core/security.py]** Message `SupabaseAdminError` distinct pour un 200 au corps invalide (`unexpected body for status 200`), sans identifiant.
 - Reste ouvert (inchangé) : IP allowlist Traefik sur `/internal/*` avant production.
+
+## 2026-11-16 — Observabilité Sentry, initialisation backend (tâche 1)
+
+### 🔴 CRITIQUE
+
+- **[app/core/sentry.py:6]** Avec un DSN configuré, une requête qui provoque une exception non gérée peut transmettre des valeurs sensibles à Sentry via les en-têtes entrants `sentry-trace` et `baggage`. Le SDK 2.75.0 copie les valeurs `sentry-*` de `baggage` dans `contexts.trace.dynamic_sampling_context`, puis les déplace dans l'en-tête `trace` de l'enveloppe. Reproduit sur une requête FastAPI en mémoire avec un e-mail et un jeton synthétiques, le traçage désactivé. → Supprimer le contexte de trace dans `before_send` et vérifier l'enveloppe complète avec un transport en mémoire.
+
+### 🔵 INFO
+
+- **[app/core/sentry.py:20]** Un DSN vide désactive l'initialisation. Avec un DSN configuré, le filtre retire la requête, l'utilisateur et les messages d'exception du corps de l'événement. Les variables locales, les breadcrumbs et l'intégration des logs sont désactivés.
+
+### Verdict
+
+CORRECTIONS REQUISES AVANT MERGE.
+
+## 2026-11-16 — Observabilité Sentry, re-audit après correction (tâche 1)
+
+### 🔴 CRITIQUE
+
+- **[app/core/sentry.py:26-38]** La suppression de `contexts.trace` dans `before_send` corrige l'enveloppe envoyée à Sentry, mais ne corrige pas la propagation HTTP sortante. `HttpxIntegration` est active par défaut et `trace_propagation_targets` vaut `['.*']` par défaut dans `sentry-sdk` 2.75.0. Une requête FastAPI entrante portant un `baggage` contrôlé par le client est donc retransmise par le backend à un service tiers (Expo, Open-Meteo ou Supabase) via les en-têtes `sentry-trace` / `baggage`, même avec `traces_sample_rate=None`. Reproduit localement avec un transport HTTPX mémoire : les deux valeurs synthétiques injectées en entrée étaient présentes dans la requête sortante. → Pour ce mode *erreurs seulement*, définir explicitement `trace_propagation_targets=[]` (ou désactiver l'intégration HTTPX) et couvrir l'absence de ces en-têtes dans une requête sortante.
+
+### 🔵 INFO
+
+- **[app/core/sentry.py:11-13]** La correction `2174c0e` est effective pour les enveloppes d'erreurs : la régression avec un vrai transport Sentry confirme l'absence de l'en-tête `trace` et des valeurs synthétiques dans l'événement sérialisé.
+
+### Verdict
+
+CORRECTIONS REQUISES AVANT MERGE — l'exfiltration de `baggage` vers les dépendances HTTP sortantes reste possible tant que la propagation n'est pas explicitement désactivée.
+
+## 2026-11-16 — Observabilité Sentry, validation finale (tâche 1)
+
+- **Résolu** : `trace_propagation_targets=[]` désactive la propagation HTTP sortante des en-têtes `sentry-trace` et `baggage`. La régression avec SDK et transport HTTPX en mémoire confirme qu'aucun des deux en-têtes ni valeur synthétique n'est transmis à une dépendance tierce.
+- **Résolu** : le filtre retire le contexte de trace avant la construction de l'enveloppe Sentry. Le test d'enveloppe réel confirme l'absence de l'en-tête `trace`, d'e-mail et de jeton synthétiques dans l'événement sérialisé.
+- **Conservé** : PII, corps de requête, variables locales, breadcrumbs, logs, profiling, sessions et tracing ne sont pas collectés. Un `SENTRY_DSN` vide reste un no-op.
+
+### Verdict
+
+APPROUVÉ POUR LE CODE — le branchement réel reste conditionné à `SENTRY_DSN` dans Dokploy et à une vérification contrôlée en environnement de développement.

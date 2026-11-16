@@ -906,3 +906,45 @@ APPROUVÉ POUR LE CODE — le branchement réel reste conditionné à `SENTRY_DS
 
 APPROUVÉ POUR LE CODE — ne poser les variables que dans Dokploy dev pour la recette contrôlée. Un
 projet PostHog de production séparé et une nouvelle validation sont requis avant trafic public.
+
+## 2026-11-16 — PostHog backend, re-audit du filtre de propriétés
+
+### 🟡 WARNING
+
+- **[app/services/analytics.py:120]** Chaque `capture()` porte un `distinct_id` non vide, mais
+  n'envoie pas la propriété PostHog `$process_person_profile: false`. Le SDK ne l'ajoute
+  automatiquement que pour les événements sans identifiant ; selon le réglage du projet PostHog,
+  ces captures peuvent donc créer ou enrichir des profils de personne. Cela contredit le
+  périmètre annoncé « sans person profiles ». → Ajouter cette propriété contrôlée par le serveur
+  à chaque capture et couvrir l'enveloppe envoyée ; conserver le réglage de projet sans profils
+  comme défense supplémentaire.
+
+### 🔵 INFO
+
+- **[app/services/analytics.py:21-120]** Le correctif valide désormais les identifiants de sommet
+  et de prédiction comme UUID RFC 4122, les plans et verdicts comme enums fermés, et les nombres
+  dans des bornes strictes. Toute propriété connue invalide annule l'événement entier ; les clés
+  inconnues sont retirées. Les tests dédiés couvrent e-mail/texte libre, bornes et valeurs valides.
+- **[app/services/analytics.py:72-80]** `disable_geoip`, l'absence de clé de feature flags et
+  l'autocapture d'exceptions désactivée limitent les données annexes. `privacy_mode=True` ne doit
+  toutefois pas être considéré comme le contrôle des propriétés analytics : il concerne
+  l'observabilité IA du SDK, d'où la nécessité de la liste blanche applicative.
+
+### Verdict
+
+CORRECTION REQUISE AVANT MERGE — le filtrage anti-PII est désormais correctement traité, mais
+l'interdiction explicite des profils de personne doit aussi être imposée dans le payload backend.
+
+## 2026-11-16 — PostHog backend, validation finale des profils
+
+- **Résolu :** chaque appel `capture()` injecte `$process_person_profile: false` après le filtre
+  applicatif. Un appelant ne peut ni retirer ni remplacer cette valeur : les propriétés inconnues,
+  dont une tentative de fournir cette clé, sont écartées avant l'injection contrôlée.
+- **Vérifié :** le test dédié couvre l'enveloppe passée au client, et une vérification avec le SDK
+  PostHog installé confirme que la propriété est conservée dans le payload sérialisé pour un
+  `distinct_id` non vide.
+
+### Verdict
+
+APPROUVÉ POUR LE CODE — l'absence de profils est imposée côté backend ; conserver le réglage
+PostHog sans profils comme défense supplémentaire lors de la recette dev/TestFlight.

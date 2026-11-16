@@ -9,6 +9,7 @@ from sqlalchemy.exc import OperationalError
 from app.core.errors import ApiError
 from app.core.config import settings
 from app.core.sentry import initialize_sentry
+from app.services.analytics import initialize_analytics, shutdown_analytics
 from app.api.v1.endpoints.user import router as user_router
 from app.api.v1.endpoints.peaks import router as peaks_router
 from app.api.v1.endpoints.score import router as score_router
@@ -29,7 +30,10 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("startup", extra={"event": "backend_started", "version": settings.app_version})
-    yield
+    try:
+        yield
+    finally:
+        shutdown_analytics()
 
 
 async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
@@ -79,4 +83,5 @@ def create_app(environment: str) -> FastAPI:
 
 
 initialize_sentry(settings.sentry_dsn, settings.environment, settings.app_version)
+initialize_analytics(settings.posthog_api_key, settings.posthog_host)
 app = create_app(settings.environment)

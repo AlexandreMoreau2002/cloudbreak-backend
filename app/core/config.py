@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     supabase_jwt_jwks: str = ""
     supabase_db_password: str = ""
     posthog_api_key: str = ""
+    posthog_host: str = ""
     sentry_dsn: str = ""
     expo_access_token: str = ""
     internal_cron_secret: str = ""

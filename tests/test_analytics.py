@@ -65,7 +65,13 @@ def test_track_captures_only_whitelisted_properties(monkeypatch) -> None:
         {
             "event": "score_calculated",
             "distinct_id": "user-1",
-            "properties": {"peak_id": PEAK_ID, "score": 88, "plan": "free", "verdict": "high"},
+            "properties": {
+                "$process_person_profile": False,
+                "peak_id": PEAK_ID,
+                "score": 88,
+                "plan": "free",
+                "verdict": "high",
+            },
         }
     ]
 
@@ -78,6 +84,21 @@ def test_track_ignores_unknown_events_and_unsafe_properties(monkeypatch) -> None
     analytics.track("score_calculated", "user-1", {"score": "eighty-eight"})
 
     assert client.captures == []
+
+
+def test_track_disables_person_profile_processing(monkeypatch) -> None:
+    client = FakePosthog("project-token", "https://eu.i.posthog.com", disable_geoip=True)
+    monkeypatch.setattr(analytics, "_client", client)
+
+    analytics.track("account_deleted", "user-1")
+
+    assert client.captures == [
+        {
+            "event": "account_deleted",
+            "distinct_id": "user-1",
+            "properties": {"$process_person_profile": False},
+        }
+    ]
 
 
 def test_track_rejects_free_text_and_out_of_range_known_properties(monkeypatch) -> None:
@@ -132,17 +153,32 @@ def test_track_captures_valid_uuid_enums_and_bounded_values(monkeypatch) -> None
         {
             "event": "score_calculated",
             "distinct_id": "user-1",
-            "properties": {"peak_id": PEAK_ID, "score": 100, "plan": "premium", "verdict": "high"},
+            "properties": {
+                "$process_person_profile": False,
+                "peak_id": PEAK_ID,
+                "score": 100,
+                "plan": "premium",
+                "verdict": "high",
+            },
         },
         {
             "event": "score_week_calculated",
             "distinct_id": "user-1",
-            "properties": {"peak_id": PEAK_ID, "cell_count": 63, "plan": "pro"},
+            "properties": {
+                "$process_person_profile": False,
+                "peak_id": PEAK_ID,
+                "cell_count": 63,
+                "plan": "pro",
+            },
         },
         {
             "event": "terrain_validated",
             "distinct_id": "user-1",
-            "properties": {"prediction_id": PREDICTION_ID, "result": False},
+            "properties": {
+                "$process_person_profile": False,
+                "prediction_id": PREDICTION_ID,
+                "result": False,
+            },
         },
     ]
 

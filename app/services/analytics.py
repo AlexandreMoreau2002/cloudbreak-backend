@@ -117,4 +117,8 @@ def track(event: str, user_id: str, properties: AnalyticsProperties | None = Non
         logger.warning("analytics_event_rejected", extra={"event": event})
         return
 
-    _client.capture(distinct_id=user_id, event=event, properties=safe_properties)
+    _client.capture(
+        distinct_id=user_id,
+        event=event,
+        properties={"$process_person_profile": False, **safe_properties},
+    )

@@ -7,6 +7,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+ARG GIT_SHA
+ARG BUILT_AT
+ARG GIT_TAG
+ENV GIT_SHA=${GIT_SHA} BUILT_AT=${BUILT_AT} GIT_TAG=${GIT_TAG}
+
 EXPOSE 8000
 
 # Migrations appliquées à chaque démarrage : si elles échouent, le conteneur ne démarre pas

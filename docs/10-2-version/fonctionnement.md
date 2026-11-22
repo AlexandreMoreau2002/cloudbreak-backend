@@ -20,9 +20,9 @@ GET /version  --->  Réponse JSON à cinq champs
 | --- | --- | --- |
 | `service` | Nom du service | Toujours `backend` |
 | `sha` | Commit Git du build | `"unknown"` si le SHA est absent ou vide |
-| `built_at` | Date du build fournie en ISO 8601 UTC | `null` si la date ou le SHA manque |
+| `built_at` | Date du build au format ISO 8601, convertie en UTC avec suffixe `Z` | `null` si la date est absente, invalide ou sans fuseau, ou si le SHA manque |
 | `version` | Version applicative du backend | `1.0.0` par défaut |
-| `tag` | Tag `vX.Y.Z` fourni si le commit correspond exactement au tag | `null` si le tag est absent ou vide |
+| `tag` | Tag `vX.Y.Z` fourni si le commit correspond exactement au tag | `null` si le tag ou le SHA est absent ou vide |
 
 La route renvoie les métadonnées présentes dans l'image ou l'environnement d'exécution. Le build fournit le SHA, la date UTC et, le cas échéant, le tag Git. La réponse se limite aux champs listés et ne nécessite aucun accès à Postgres ou Redis.
 

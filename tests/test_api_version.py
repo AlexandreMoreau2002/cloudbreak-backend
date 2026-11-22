@@ -1,4 +1,4 @@
-from pytest import MonkeyPatch
+from pytest import MonkeyPatch, mark
 from fastapi.testclient import TestClient
 
 from app.core import config
@@ -70,3 +70,45 @@ def test_does_not_expose_settings_or_secrets(monkeypatch: MonkeyPatch) -> None:
     assert set(response.json()) == {"service", "sha", "built_at", "version", "tag"}
     assert "test-only-cron-secret" not in response.text
     assert "test-only-service-role" not in response.text
+
+
+def test_ignores_build_timestamp_and_tag_without_sha(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.delenv("GIT_SHA", raising=False)
+    monkeypatch.setenv("BUILT_AT", "2026-11-22T10:15:00Z")
+    monkeypatch.setenv("GIT_TAG", "v1.0.0")
+    monkeypatch.setattr(config, "settings", config.Settings(_env_file=None))
+    client = TestClient(create_app("development"))
+
+    response = client.get("/version")
+
+    assert response.status_code == 200
+    assert response.json()["sha"] == "unknown"
+    assert response.json()["built_at"] is None
+    assert response.json()["tag"] is None
+
+
+@mark.parametrize(
+    ("built_at", "expected"),
+    [
+        ("2026-11-22T11:15:00+01:00", "2026-11-22T10:15:00Z"),
+        ("2026-11-22T23:15:00-05:00", "2026-11-23T04:15:00Z"),
+        ("2026-11-22T10:15:00", None),
+        ("invalid", None),
+        (None, None),
+    ],
+)
+def test_returns_utc_build_timestamp(
+    monkeypatch: MonkeyPatch, built_at: str | None, expected: str | None
+) -> None:
+    monkeypatch.setenv("GIT_SHA", "9f3c2ab")
+    if built_at is None:
+        monkeypatch.delenv("BUILT_AT", raising=False)
+    else:
+        monkeypatch.setenv("BUILT_AT", built_at)
+    monkeypatch.setattr(config, "settings", config.Settings(_env_file=None))
+    client = TestClient(create_app("development"))
+
+    response = client.get("/version")
+
+    assert response.status_code == 200
+    assert response.json()["built_at"] == expected

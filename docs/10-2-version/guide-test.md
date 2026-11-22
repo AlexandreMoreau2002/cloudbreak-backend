@@ -26,9 +26,9 @@
 
 2. Recréer le service API avec `docker compose -f docker-compose.dev.yml up -d --force-recreate api` et rejouer la requête locale.
 3. Vérifier que le SHA, la date de build et le tag correspondent aux valeurs de test et que la réponse contient exactement les cinq champs du contrat.
-4. Vider `GIT_TAG`, recréer le service et vérifier que `tag` vaut `null` avec le même SHA et la même date.
+4. Tester successivement `GIT_TAG=` et `GIT_TAG=nightly`. À chaque recréation du service, vérifier que `tag` vaut `null` avec le même SHA et la même date.
 5. Régler `BUILT_AT=2026-11-22T11:15:00+01:00`, recréer le service et vérifier `built_at="2026-11-22T10:15:00Z"`.
-6. Vider `GIT_SHA`, garder la date et remettre `GIT_TAG=v1.0.0`. Recréer le service puis vérifier `sha="unknown"`, `built_at=null` et `tag=null`.
+6. Tester successivement `GIT_SHA=`, `GIT_SHA="   "` et `GIT_SHA=not-a-sha`, en gardant la date et `GIT_TAG=v1.0.0`. À chaque recréation du service, vérifier `sha="unknown"`, `built_at=null` et `tag=null`.
 7. Rétablir les valeurs du fichier `.env` et recréer le service API.
 
 ## 3. Premier déploiement dev
@@ -41,5 +41,5 @@
 
 - [ ] HTTP 200 sans jeton sur `/version` et HTTP 404 sur `/api/v1/version`.
 - [ ] Exactement cinq champs, métadonnées renseignées attendues et aucun secret.
-- [ ] Valeurs de repli vérifiées sans build args et avec un tag vide.
+- [ ] Valeurs de repli vérifiées sans build args, avec un SHA invalide et avec un tag vide ou invalide.
 - [ ] Métadonnées de l'image vérifiées lors du premier déploiement dev.

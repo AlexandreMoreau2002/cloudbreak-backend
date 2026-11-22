@@ -44,18 +44,31 @@ def test_returns_safe_local_fallback(monkeypatch: MonkeyPatch) -> None:
     }
 
 
-def test_returns_null_tag_when_not_injected(monkeypatch: MonkeyPatch) -> None:
-    monkeypatch.setenv("GIT_SHA", "9f3c2ab")
+@mark.parametrize(
+    ("tag", "expected"),
+    [
+        ("", None),
+        ("nightly", None),
+        ("v1.2.3-rc.1", None),
+        ("v12.34.56", "v12.34.56"),
+    ],
+)
+def test_only_returns_release_tags(
+    monkeypatch: MonkeyPatch, tag: str, expected: str | None
+) -> None:
+    sha = "9f3c2ab9f3c2ab9f3c2ab9f3c2ab9f3c2ab9f3c2"
+    monkeypatch.setenv("GIT_SHA", sha)
     monkeypatch.setenv("BUILT_AT", "2026-11-22T10:15:00Z")
-    monkeypatch.setenv("GIT_TAG", "")
+    monkeypatch.setenv("GIT_TAG", tag)
     monkeypatch.setattr(config, "settings", config.Settings(_env_file=None))
     client = TestClient(create_app("development"))
 
     response = client.get("/version")
 
     assert response.status_code == 200
-    assert response.json()["sha"] == "9f3c2ab"
-    assert response.json()["tag"] is None
+    assert response.json()["sha"] == sha
+    assert response.json()["built_at"] == "2026-11-22T10:15:00Z"
+    assert response.json()["tag"] == expected
 
 
 def test_does_not_expose_settings_or_secrets(monkeypatch: MonkeyPatch) -> None:
@@ -72,8 +85,14 @@ def test_does_not_expose_settings_or_secrets(monkeypatch: MonkeyPatch) -> None:
     assert "test-only-service-role" not in response.text
 
 
-def test_ignores_build_timestamp_and_tag_without_sha(monkeypatch: MonkeyPatch) -> None:
-    monkeypatch.delenv("GIT_SHA", raising=False)
+@mark.parametrize("sha", [None, "", "   ", "unknown", "not-a-sha"])
+def test_ignores_build_timestamp_and_tag_without_valid_sha(
+    monkeypatch: MonkeyPatch, sha: str | None
+) -> None:
+    if sha is None:
+        monkeypatch.delenv("GIT_SHA", raising=False)
+    else:
+        monkeypatch.setenv("GIT_SHA", sha)
     monkeypatch.setenv("BUILT_AT", "2026-11-22T10:15:00Z")
     monkeypatch.setenv("GIT_TAG", "v1.0.0")
     monkeypatch.setattr(config, "settings", config.Settings(_env_file=None))

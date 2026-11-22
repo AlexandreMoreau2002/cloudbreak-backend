@@ -1,3 +1,4 @@
+import re
 from datetime import UTC, datetime
 
 from fastapi import APIRouter
@@ -6,6 +7,8 @@ from app.core import config
 from app.schemas.version import VersionResponse
 
 router = APIRouter()
+GIT_SHA_PATTERN = re.compile(r"[0-9a-fA-F]{7,40}")
+RELEASE_TAG_PATTERN = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+")
 
 
 def _utc_build_timestamp(value: str) -> str | None:
@@ -22,10 +25,12 @@ def _utc_build_timestamp(value: str) -> str | None:
 async def get_version() -> VersionResponse:
     settings = config.settings
     sha = settings.git_sha
+    tag = settings.git_tag
+    has_valid_sha = GIT_SHA_PATTERN.fullmatch(sha) is not None
     return VersionResponse(
         service="backend",
-        sha=sha or "unknown",
-        built_at=_utc_build_timestamp(settings.built_at) if sha else None,
+        sha=sha if has_valid_sha else "unknown",
+        built_at=_utc_build_timestamp(settings.built_at) if has_valid_sha else None,
         version=settings.app_version,
-        tag=(settings.git_tag or None) if sha else None,
+        tag=tag if has_valid_sha and RELEASE_TAG_PATTERN.fullmatch(tag) else None,
     )

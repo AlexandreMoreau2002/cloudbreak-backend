@@ -1,6 +1,6 @@
 # Cloudbreak — Audit produit
 
-_Dernière mise à jour : 2026-10-27_
+_Dernière mise à jour : 2026-11-22_
 
 ---
 
@@ -22,6 +22,7 @@ L'algorithme tourne côté serveur — il peut être amélioré sans mise à jou
 | Fonctionnalité | État |
 |----------------|------|
 | API score mer de nuage | ✅ Fonctionne en vrai |
+| Provenance du backend (`GET /version`) — SHA, date du build, version et tag éventuel | Story 10.2 — backend implémenté, injection à vérifier sur le serveur dev |
 | Données météo Open-Meteo | ✅ Appel réel (gratuit, sans clé) |
 | Cache Redis météo 30 min (1 800 secondes) | ✅ Actif |
 | Auth JWT Supabase | ✅ Validé localement |

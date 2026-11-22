@@ -14,6 +14,7 @@ from app.api.v1.endpoints.user import router as user_router
 from app.api.v1.endpoints.peaks import router as peaks_router
 from app.api.v1.endpoints.score import router as score_router
 from app.api.v1.endpoints.health import router as health_router
+from app.api.v1.endpoints.version import router as version_router
 from app.api.v1.endpoints.favorites import router as favorites_router
 from app.api.v1.endpoints.validations import router as validations_router
 from app.api.v1.endpoints.internal_maintenance import router as internal_maintenance_router
@@ -70,6 +71,7 @@ def create_app(environment: str) -> FastAPI:
     application.include_router(user_router)
     application.include_router(score_router)
     application.include_router(health_router)
+    application.include_router(version_router)
     application.include_router(favorites_router)
     application.include_router(validations_router)
     application.include_router(subscription_router)

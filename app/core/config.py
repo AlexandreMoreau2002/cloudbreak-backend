@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     anon_purge_max_per_run: int = 200
     environment: str = "development"
     app_version: str = "1.0.0"
+    git_sha: str = ""
+    built_at: str = ""
+    git_tag: str = ""
     apple_bundle_id: str = ""
     apple_environment: Literal["Sandbox", "Production"] = "Sandbox"
     apple_app_id: int | None = None

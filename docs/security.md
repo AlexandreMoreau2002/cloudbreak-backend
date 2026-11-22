@@ -2,6 +2,11 @@
 
 Document de référence sécurité. À mettre à jour à chaque story qui touche auth, réseau, données ou dépendances.
 
+## 2026-11-22 — Provenance publique du backend
+
+- `GET /version` est accessible sur le serveur de production sans authentification. Le schéma de réponse limite le JSON à `service`, `sha`, `built_at`, `version` et `tag`.
+- Les valeurs de build `GIT_SHA`, `BUILT_AT` et `GIT_TAG` doivent rester des métadonnées publiques. Un test vérifie que les secrets cron et Supabase configurés ne figurent pas dans la réponse.
+
 ## 2026-11-10 — Abonnement Apple rattaché au nouveau compte après suppression de l'ancien
 
 - **Constat** (test de fumée prod) : un Apple ID garde son abonnement quand on supprime son compte Cloudbreak. La transaction porte l'`appAccountToken` de l'ancien compte ; `POST /user/subscription/verify` la refusait (400) pour tout nouveau compte, y compris via « Restaurer un achat ». Un utilisateur payant restait en Free, ce que la review Apple peut tester (suppression de compte puis recréation).

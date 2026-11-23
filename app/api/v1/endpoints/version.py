@@ -1,5 +1,8 @@
+import json
 import re
 from datetime import UTC, datetime
+
+from pathlib import Path
 
 from fastapi import APIRouter
 
@@ -21,16 +24,34 @@ def _utc_build_timestamp(value: str) -> str | None:
         return None
 
 
+BUILD_INFO_PATH = Path(__file__).resolve().parents[4] / "build_info.json"
+
+
+def _build_info() -> tuple[str, str, str]:
+    """Variables d'environnement d'abord, sinon build_info.json écrit au build."""
+    settings = config.settings
+    if settings.git_sha:
+        return settings.git_sha, settings.built_at, settings.git_tag
+    try:
+        data = json.loads(BUILD_INFO_PATH.read_text())
+        return (
+            str(data.get("sha") or ""),
+            str(data.get("built_at") or ""),
+            str(data.get("tag") or ""),
+        )
+    except (OSError, ValueError, AttributeError):
+        return "", "", ""
+
+
 @router.get("/version")
 async def get_version() -> VersionResponse:
     settings = config.settings
-    sha = settings.git_sha
-    tag = settings.git_tag
+    sha, built_at, tag = _build_info()
     has_valid_sha = GIT_SHA_PATTERN.fullmatch(sha) is not None
     return VersionResponse(
         service="backend",
         sha=sha if has_valid_sha else "unknown",
-        built_at=_utc_build_timestamp(settings.built_at) if has_valid_sha else None,
+        built_at=_utc_build_timestamp(built_at) if has_valid_sha else None,
         version=settings.app_version,
         tag=tag if has_valid_sha and RELEASE_TAG_PATTERN.fullmatch(tag) else None,
     )

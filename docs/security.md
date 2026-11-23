@@ -953,3 +953,11 @@ l'interdiction explicite des profils de personne doit aussi être imposée dans 
 
 APPROUVÉ POUR LE CODE — l'absence de profils est imposée côté backend ; conserver le réglage
 PostHog sans profils comme défense supplémentaire lors de la recette dev/TestFlight.
+
+## Console admin (story 10.3)
+
+`GET /api/v1/admin/overview` exige un JWT Supabase valide, le rôle
+`app_metadata.role=admin` et la présence du `sub` dans `ADMIN_USER_IDS`.
+Une allowlist vide refuse tout accès. Les lectures autorisées sont auditées
+sans email, secret ni autre donnée personnelle. Les routes `/internal/*`
+restent isolées par `X-Cron-Secret`; le secret ne doit jamais être committé.

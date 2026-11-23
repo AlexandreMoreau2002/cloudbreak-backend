@@ -75,7 +75,7 @@ def _prediction(peak_id: str, user_id: str, created_at: datetime) -> Prediction:
     )
 
 
-async def test_overview_counts_users_and_subscriptions_against_seven_day_baseline(
+async def test_overview_counts_permanent_accounts_and_recent_creations(
     db: AsyncSession, redis: AsyncMock, peak_id: str
 ) -> None:
     db.add_all(
@@ -118,10 +118,8 @@ async def test_overview_counts_users_and_subscriptions_against_seven_day_baselin
     overview = await admin_overview.build_overview(db, redis)
 
     assert overview["kpis"] == {
-        "users_total": {"value": 6, "delta_7d": 2},
-        "users_permanent": {"value": 4, "delta_7d": 1},
-        "users_anonymous": {"value": 2, "delta_7d": 1},
-        "users_active_30d": {"value": 2, "delta_7d": -1},
+        "users_permanent": {"value": 6, "delta_7d": 2},
+        "users_active_30d": {"value": 2, "delta_7d": 0},
         "subscriptions_active": {"value": 2, "delta_7d": 1},
         "subscriptions_trial": {"value": 3, "delta_7d": 1},
     }
@@ -177,9 +175,7 @@ async def test_ninety_day_series_keeps_prior_users_and_fills_days_without_checks
         ("2026-11-22", 2),
         ("2026-11-23", 1),
     ]
-    assert [
-        (day["users_total"], day["users_permanent"], day["users_anonymous"]) for day in series
-    ] == [(2, 1, 1)] * 89 + [(3, 2, 1)]
+    assert [day["users_permanent"] for day in series] == [2] * 89 + [3]
     assert overview["checks_daily"][-3:] == [
         {"date": "2026-11-21", "count": 0},
         {"date": "2026-11-22", "count": 2},
@@ -226,6 +222,25 @@ async def test_overview_classifies_on_time_late_and_failed_crons(
         "expected_every_s": 93600,
         "overdue_s": 17,
     }
+    assert by_job["purge"]["overdue_s"] is None
+
+
+async def test_overview_marks_a_cron_late_immediately_after_its_deadline(
+    db: AsyncSession, redis: AsyncMock
+) -> None:
+    db.add(
+        CronHeartbeat(
+            job="purge",
+            last_run_at=NOW - timedelta(seconds=90000, milliseconds=500),
+            last_status="ok",
+        )
+    )
+    await db.flush()
+
+    overview = await admin_overview.build_overview(db, redis)
+
+    assert overview["crons"][0]["state"] == "late"
+    assert overview["crons"][0]["overdue_s"] == 1
 
 
 async def test_overview_reports_never_for_jobs_without_heartbeats(
@@ -307,11 +322,23 @@ async def test_overview_returns_fresh_server_gauges_and_ordered_history(
 
 
 @pytest.mark.parametrize(
-    ("latest", "expected_state", "expected_sampled_at"),
+    ("latest", "history", "expected_state", "expected_sampled_at", "expected_history"),
     [
-        (_metrics("2026-11-23T11:29:59Z"), "stale", "2026-11-23T11:29:59Z"),
-        (None, "never", None),
-        (b"invalid", "never", None),
+        (
+            _metrics("2026-11-23T11:29:59Z"),
+            [_metrics("2026-11-23T11:29:59Z")],
+            "stale",
+            "2026-11-23T11:29:59Z",
+            1,
+        ),
+        (None, [], "never", None, 0),
+        (
+            b"invalid",
+            [_metrics("2026-11-23T11:14:00Z")],
+            "stale",
+            "2026-11-23T11:14:00Z",
+            1,
+        ),
     ],
     ids=["stale", "missing", "invalid"],
 )
@@ -319,11 +346,13 @@ async def test_overview_hides_unavailable_server_gauges(
     db: AsyncSession,
     redis: AsyncMock,
     latest: bytes | None,
+    history: list[bytes],
     expected_state: str,
     expected_sampled_at: str | None,
+    expected_history: int,
 ) -> None:
     redis.get.return_value = latest
-    redis.lrange.return_value = [_metrics("2026-11-23T11:29:59Z")]
+    redis.lrange.return_value = history
 
     overview = await admin_overview.build_overview(db, redis)
 
@@ -337,5 +366,15 @@ async def test_overview_hides_unavailable_server_gauges(
         "swap_used_mb": None,
         "swap_total_mb": None,
         "disk_used_pct": None,
-        "history_24h": [],
+        "history_24h": [
+            {
+                "sampled_at": expected_sampled_at,
+                "cpu_load_1m": 0.5,
+                "mem_available_pct": 37.5,
+                "swap_used_pct": 12.5,
+                "disk_used_pct": 55,
+            }
+        ]
+        if expected_history
+        else [],
     }

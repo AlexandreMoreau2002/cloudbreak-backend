@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from math import ceil
 from typing import Any, cast
 
 from redis.asyncio import Redis
@@ -19,11 +20,7 @@ async def build_overview(db: AsyncSession, redis: Redis) -> dict[str, object]:
     async def count(query: object) -> int:
         return int((await db.scalar(cast(Any, query))) or 0)
 
-    users = await count(select(func.count()).select_from(User))
-    anonymous = await count(
-        select(func.count()).select_from(User).where(User.auth_provider == "anonymous")
-    )
-    permanent = users - anonymous
+    permanent = await count(select(func.count()).select_from(User))
     active = await count(
         select(func.count()).select_from(Subscription).where(Subscription.status == "active")
     )
@@ -35,29 +32,18 @@ async def build_overview(db: AsyncSession, redis: Redis) -> dict[str, object]:
             Prediction.created_at >= now - timedelta(days=30)
         )
     )
-    users_7d = await count(
-        select(func.count()).select_from(User).where(User.created_at <= seven_days_ago)
-    )
-    anonymous_7d = await count(
-        select(func.count())
-        .select_from(User)
-        .where(User.auth_provider == "anonymous", User.created_at <= seven_days_ago)
-    )
-    active_7d = await count(
-        select(func.count(func.distinct(Prediction.user_id))).where(
-            Prediction.created_at >= seven_days_ago - timedelta(days=30),
-            Prediction.created_at < seven_days_ago,
-        )
+    permanent_7d = await count(
+        select(func.count()).select_from(User).where(User.created_at >= seven_days_ago)
     )
     subscriptions_active_7d = await count(
         select(func.count())
         .select_from(Subscription)
-        .where(Subscription.status == "active", Subscription.created_at <= seven_days_ago)
+        .where(Subscription.status == "active", Subscription.created_at >= seven_days_ago)
     )
     subscriptions_trial_7d = await count(
         select(func.count())
         .select_from(Subscription)
-        .where(Subscription.status == "trial", Subscription.created_at <= seven_days_ago)
+        .where(Subscription.status == "trial", Subscription.created_at >= seven_days_ago)
     )
     crons = await db.scalars(select(CronHeartbeat))
     records = {str(entry.job): entry for entry in crons}
@@ -71,8 +57,9 @@ async def build_overview(db: AsyncSession, redis: Redis) -> dict[str, object]:
             state, overdue = "failed", None
         else:
             last_run_at = cast(datetime, row.last_run_at)
-            overdue = max(0, int((now - last_run_at).total_seconds()) - seconds)
-            state = "late" if overdue else "ok"
+            overdue_seconds = (now - last_run_at).total_seconds() - seconds
+            state = "late" if overdue_seconds > 0 else "ok"
+            overdue = ceil(overdue_seconds) if state == "late" else None
         cron_data.append(
             {
                 "job": job,
@@ -83,6 +70,18 @@ async def build_overview(db: AsyncSession, redis: Redis) -> dict[str, object]:
                 "overdue_s": overdue,
             }
         )
+    history_raw = redis.lrange("ops:server_metrics:history", 0, 95)
+    if hasattr(history_raw, "__await__"):
+        history_raw = await history_raw
+    valid_history = []
+    for value in history_raw:
+        try:
+            item = ServerMetricsRequest.model_validate_json(value).model_dump(mode="json")
+            sampled_at = datetime.fromisoformat(item["sampled_at"].replace("Z", "+00:00"))
+            if sampled_at >= now - timedelta(hours=24):
+                valid_history.append(item)
+        except (TypeError, ValueError):
+            continue
     raw = await redis.get("ops:server_metrics:last")
     try:
         metric = (
@@ -90,6 +89,8 @@ async def build_overview(db: AsyncSession, redis: Redis) -> dict[str, object]:
         )
     except (TypeError, ValueError):
         metric = None
+    if metric is None and valid_history:
+        metric = max(valid_history, key=lambda item: item["sampled_at"])
     sampled = (
         datetime.fromisoformat(metric["sampled_at"].replace("Z", "+00:00")) if metric else None
     )
@@ -141,51 +142,32 @@ async def build_overview(db: AsyncSession, redis: Redis) -> dict[str, object]:
         }
         for index in range(13, -1, -1)
     ]
-    user_rows = await db.execute(select(User.created_at, User.auth_provider))
-    created_by_day: dict[str, tuple[int, int]] = {}
+    user_rows = await db.execute(select(User.created_at))
+    created_by_day: dict[str, int] = {}
     running_total = 0
-    running_anonymous = 0
-    for created_at, provider in user_rows:
-        created_day = cast(datetime, created_at).astimezone(UTC).date()
+    for created_at in user_rows.scalars():
+        created_day = created_at.astimezone(UTC).date()
         if created_day < window_start:
             running_total += 1
-            running_anonymous += provider == "anonymous"
             continue
         day = created_day.isoformat()
-        totals = created_by_day.get(day, (0, 0))
-        created_by_day[day] = (totals[0] + 1, totals[1] + (provider == "anonymous"))
+        created_by_day[day] = created_by_day.get(day, 0) + 1
     series = []
     for index in range(89, -1, -1):
         day = (now.date() - timedelta(days=index)).isoformat()
-        created = created_by_day.get(day, (0, 0))
-        running_total += created[0]
-        running_anonymous += created[1]
+        running_total += created_by_day.get(day, 0)
         series.append(
             {
                 "date": day,
-                "users_total": running_total,
-                "users_permanent": running_total - running_anonymous,
-                "users_anonymous": running_anonymous,
+                "users_permanent": running_total,
                 "checks": checks.get(day, 0),
             }
         )
 
-    def kpi(value: int, baseline: int) -> dict[str, int]:
-        return {"value": value, "delta_7d": value - baseline}
+    def kpi(value: int, delta_7d: int) -> dict[str, int]:
+        return {"value": value, "delta_7d": delta_7d}
 
-    history_raw = redis.lrange("ops:server_metrics:history", 0, 95)
-    if hasattr(history_raw, "__await__"):
-        history_raw = await history_raw
-    if server["state"] == "ok":
-        valid_history = []
-        for value in history_raw:
-            try:
-                item = ServerMetricsRequest.model_validate_json(value).model_dump(mode="json")
-                sampled_at = datetime.fromisoformat(item["sampled_at"].replace("Z", "+00:00"))
-                if sampled_at >= now - timedelta(hours=24):
-                    valid_history.append(item)
-            except (TypeError, ValueError):
-                continue
+    if server["state"] in {"ok", "stale"}:
         server["history_24h"] = [
             {
                 "sampled_at": item["sampled_at"],
@@ -205,10 +187,8 @@ async def build_overview(db: AsyncSession, redis: Redis) -> dict[str, object]:
     return {
         "generated_at": now.isoformat(),
         "kpis": {
-            "users_total": kpi(users, users_7d),
-            "users_permanent": kpi(permanent, users_7d - anonymous_7d),
-            "users_anonymous": kpi(anonymous, anonymous_7d),
-            "users_active_30d": kpi(active_30d, active_7d),
+            "users_permanent": kpi(permanent, permanent_7d),
+            "users_active_30d": kpi(active_30d, 0),
             "subscriptions_active": kpi(active, subscriptions_active_7d),
             "subscriptions_trial": kpi(trial, subscriptions_trial_7d),
         },

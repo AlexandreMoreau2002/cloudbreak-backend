@@ -35,9 +35,15 @@ def teardown_function() -> None:
 
 
 def test_overview_without_token_is_forbidden() -> None:
+    db = AsyncMock(spec=AsyncSession)
+    app.dependency_overrides[get_db] = lambda: db
     response = TestClient(app).get("/api/v1/admin/overview")
     assert response.status_code == 403
     assert response.json()["code"] == "ADMIN_FORBIDDEN"
+    audit = db.add.call_args.args[0]
+    assert audit.actor_id is None
+    assert audit.result == "denied"
+    db.commit.assert_awaited_once()
 
 
 def test_unknown_heartbeat_is_not_found() -> None:

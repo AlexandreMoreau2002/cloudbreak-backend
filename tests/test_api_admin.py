@@ -1,3 +1,12 @@
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, patch
+
+from fastapi.testclient import TestClient
+
+from app.core.dependencies import get_redis
+from app.main import app
+
+
 def test_admin_routes_are_registered() -> None:
     paths = {
         path
@@ -13,15 +22,6 @@ def test_admin_routes_are_registered() -> None:
     }
     assert "/api/v1/admin/overview" in paths
     assert "/internal/server-metrics" in paths
-
-
-from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, patch
-
-from fastapi.testclient import TestClient
-
-from app.core.dependencies import get_redis
-from app.main import app
 
 
 def setup_function() -> None:

@@ -1,5 +1,6 @@
 import hmac
 import logging
+import uuid
 from uuid import UUID
 from typing import Any, cast
 from hashlib import sha256
@@ -17,6 +18,7 @@ from app.core.config import settings
 from app.core.errors import ApiError, ErrorCode
 from app.services.analytics import track
 from app.models.subscription import Subscription
+from app.models.admin_audit_log import AdminAuditLog
 from app.core.security import decode_supabase_jwt
 from app.domain.entitlement import is_entitlement_active
 from app.services.quota import QuotaService, QuotaExceededException
@@ -149,21 +151,26 @@ def get_current_user(
     return decode_user_payload(payload)
 
 
-def require_admin(
+async def require_admin(
     credentials: HTTPAuthorizationCredentials | None = Depends(admin_bearer_scheme),
+    db: AsyncSession = Depends(get_db),
 ) -> dict[str, object]:
     """Refuse par défaut tout accès qui n'est pas un administrateur explicitement autorisé."""
+    actor_id: str | None = None
     if credentials is None:
+        await _audit_admin_overview(db, actor_id, "denied")
         raise ApiError(status.HTTP_403_FORBIDDEN, "Accès refusé", ErrorCode.ADMIN_FORBIDDEN)
     try:
         payload = decode_supabase_jwt(
             credentials.credentials, settings.supabase_jwt_jwks, settings.supabase_url
         )
     except ValueError:
+        await _audit_admin_overview(db, actor_id, "denied")
         raise ApiError(
             status.HTTP_403_FORBIDDEN, "Accès refusé", ErrorCode.ADMIN_FORBIDDEN
         ) from None
     sub = payload.get("sub")
+    actor_id = sub if isinstance(sub, str) else None
     metadata = payload.get("app_metadata")
     allowed = {value.strip() for value in settings.admin_user_ids.split(",") if value.strip()}
     if (
@@ -172,8 +179,22 @@ def require_admin(
         or metadata.get("role") != "admin"
         or sub not in allowed
     ):
+        await _audit_admin_overview(db, actor_id, "denied")
         raise ApiError(status.HTTP_403_FORBIDDEN, "Accès refusé", ErrorCode.ADMIN_FORBIDDEN)
     return {"id": sub}
+
+
+async def _audit_admin_overview(db: AsyncSession, actor_id: str | None, result: str) -> None:
+    db.add(
+        AdminAuditLog(
+            id=str(uuid.uuid4()),
+            actor_id=actor_id,
+            action="read",
+            resource="overview",
+            result=result,
+        )
+    )
+    await db.commit()
 
 
 def get_permanent_user(

@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -6,14 +6,20 @@ from app.core.dependencies import require_admin
 from app.core.errors import ApiError
 
 
-def test_admin_without_credentials_is_forbidden() -> None:
+@pytest.mark.asyncio
+async def test_admin_without_credentials_is_forbidden() -> None:
+    db = MagicMock()
+    db.commit = AsyncMock()
     with pytest.raises(ApiError) as error:
-        require_admin(None)
+        await require_admin(None, db)
     assert error.value.code == "ADMIN_FORBIDDEN"
 
 
-def test_admin_allowlist_is_required() -> None:
+@pytest.mark.asyncio
+async def test_admin_allowlist_is_required() -> None:
     credentials = type("Credentials", (), {"credentials": "token"})()
+    db = MagicMock()
+    db.commit = AsyncMock()
     with (
         patch(
             "app.core.dependencies.decode_supabase_jwt",
@@ -22,11 +28,14 @@ def test_admin_allowlist_is_required() -> None:
         patch("app.core.dependencies.settings.admin_user_ids", ""),
     ):
         with pytest.raises(ApiError):
-            require_admin(credentials)
+            await require_admin(credentials, db)
 
 
-def test_admin_in_allowlist_with_admin_role_is_allowed() -> None:
+@pytest.mark.asyncio
+async def test_admin_in_allowlist_with_admin_role_is_allowed() -> None:
     credentials = type("Credentials", (), {"credentials": "token"})()
+    db = MagicMock()
+    db.commit = AsyncMock()
     with (
         patch(
             "app.core.dependencies.decode_supabase_jwt",
@@ -34,18 +43,21 @@ def test_admin_in_allowlist_with_admin_role_is_allowed() -> None:
         ),
         patch("app.core.dependencies.settings.admin_user_ids", "allowed,another"),
     ):
-        assert require_admin(credentials) == {"id": "allowed"}
+        assert await require_admin(credentials, db) == {"id": "allowed"}
 
 
-def test_admin_outside_allowlist_or_missing_role_is_forbidden() -> None:
+@pytest.mark.asyncio
+async def test_admin_outside_allowlist_or_missing_role_is_forbidden() -> None:
     credentials = type("Credentials", (), {"credentials": "token"})()
+    db = MagicMock()
+    db.commit = AsyncMock()
     with patch("app.core.dependencies.settings.admin_user_ids", "allowed"):
         with patch(
             "app.core.dependencies.decode_supabase_jwt",
             return_value={"sub": "other", "app_metadata": {"role": "admin"}},
         ):
             with pytest.raises(ApiError):
-                require_admin(credentials)
+                await require_admin(credentials, db)
         with patch("app.core.dependencies.decode_supabase_jwt", return_value={"sub": "allowed"}):
             with pytest.raises(ApiError):
-                require_admin(credentials)
+                await require_admin(credentials, db)

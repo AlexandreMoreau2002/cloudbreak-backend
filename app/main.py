@@ -3,10 +3,12 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import OperationalError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.core.errors import ApiError
+from app.core.errors import ApiError, ErrorCode, log_server_error
 from app.core.config import settings
 from app.core.sentry import initialize_sentry
 from app.services.analytics import initialize_analytics, shutdown_analytics
@@ -41,6 +43,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
     """Sérialise les erreurs métier avec un code au premier niveau."""
+    if exc.status_code >= 500:
+        log_server_error(request.url.path, exc.status_code, exc)
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail, "code": exc.code},
@@ -48,13 +52,26 @@ async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
 
 
 async def db_operational_error_handler(request: Request, exc: OperationalError) -> JSONResponse:
-    logger.error(
-        "database_unavailable",
-        extra={"path": request.url.path, "error": type(exc).__name__},
-    )
+    log_server_error(request.url.path, 503, exc)
     return JSONResponse(
         status_code=503,
         content={"detail": "Base de données indisponible", "code": "DATABASE_UNAVAILABLE"},
+    )
+
+
+async def http_error_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    """Garde la réponse par défaut de FastAPI et journalise les 5xx."""
+    if exc.status_code >= 500:
+        log_server_error(request.url.path, exc.status_code, exc)
+    return await http_exception_handler(request, exc)  # type: ignore[return-value]
+
+
+async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Toute exception non gérée : 500 JSON générique, journalisé sans stack trace."""
+    log_server_error(request.url.path, 500, exc)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Erreur interne", "code": ErrorCode.INTERNAL_ERROR},
     )
 
 
@@ -85,6 +102,8 @@ def create_app(environment: str) -> FastAPI:
 
     application.add_exception_handler(ApiError, api_error_handler)  # type: ignore[arg-type]
     application.add_exception_handler(OperationalError, db_operational_error_handler)  # type: ignore[arg-type]
+    application.add_exception_handler(StarletteHTTPException, http_error_handler)  # type: ignore[arg-type]
+    application.add_exception_handler(Exception, unhandled_error_handler)
     return application
 
 

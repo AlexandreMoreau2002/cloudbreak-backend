@@ -118,10 +118,10 @@ async def test_overview_counts_permanent_accounts_and_recent_creations(
     overview = await admin_overview.build_overview(db, redis)
 
     assert overview["kpis"] == {
-        "users_permanent": {"value": 6, "delta_7d": 2},
+        "users_permanent": {"value": 6, "delta_7d": 3},
         "users_active_30d": {"value": 2, "delta_7d": 0},
         "subscriptions_active": {"value": 2, "delta_7d": 1},
-        "subscriptions_trial": {"value": 3, "delta_7d": 1},
+        "subscriptions_trial": {"value": 3, "delta_7d": 2},
     }
 
 

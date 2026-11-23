@@ -7,6 +7,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Dokploy ne transmet pas le commit au build : on le relit dans .git (GIT_SHA/BUILT_AT/GIT_TAG restent prioritaires).
+RUN python scripts/build_info.py
+
 ARG GIT_SHA
 ARG BUILT_AT
 ARG GIT_TAG

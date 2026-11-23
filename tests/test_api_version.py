@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pytest import MonkeyPatch, mark
 from fastapi.testclient import TestClient
 
@@ -131,3 +133,39 @@ def test_returns_utc_build_timestamp(
 
     assert response.status_code == 200
     assert response.json()["built_at"] == expected
+
+
+def test_reads_build_info_file_when_env_is_empty(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    from app.api.v1.endpoints import version as version_module
+
+    info = tmp_path / "build_info.json"
+    info.write_text(
+        '{"sha": "' + "a" * 40 + '", "built_at": "2026-11-23T21:00:00Z", "tag": "v1.0.1"}'
+    )
+    monkeypatch.delenv("GIT_SHA", raising=False)
+    monkeypatch.delenv("BUILT_AT", raising=False)
+    monkeypatch.delenv("GIT_TAG", raising=False)
+    monkeypatch.setattr(config, "settings", config.Settings(_env_file=None))
+    monkeypatch.setattr(version_module, "BUILD_INFO_PATH", info)
+
+    body = TestClient(create_app("production")).get("/version").json()
+
+    assert body["sha"] == "a" * 40
+    assert body["built_at"] == "2026-11-23T21:00:00Z"
+    assert body["tag"] == "v1.0.1"
+
+
+def test_missing_or_broken_build_info_file_falls_back_to_unknown(
+    monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
+    from app.api.v1.endpoints import version as version_module
+
+    broken = tmp_path / "build_info.json"
+    broken.write_text("{pas du json")
+    monkeypatch.delenv("GIT_SHA", raising=False)
+    monkeypatch.setattr(config, "settings", config.Settings(_env_file=None))
+    for path in (broken, tmp_path / "absent.json"):
+        monkeypatch.setattr(version_module, "BUILD_INFO_PATH", path)
+        body = TestClient(create_app("production")).get("/version").json()
+        assert body["sha"] == "unknown"
+        assert body["built_at"] is None

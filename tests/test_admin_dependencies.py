@@ -23,3 +23,29 @@ def test_admin_allowlist_is_required() -> None:
     ):
         with pytest.raises(ApiError):
             require_admin(credentials)
+
+
+def test_admin_in_allowlist_with_admin_role_is_allowed() -> None:
+    credentials = type("Credentials", (), {"credentials": "token"})()
+    with (
+        patch(
+            "app.core.dependencies.decode_supabase_jwt",
+            return_value={"sub": "allowed", "app_metadata": {"role": "admin"}},
+        ),
+        patch("app.core.dependencies.settings.admin_user_ids", "allowed,another"),
+    ):
+        assert require_admin(credentials) == {"id": "allowed"}
+
+
+def test_admin_outside_allowlist_or_missing_role_is_forbidden() -> None:
+    credentials = type("Credentials", (), {"credentials": "token"})()
+    with patch("app.core.dependencies.settings.admin_user_ids", "allowed"):
+        with patch(
+            "app.core.dependencies.decode_supabase_jwt",
+            return_value={"sub": "other", "app_metadata": {"role": "admin"}},
+        ):
+            with pytest.raises(ApiError):
+                require_admin(credentials)
+        with patch("app.core.dependencies.decode_supabase_jwt", return_value={"sub": "allowed"}):
+            with pytest.raises(ApiError):
+                require_admin(credentials)

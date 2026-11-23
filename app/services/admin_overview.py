@@ -49,6 +49,16 @@ async def build_overview(db: AsyncSession, redis: Redis) -> dict[str, object]:
             Prediction.created_at < seven_days_ago,
         )
     )
+    subscriptions_active_7d = await count(
+        select(func.count())
+        .select_from(Subscription)
+        .where(Subscription.status == "active", Subscription.created_at <= seven_days_ago)
+    )
+    subscriptions_trial_7d = await count(
+        select(func.count())
+        .select_from(Subscription)
+        .where(Subscription.status == "trial", Subscription.created_at <= seven_days_ago)
+    )
     crons = await db.scalars(select(CronHeartbeat))
     records = {str(entry.job): entry for entry in crons}
     expected = {"purge": 90000, "favorites": 90000, "backup": 93600}
@@ -117,9 +127,10 @@ async def build_overview(db: AsyncSession, redis: Redis) -> dict[str, object]:
                 "history_24h": [],
             }
         )
+    window_start = now.date() - timedelta(days=89)
     prediction_rows = await db.execute(
         select(func.date(Prediction.created_at), func.count())
-        .where(Prediction.created_at >= now - timedelta(days=89))
+        .where(Prediction.created_at >= datetime.combine(window_start, datetime.min.time(), UTC))
         .group_by(func.date(Prediction.created_at))
     )
     checks = {str(day): int(count) for day, count in prediction_rows}
@@ -128,16 +139,21 @@ async def build_overview(db: AsyncSession, redis: Redis) -> dict[str, object]:
             "date": (now.date() - timedelta(days=index)).isoformat(),
             "count": checks.get((now.date() - timedelta(days=index)).isoformat(), 0),
         }
-        for index in range(14)
+        for index in range(13, -1, -1)
     ]
     user_rows = await db.execute(select(User.created_at, User.auth_provider))
     created_by_day: dict[str, tuple[int, int]] = {}
-    for created_at, provider in user_rows:
-        day = cast(datetime, created_at).astimezone(UTC).date().isoformat()
-        totals = created_by_day.get(day, (0, 0))
-        created_by_day[day] = (totals[0] + 1, totals[1] + (provider == "anonymous"))
     running_total = 0
     running_anonymous = 0
+    for created_at, provider in user_rows:
+        created_day = cast(datetime, created_at).astimezone(UTC).date()
+        if created_day < window_start:
+            running_total += 1
+            running_anonymous += provider == "anonymous"
+            continue
+        day = created_day.isoformat()
+        totals = created_by_day.get(day, (0, 0))
+        created_by_day[day] = (totals[0] + 1, totals[1] + (provider == "anonymous"))
     series = []
     for index in range(89, -1, -1):
         day = (now.date() - timedelta(days=index)).isoformat()
@@ -164,9 +180,10 @@ async def build_overview(db: AsyncSession, redis: Redis) -> dict[str, object]:
         valid_history = []
         for value in history_raw:
             try:
-                valid_history.append(
-                    ServerMetricsRequest.model_validate_json(value).model_dump(mode="json")
-                )
+                item = ServerMetricsRequest.model_validate_json(value).model_dump(mode="json")
+                sampled_at = datetime.fromisoformat(item["sampled_at"].replace("Z", "+00:00"))
+                if sampled_at >= now - timedelta(hours=24):
+                    valid_history.append(item)
             except (TypeError, ValueError):
                 continue
         server["history_24h"] = [
@@ -183,7 +200,7 @@ async def build_overview(db: AsyncSession, redis: Redis) -> dict[str, object]:
                 if item["disk_total_gb"]
                 else 0,
             }
-            for item in valid_history
+            for item in sorted(valid_history, key=lambda item: item["sampled_at"])
         ]
     return {
         "generated_at": now.isoformat(),
@@ -192,8 +209,8 @@ async def build_overview(db: AsyncSession, redis: Redis) -> dict[str, object]:
             "users_permanent": kpi(permanent, users_7d - anonymous_7d),
             "users_anonymous": kpi(anonymous, anonymous_7d),
             "users_active_30d": kpi(active_30d, active_7d),
-            "subscriptions_active": kpi(active, active),
-            "subscriptions_trial": kpi(trial, trial),
+            "subscriptions_active": kpi(active, subscriptions_active_7d),
+            "subscriptions_trial": kpi(trial, subscriptions_trial_7d),
         },
         "checks_daily": zero_days,
         "series_90d": series,

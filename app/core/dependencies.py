@@ -113,8 +113,7 @@ def require_cron_secret(x_cron_secret: str | None = Header(default=None)) -> Non
         if not _weak_secret_warned:
             _weak_secret_warned = True
             logger.warning(
-                "internal_cron_secret_too_weak",
-                extra={"min_length": MIN_CRON_SECRET_LENGTH},
+                "internal_cron_secret_too_weak", extra={"min_length": MIN_CRON_SECRET_LENGTH}
             )
         configured = ""
     if not configured:

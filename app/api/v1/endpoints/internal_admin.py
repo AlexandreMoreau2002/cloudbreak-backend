@@ -60,6 +60,7 @@ async def server_metrics(body: ServerMetricsRequest, redis: Redis = Depends(get_
             status.HTTP_422_UNPROCESSABLE_ENTITY, "Relevé trop ancien", "VALIDATION_ERROR"
         )
     raw = body.model_dump(mode="json")
+    raw["sampled_at"] = sampled.isoformat()
     encoded = json.dumps(raw)
     await redis.set("ops:server_metrics:last", encoded, ex=2700)
     lpush_result = redis.lpush("ops:server_metrics:history", encoded)

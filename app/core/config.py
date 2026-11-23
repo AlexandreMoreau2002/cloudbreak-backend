@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     sentry_dsn: str = ""
     expo_access_token: str = ""
     internal_cron_secret: str = ""
+    admin_user_ids: str = ""
     supabase_service_role_key: str = ""
     # Purge des comptes anonymes inactifs (POST /internal/maintenance/purge-anonymous).
     anon_retention_days: int = 30

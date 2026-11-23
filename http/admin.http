@@ -1,0 +1,24 @@
+@baseUrl = http://localhost:8000
+@adminToken = coller-localement-un-jwt-admin
+@cronSecret = coller-localement-le-secret
+
+### Overview admin — 200
+GET {{baseUrl}}/api/v1/admin/overview
+Authorization: Bearer {{adminToken}}
+
+### Sans token — 403 ADMIN_FORBIDDEN
+GET {{baseUrl}}/api/v1/admin/overview
+
+### Heartbeat — 204
+POST {{baseUrl}}/internal/heartbeats/purge
+X-Cron-Secret: {{cronSecret}}
+Content-Type: application/json
+
+{"status":"ok","duration_s":12}
+
+### Métriques — 204
+POST {{baseUrl}}/internal/server-metrics
+X-Cron-Secret: {{cronSecret}}
+Content-Type: application/json
+
+{"sampled_at":"2026-11-23T10:00:00Z","cpu_load_1m":0.35,"cpu_count":2,"mem_total_mb":3819,"mem_available_mb":1474,"swap_total_mb":4095,"swap_used_mb":1929,"disk_total_gb":78,"disk_used_gb":44.5}

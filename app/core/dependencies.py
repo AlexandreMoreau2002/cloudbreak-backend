@@ -10,6 +10,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from starlette.requests import HTTPConnection
 
 from app.db.session import get_db
 from app.core.config import settings
@@ -35,6 +36,19 @@ class Bearer403(HTTPBearer):
 
 
 bearer_scheme = Bearer403()
+
+
+class AdminBearer(HTTPBearer):
+    """Normalise les en-têtes Bearer malformés vers le refus admin."""
+
+    async def __call__(self, request: HTTPConnection) -> HTTPAuthorizationCredentials | None:
+        try:
+            return await super().__call__(request)
+        except HTTPException:
+            return None
+
+
+admin_bearer_scheme = AdminBearer(auto_error=False)
 
 # Redis singleton
 _redis: Redis | None = None
@@ -99,7 +113,8 @@ def require_cron_secret(x_cron_secret: str | None = Header(default=None)) -> Non
         if not _weak_secret_warned:
             _weak_secret_warned = True
             logger.warning(
-                "internal_cron_secret_too_weak", extra={"min_length": MIN_CRON_SECRET_LENGTH}
+                "internal_cron_secret_too_weak",
+                extra={"min_length": MIN_CRON_SECRET_LENGTH},
             )
         configured = ""
     if not configured:
@@ -133,6 +148,33 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return decode_user_payload(payload)
+
+
+def require_admin(
+    credentials: HTTPAuthorizationCredentials | None = Depends(admin_bearer_scheme),
+) -> dict[str, object]:
+    """Refuse par défaut tout accès qui n'est pas un administrateur explicitement autorisé."""
+    if credentials is None:
+        raise ApiError(status.HTTP_403_FORBIDDEN, "Accès refusé", ErrorCode.ADMIN_FORBIDDEN)
+    try:
+        payload = decode_supabase_jwt(
+            credentials.credentials, settings.supabase_jwt_jwks, settings.supabase_url
+        )
+    except ValueError:
+        raise ApiError(
+            status.HTTP_403_FORBIDDEN, "Accès refusé", ErrorCode.ADMIN_FORBIDDEN
+        ) from None
+    sub = payload.get("sub")
+    metadata = payload.get("app_metadata")
+    allowed = {value.strip() for value in settings.admin_user_ids.split(",") if value.strip()}
+    if (
+        not isinstance(sub, str)
+        or not isinstance(metadata, dict)
+        or metadata.get("role") != "admin"
+        or sub not in allowed
+    ):
+        raise ApiError(status.HTTP_403_FORBIDDEN, "Accès refusé", ErrorCode.ADMIN_FORBIDDEN)
+    return {"id": sub}
 
 
 def get_permanent_user(

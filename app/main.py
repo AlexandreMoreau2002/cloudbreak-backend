@@ -19,6 +19,8 @@ from app.api.v1.endpoints.favorites import router as favorites_router
 from app.api.v1.endpoints.validations import router as validations_router
 from app.api.v1.endpoints.internal_maintenance import router as internal_maintenance_router
 from app.api.v1.endpoints.internal_notifications import router as internal_notifications_router
+from app.api.v1.endpoints.internal_admin import router as internal_admin_router
+from app.api.v1.endpoints.admin import router as admin_router
 from app.api.v1.endpoints.subscription import (
     router as subscription_router,
     webhook_router as apple_webhook_router,
@@ -78,6 +80,8 @@ def create_app(environment: str) -> FastAPI:
     application.include_router(apple_webhook_router)
     application.include_router(internal_notifications_router)
     application.include_router(internal_maintenance_router)
+    application.include_router(internal_admin_router)
+    application.include_router(admin_router)
 
     application.add_exception_handler(ApiError, api_error_handler)  # type: ignore[arg-type]
     application.add_exception_handler(OperationalError, db_operational_error_handler)  # type: ignore[arg-type]

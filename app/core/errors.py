@@ -1,3 +1,16 @@
+import json
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def log_server_error(path: str, status: int, exc: BaseException) -> None:
+    """Journalise une erreur 5xx en JSON : jamais de stack trace, ni message d'exception."""
+    logger.error(
+        json.dumps({"level": "error", "path": path, "status": status, "error": type(exc).__name__})
+    )
+
+
 class ApiError(Exception):
     """Erreur API dont le handler conserve le contrat de réponse direct."""
 

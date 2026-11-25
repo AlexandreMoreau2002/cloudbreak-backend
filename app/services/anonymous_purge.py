@@ -28,6 +28,7 @@ from sqlalchemy import Select, func, select, union_all
 from app.models.user import User
 from app.models.favorite import Favorite
 from app.services.quota import QuotaService
+from app.services.daily_stats import record_snapshot
 from app.models.prediction import Prediction
 from app.services.user import delete_user_data
 from app.models.terrain_validation import TerrainValidation
@@ -139,7 +140,12 @@ class _Run:
         self.service_role_key = service_role_key
 
     async def execute(self, now: datetime | None) -> PurgeSummary:
-        cutoff = (now or datetime.now(UTC)) - timedelta(days=self.retention_days)
+        current = now or datetime.now(UTC)
+        cutoff = current - timedelta(days=self.retention_days)
+        if not self.dry_run:
+            # Instantané des compteurs avant suppression : l'historique survit à la purge.
+            await record_snapshot(self.db, current)
+            await self.db.commit()
         candidates = await fetch_candidates(self.db, cutoff, self.max_per_run)
         summary = PurgeSummary(candidates=len(candidates), dry_run=self.dry_run)
         for user_id in candidates:

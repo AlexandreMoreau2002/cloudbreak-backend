@@ -10,6 +10,7 @@ from app.models.cron_heartbeat import CronHeartbeat
 from app.models.prediction import Prediction
 from app.models.subscription import Subscription
 from app.models.user import User
+from app.services import daily_stats
 from app.schemas.admin import ServerMetricsRequest
 
 
@@ -34,6 +35,9 @@ async def build_overview(db: AsyncSession, redis: Redis) -> dict[str, object]:
             Prediction.user_id.in_(select(User.supabase_user_id)),
         )
     )
+    users_total = await count(select(func.count(func.distinct(Prediction.user_id))))
+    # Upsert de l'instantané du jour : committé par l'audit de l'endpoint (même session).
+    await daily_stats.record_snapshot(db, now)
     permanent_7d = await count(
         select(func.count()).select_from(User).where(User.created_at >= seven_days_ago)
     )
@@ -154,19 +158,25 @@ async def build_overview(db: AsyncSession, redis: Redis) -> dict[str, object]:
             continue
         day = created_day.isoformat()
         created_by_day[day] = created_by_day.get(day, 0) + 1
+    snapshots = await daily_stats.snapshots_since(db, window_start)
+    week_ago = snapshots.get(now.date() - timedelta(days=7))
     series = []
+    last_users_total: int | None = None
     for index in range(89, -1, -1):
-        day = (now.date() - timedelta(days=index)).isoformat()
+        day_date = now.date() - timedelta(days=index)
+        day = day_date.isoformat()
         running_total += created_by_day.get(day, 0)
+        last_users_total = snapshots.get(day_date, last_users_total)
         series.append(
             {
                 "date": day,
+                "users_total": users_total if index == 0 else last_users_total,
                 "users_permanent": running_total,
                 "checks": checks.get(day, 0),
             }
         )
 
-    def kpi(value: int, delta_7d: int) -> dict[str, int]:
+    def kpi(value: int, delta_7d: int | None) -> dict[str, int | None]:
         return {"value": value, "delta_7d": delta_7d}
 
     if server["state"] in {"ok", "stale"}:
@@ -189,6 +199,7 @@ async def build_overview(db: AsyncSession, redis: Redis) -> dict[str, object]:
     return {
         "generated_at": now.isoformat(),
         "kpis": {
+            "users_total": kpi(users_total, None if week_ago is None else users_total - week_ago),
             "users_permanent": kpi(permanent, permanent_7d),
             "users_active_30d": kpi(active_30d, 0),
             "subscriptions_active": kpi(active, subscriptions_active_7d),

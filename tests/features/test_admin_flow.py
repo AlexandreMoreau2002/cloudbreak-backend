@@ -15,9 +15,9 @@ def test_admin_overview_writes_an_audit_entry_for_each_successful_call() -> None
     app.dependency_overrides[get_redis] = lambda: AsyncMock()
     response_body = {
         "generated_at": "2026-11-23T00:00:00Z",
-        "kpis": {},
+        "kpis": {"users_total": {"value": 3, "delta_7d": None}},
         "checks_daily": [],
-        "series_90d": [],
+        "series_90d": [{"date": "2026-11-23", "users_total": None}],
         "crons": [],
         "server": {},
     }
@@ -26,6 +26,8 @@ def test_admin_overview_writes_an_audit_entry_for_each_successful_call() -> None
     app.dependency_overrides.clear()
     assert response.status_code == 200
     assert response.json() == response_body
+    assert response.json()["kpis"]["users_total"]["delta_7d"] is None
+    assert "users_total" in response.json()["series_90d"][0]
     db.add.assert_called_once()
     db.commit.assert_awaited_once()
 

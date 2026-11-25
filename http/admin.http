@@ -3,6 +3,9 @@
 @cronSecret = coller-localement-le-secret
 
 ### Overview admin — 200
+# kpis.users_total = {"value": 12, "delta_7d": 3} (delta_7d null sans instantané J-7) :
+# utilisateurs avec au moins un check, anonymes compris (users_permanent = comptes).
+# series_90d[].users_total = entier (dernière valeur connue reportée) ou null avant le premier instantané.
 GET {{baseUrl}}/api/v1/admin/overview
 Authorization: Bearer {{adminToken}}
 

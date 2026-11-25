@@ -2,7 +2,7 @@ import json
 from unittest.mock import AsyncMock
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, date, datetime, timedelta, tzinfo
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from redis.asyncio import Redis
@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.models.peak import Peak
 from app.models.user import User
+from app.models.daily_stat import DailyStat
 from app.services import admin_overview
 from app.models.prediction import Prediction
 from app.models.subscription import Subscription
@@ -119,6 +120,7 @@ async def test_overview_counts_permanent_accounts_and_recent_creations(
     overview = await admin_overview.build_overview(db, redis)
 
     assert overview["kpis"] == {
+        "users_total": {"value": 4, "delta_7d": None},
         "users_permanent": {"value": 6, "delta_7d": 3},
         "users_active_30d": {"value": 2, "delta_7d": 0},
         "subscriptions_active": {"value": 2, "delta_7d": 1},
@@ -396,3 +398,53 @@ async def test_overview_hides_unavailable_server_gauges(
         if expected_history
         else [],
     }
+
+
+async def test_overview_counts_anonymous_users_in_users_total(
+    db: AsyncSession, redis: AsyncMock, peak_id: str
+) -> None:
+    db.add(User(supabase_user_id="acc", auth_provider="email", created_at=NOW))
+    db.add_all(
+        [
+            _prediction(peak_id, "acc", NOW),
+            _prediction(peak_id, "anon-1", NOW),
+            _prediction(peak_id, "anon-2", NOW - timedelta(days=2)),
+        ]
+    )
+    await db.flush()
+
+    overview = await admin_overview.build_overview(db, redis)
+
+    kpis = cast(dict[str, dict[str, int | None]], overview["kpis"])
+    assert kpis["users_total"] == {"value": 3, "delta_7d": None}
+    assert kpis["users_permanent"]["value"] == 1
+
+
+async def test_users_total_delta_uses_snapshot_of_seven_days_ago(
+    db: AsyncSession, redis: AsyncMock, peak_id: str
+) -> None:
+    db.add(DailyStat(day=NOW.date() - timedelta(days=7), users_total=1, accounts_total=0, checks=0))
+    db.add_all(_prediction(peak_id, f"u{n}", NOW) for n in range(4))
+    await db.flush()
+
+    overview = await admin_overview.build_overview(db, redis)
+
+    kpis = cast(dict[str, dict[str, int | None]], overview["kpis"])
+    assert kpis["users_total"] == {"value": 4, "delta_7d": 3}
+
+
+async def test_series_users_total_carries_last_value_and_is_null_before_first_snapshot(
+    db: AsyncSession, redis: AsyncMock
+) -> None:
+    first = NOW.date() - timedelta(days=5)
+    db.add(DailyStat(day=first, users_total=2, accounts_total=0, checks=0))
+    await db.flush()
+
+    overview = await admin_overview.build_overview(db, redis)
+
+    series = cast(list[dict[str, Any]], overview["series_90d"])
+    by_day = {point["date"]: point["users_total"] for point in series}
+    assert by_day[(first - timedelta(days=1)).isoformat()] is None
+    assert by_day[first.isoformat()] == 2
+    assert by_day[(first + timedelta(days=2)).isoformat()] == 2
+    assert by_day[NOW.date().isoformat()] == 0  # instantané du jour écrit par l'appel

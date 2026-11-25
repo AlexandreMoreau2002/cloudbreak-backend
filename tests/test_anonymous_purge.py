@@ -1,6 +1,7 @@
 """Tests du service de purge des comptes anonymes inactifs."""
 
 import pytest
+from collections.abc import Iterator
 from sqlalchemy.dialects import postgresql
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, call, patch
@@ -18,6 +19,12 @@ NOW = datetime(2026, 10, 27, 4, 0, tzinfo=UTC)
 MODULE = "app.services.anonymous_purge"
 URL = "https://supabase.test"
 KEY = "service-role"
+
+
+@pytest.fixture(autouse=True)
+def snapshot() -> Iterator[AsyncMock]:
+    with patch(f"{MODULE}.record_snapshot", new=AsyncMock()) as record:
+        yield record
 
 
 def _db(user_ids: list[str]) -> AsyncMock:
@@ -521,3 +528,46 @@ async def test_lock_release_failure_does_not_break_a_successful_run(
     assert summary.candidates == 0
     assert any(r.message == "anonymous_purge_lock_release_failed" for r in caplog.records)
     assert redis.set_calls[0][1] not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_real_purge_records_the_snapshot_and_commits_before_deleting(
+    snapshot: AsyncMock,
+) -> None:
+    db = _db(["anon-1"])
+    order: list[str] = []
+    snapshot.side_effect = lambda *args: order.append("snapshot")
+    db.commit.side_effect = lambda: order.append("commit")
+
+    async def _delete(*args: object) -> None:
+        order.append("delete")
+
+    with (
+        patch(f"{MODULE}.get_supabase_user", new=AsyncMock(return_value=None)),
+        patch(f"{MODULE}.delete_user_data", new=AsyncMock(side_effect=_delete)),
+        patch(f"{MODULE}.QuotaService") as quota_cls,
+    ):
+        quota_cls.return_value.delete_user_keys = AsyncMock()
+        await purge_inactive_anonymous_accounts(
+            db,
+            AsyncMock(),
+            retention_days=30,
+            max_per_run=200,
+            dry_run=False,
+            supabase_url=URL,
+            service_role_key=KEY,
+            now=NOW,
+        )
+
+    snapshot.assert_awaited_once_with(db, NOW)
+    assert order[:3] == ["snapshot", "commit", "delete"]
+
+
+@pytest.mark.asyncio
+async def test_dry_run_does_not_record_a_snapshot(snapshot: AsyncMock) -> None:
+    db = _db(["anon-1"])
+
+    await _run(db, dry_run=True, supabase={"anon-1": {"is_anonymous": True}})
+
+    snapshot.assert_not_awaited()
+    db.commit.assert_not_awaited()

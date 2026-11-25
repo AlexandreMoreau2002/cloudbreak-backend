@@ -1,0 +1,69 @@
+# Score mer de nuage — tests manuels
+#
+# Prérequis dans .vscode/settings.json > rest-client.environmentVariables > local :
+#   "baseUrl": "http://localhost:8000"
+#   "jwt": "<token Supabase — copié depuis les logs mobile>"
+#
+# IDs réels en DB (UUID5 générés depuis le slug) :
+#   Mont Blanc              : 95b3d052-884a-59f4-8509-5e4869f0b468  (4807m)
+#   Pic du Midi de Bigorre  : dce6fffe-591e-5c14-80e2-1d3927fde489  (2877m)
+#   Mont Ventoux            : 0728f7c7-a0c9-5fb0-b87d-d9edc8696840  (1910m)
+#   Puy de Dôme             : 42cd96c1-c2c0-5cd0-8534-3931e696790b  (1464m)
+#   La Bastille (Grenoble)  : 90c1a7f5-5d75-5785-80c3-3230aa1cbfe0  (476m)
+#
+# 💡 Astuce : récupère un peak_id via GET /api/v1/peaks/search?q=nom
+
+
+###
+# ✅ Score Puy de Dôme — heure par défaut (6h matin, idéal mer de nuage)
+GET {{baseUrl}}/api/v1/score?peak_id=42cd96c1-c2c0-5cd0-8534-3931e696790b&date=2026-03-22
+Authorization: Bearer {{jwt}}
+
+###
+# ✅ Score Puy de Dôme — heure personnalisée (8h)
+GET {{baseUrl}}/api/v1/score?peak_id=42cd96c1-c2c0-5cd0-8534-3931e696790b&date=2026-03-22&hour=8
+Authorization: Bearer {{jwt}}
+
+###
+# ✅ Score Mont Ventoux
+GET {{baseUrl}}/api/v1/score?peak_id=0728f7c7-a0c9-5fb0-b87d-d9edc8696840&date=2026-03-22
+Authorization: Bearer {{jwt}}
+
+###
+# ✅ Score Mont Blanc (4807m — très haut, mer de nuage rare)
+GET {{baseUrl}}/api/v1/score?peak_id=95b3d052-884a-59f4-8509-5e4869f0b468&date=2026-03-22
+Authorization: Bearer {{jwt}}
+
+###
+# ✅ Score Pic du Midi de Bigorre (2877m)
+GET {{baseUrl}}/api/v1/score?peak_id=dce6fffe-591e-5c14-80e2-1d3927fde489&date=2026-03-22
+Authorization: Bearer {{jwt}}
+
+###
+# ✅ Score La Bastille Grenoble (476m — viewpoint urbain)
+GET {{baseUrl}}/api/v1/score?peak_id=90c1a7f5-5d75-5785-80c3-3230aa1cbfe0&date=2026-03-22
+Authorization: Bearer {{jwt}}
+
+###
+# ❌ Sans JWT → 403
+GET {{baseUrl}}/api/v1/score?peak_id=42cd96c1-c2c0-5cd0-8534-3931e696790b&date=2026-03-22
+
+###
+# ❌ Token invalide → 403
+GET {{baseUrl}}/api/v1/score?peak_id=42cd96c1-c2c0-5cd0-8534-3931e696790b&date=2026-03-22
+Authorization: Bearer token.invalide.ici
+
+###
+# ❌ Peak introuvable → 404
+GET {{baseUrl}}/api/v1/score?peak_id=00000000-0000-0000-0000-000000000000&date=2026-03-22
+Authorization: Bearer {{jwt}}
+
+###
+# ❌ Date manquante → 422
+GET {{baseUrl}}/api/v1/score?peak_id=42cd96c1-c2c0-5cd0-8534-3931e696790b
+Authorization: Bearer {{jwt}}
+
+###
+# ❌ Heure hors limites (hour=25) → 422
+GET {{baseUrl}}/api/v1/score?peak_id=42cd96c1-c2c0-5cd0-8534-3931e696790b&date=2026-03-22&hour=25
+Authorization: Bearer {{jwt}}

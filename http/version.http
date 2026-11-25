@@ -1,0 +1,17 @@
+@localBaseUrl = http://localhost:8000
+@devBaseUrl = https://dev-api.cloudbreak-app.com
+
+### Build local
+# Attendu sans métadonnées : 200, sha "unknown", built_at et tag null.
+GET {{localBaseUrl}}/version
+Accept: application/json
+
+### Build dev
+# Attendu : 200, cinq champs ; sha et built_at du build, tag éventuel.
+GET {{devBaseUrl}}/version
+Accept: application/json
+
+### Vérifier le chemin racine
+# Attendu : 404.
+GET {{localBaseUrl}}/api/v1/version
+Accept: application/json

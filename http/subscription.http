@@ -1,0 +1,64 @@
+### StoreKit 2 subscription verification — use only non-production test JWS values.
+@baseUrl = http://localhost:8000
+@token = {{$dotenv CLOUDBREAK_JWT}}
+@placeholderJws = NOT_A_REAL_APPLE_JWS__REPLACE_WITH_SANDBOX_TRANSACTION
+@placeholderNotificationJws = NOT_A_REAL_APPLE_NOTIFICATION_JWS__REPLACE_WITH_SANDBOX_EVENT
+
+### Current entitlement — free/no subscription is { plan: free, status: none }.
+GET {{baseUrl}}/api/v1/user/subscription
+Authorization: Bearer {{token}}
+
+### Apple Server Notifications V2. Public endpoint; replace only locally with a signed Sandbox payload.
+POST {{baseUrl}}/api/v1/webhooks/apple
+Content-Type: application/json
+
+{
+  "signedPayload": "{{placeholderNotificationJws}}"
+}
+
+### Invalid notification — expected 400 APPLE_TRANSACTION_INVALID and no entitlement change.
+POST {{baseUrl}}/api/v1/webhooks/apple
+Content-Type: application/json
+
+{
+  "signedPayload": "malformed-but-long-enough-to-reach-the-verifier"
+}
+
+### Nominal Sandbox verification. Replace placeholder locally; never commit a real JWS.
+POST {{baseUrl}}/api/v1/user/subscription/verify
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "signed_transaction": "{{placeholderJws}}"
+}
+
+### No authorization — expected 403.
+POST {{baseUrl}}/api/v1/user/subscription/verify
+Content-Type: application/json
+
+{
+  "signed_transaction": "{{placeholderJws}}"
+}
+
+### Malformed JWS — expected 400 APPLE_TRANSACTION_INVALID.
+POST {{baseUrl}}/api/v1/user/subscription/verify
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "signed_transaction": "malformed-but-long-enough-to-reach-the-verifier"
+}
+
+### Reuse the exact valid Sandbox JWS above — same account is idempotent; another account is 409.
+POST {{baseUrl}}/api/v1/user/subscription/verify
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "signed_transaction": "{{placeholderJws}}"
+}
+
+### Expired plan check: after an expiry or server notification, GET must return status expired.
+GET {{baseUrl}}/api/v1/user/subscription
+Authorization: Bearer {{token}}

@@ -1,0 +1,10 @@
+{
+  "rest-client.environmentVariables": {
+    "local": {
+      "baseUrl": "http://localhost:8000",
+      "supabaseUrl": "https://<project>.supabase.co",
+      "supabaseKey": "<supabase-publishable-key>",
+      "jwt": ""
+    }
+  }
+}

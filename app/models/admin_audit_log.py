@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import Column, DateTime, String
+from sqlalchemy import Column, DateTime, Integer, String
 
 from app.db.session import Base
 
@@ -13,3 +13,7 @@ class AdminAuditLog(Base):
     resource = Column(String(100), nullable=False)
     occurred_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
     result = Column(String(20), nullable=False)
+    # Cible d'une action sur un compte : jamais d'email en clair, seulement son HMAC.
+    target_hash = Column(String(64), nullable=True)
+    target_user_id = Column(String(255), nullable=True)
+    grant_days = Column(Integer, nullable=True)

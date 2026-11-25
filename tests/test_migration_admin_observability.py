@@ -28,3 +28,25 @@ def test_empty_postgresql_gains_admin_tables_at_revision_c3d4e5f6a7b8(
     upgrade_postgresql("c3d4e5f6a7b8")
 
     assert asyncio.run(_tables(postgresql_database_url)) == before | admin_tables
+
+
+async def _columns(url: URL, table: str) -> set[str]:
+    engine = create_async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            return await connection.run_sync(
+                lambda conn: {c["name"] for c in inspect(conn).get_columns(table)}
+            )
+    finally:
+        await engine.dispose()
+
+
+def test_revision_d9e0f1a2b3c4_adds_origin_and_audit_target_columns(
+    postgresql_database_url: URL, upgrade_postgresql: Callable[[str], None]
+) -> None:
+    upgrade_postgresql("c4d5e6f7a8b9")
+    assert "origin" not in asyncio.run(_columns(postgresql_database_url, "subscriptions"))
+    upgrade_postgresql("d9e0f1a2b3c4")
+    assert "origin" in asyncio.run(_columns(postgresql_database_url, "subscriptions"))
+    audit = asyncio.run(_columns(postgresql_database_url, "admin_audit_log"))
+    assert {"target_hash", "target_user_id", "grant_days"} <= audit

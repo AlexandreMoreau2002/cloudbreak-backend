@@ -33,3 +33,71 @@ X-Cron-Secret: {{cronSecret}}
 Content-Type: application/json
 
 {}
+
+### Recherche par email exact — 200 (jamais l'email dans la réponse)
+POST {{baseUrl}}/api/v1/admin/users/lookup
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"email":"utilisateur@example.com"}
+
+### Recherche — compte introuvable — 404 ADMIN_USER_NOT_FOUND
+POST {{baseUrl}}/api/v1/admin/users/lookup
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"email":"inconnu@example.com"}
+
+### Recherche — email invalide ou partiel — 422
+POST {{baseUrl}}/api/v1/admin/users/lookup
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"email":"utilisateur"}
+
+### Recherche sans token — 403 ADMIN_FORBIDDEN
+POST {{baseUrl}}/api/v1/admin/users/lookup
+Content-Type: application/json
+
+{"email":"utilisateur@example.com"}
+
+### Recherche avec un JWT non admin — 403 ADMIN_FORBIDDEN
+POST {{baseUrl}}/api/v1/admin/users/lookup
+Authorization: Bearer {{nonAdminToken}}
+Content-Type: application/json
+
+{"email":"utilisateur@example.com"}
+
+### Offrir Premium 30 jours (user_id issu de la recherche) — 200, origin "granted"
+POST {{baseUrl}}/api/v1/admin/users/grant-premium
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"user_id":"coller-le-user-id","days":30}
+
+### Offrir — durée invalide (0 ou > 366) — 422
+POST {{baseUrl}}/api/v1/admin/users/grant-premium
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"user_id":"coller-le-user-id","days":0}
+
+### Offrir — abonnement Apple actif — 409 ADMIN_APPLE_SUBSCRIPTION_ACTIVE
+POST {{baseUrl}}/api/v1/admin/users/grant-premium
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"user_id":"id-d-un-abonne-apple","days":30}
+
+### Offrir — compte inconnu — 404 ADMIN_USER_NOT_FOUND
+POST {{baseUrl}}/api/v1/admin/users/grant-premium
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"user_id":"inconnu","days":30}
+
+### Offrir sans token — 403 ADMIN_FORBIDDEN
+POST {{baseUrl}}/api/v1/admin/users/grant-premium
+Content-Type: application/json
+
+{"user_id":"x","days":30}

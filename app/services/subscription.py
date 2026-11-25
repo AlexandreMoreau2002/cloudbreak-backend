@@ -174,6 +174,7 @@ async def apply_verified_transaction(
                 db.add(subscription)
             subscription_values = cast(Any, subscription)
             subscription_values.plan = "premium"
+            subscription_values.origin = "apple"
             subscription_values.status = transaction.status
             subscription_values.expires_at = transaction.expires_at
             subscription_values.apple_period_expires_at = transaction.expires_at
@@ -288,6 +289,7 @@ async def apply_apple_notification(
             if should_project:
                 subscription_values = cast(Any, subscription)
                 subscription_values.plan = "premium"
+                subscription_values.origin = "apple"
                 subscription_values.status = target_status
                 subscription_values.expires_at = effective_expiry
                 subscription_values.apple_period_expires_at = transaction.expires_at

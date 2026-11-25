@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     anon_retention_days: int = 30
     anon_purge_max_per_run: int = 200
     environment: str = "development"
-    app_version: str = "1.1.0"
+    app_version: str = "1.1.1"
     git_sha: str = ""
     built_at: str = ""
     git_tag: str = ""

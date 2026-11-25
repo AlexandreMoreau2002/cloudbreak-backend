@@ -2,6 +2,7 @@ import json
 from unittest.mock import AsyncMock
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, date, datetime, timedelta, tzinfo
+from typing import cast
 
 import pytest
 from redis.asyncio import Redis
@@ -123,6 +124,23 @@ async def test_overview_counts_permanent_accounts_and_recent_creations(
         "subscriptions_active": {"value": 2, "delta_7d": 1},
         "subscriptions_trial": {"value": 3, "delta_7d": 2},
     }
+
+
+async def test_active_30d_ignores_predictions_of_users_missing_from_users_table(
+    db: AsyncSession, redis: AsyncMock, peak_id: str
+) -> None:
+    db.add(User(supabase_user_id="known", auth_provider="email", created_at=NOW))
+    db.add_all(
+        _prediction(peak_id, user_id, NOW - timedelta(days=1))
+        for user_id in ["known", "known", "anonymous-session", "deleted-account"]
+    )
+    await db.flush()
+
+    overview = await admin_overview.build_overview(db, redis)
+
+    kpis = cast(dict[str, dict[str, int]], overview["kpis"])
+    assert kpis["users_active_30d"] == {"value": 1, "delta_7d": 0}
+    assert kpis["users_active_30d"]["value"] <= kpis["users_permanent"]["value"]
 
 
 async def test_overview_returns_all_fourteen_check_dates_on_empty_database(

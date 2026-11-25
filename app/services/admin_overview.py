@@ -29,7 +29,9 @@ async def build_overview(db: AsyncSession, redis: Redis) -> dict[str, object]:
     )
     active_30d = await count(
         select(func.count(func.distinct(Prediction.user_id))).where(
-            Prediction.created_at >= now - timedelta(days=30)
+            Prediction.created_at >= now - timedelta(days=30),
+            # Comptes de `users` seulement : exclut les sessions anonymes et les comptes supprimés.
+            Prediction.user_id.in_(select(User.supabase_user_id)),
         )
     )
     permanent_7d = await count(

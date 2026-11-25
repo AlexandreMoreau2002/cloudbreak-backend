@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import Column, DateTime, String
+from sqlalchemy import Column, DateTime, String, text
 
 from app.db.session import Base
 
@@ -16,6 +16,8 @@ class Subscription(Base):
     plan = Column(String(50), default="free")  # free | premium | pro
     status = Column(String(50), default="none")  # none | trial | active | expired | revoked
     expires_at = Column(DateTime(timezone=True), nullable=True)
+    # apple = achat StoreKit | granted = offert par un admin (jamais sur un Apple actif)
+    origin = Column(String(20), nullable=False, default="apple", server_default=text("'apple'"))
     apple_period_expires_at = Column(DateTime(timezone=True), nullable=True)
     original_transaction_id = Column(String(255), nullable=True, unique=True)
     latest_transaction_id = Column(String(255), nullable=True, unique=True)

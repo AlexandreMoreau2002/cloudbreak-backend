@@ -961,3 +961,35 @@ PostHog sans profils comme défense supplémentaire lors de la recette dev/TestF
 Une allowlist vide refuse tout accès. Les lectures autorisées sont auditées
 sans email, secret ni autre donnée personnelle. Les routes `/internal/*`
 restent isolées par `X-Cron-Secret`; le secret ne doit jamais être committé.
+
+## Console admin v1 — recherche par email et octroi Premium (story 10.5)
+
+**Surface ajoutée** : `POST /api/v1/admin/users/lookup` (email exact dans le **corps**, jamais dans
+l'URL) et `POST /api/v1/admin/users/grant-premium` (`user_id`, `days` 1–366). Mêmes garde-fous que
+l'overview : JWT Supabase valide, `app_metadata.role=admin` **et** `sub ∈ ADMIN_USER_IDS`
+(`require_admin`), sinon `403 ADMIN_FORBIDDEN`.
+
+**Exception à « l'email n'est jamais exposé ni loggé »** : l'email n'est *lu* que pour comparer à
+`users.email` (égalité exacte, insensible à la casse). Il n'est jamais renvoyé (la réponse porte
+`user_id`, plan, statut, `expires_at`, `origin`), jamais écrit dans l'audit, jamais loggé. Aucune
+liste d'utilisateurs, aucune recherche partielle.
+
+**Audit** (`admin_audit_log`, colonnes `target_hash`, `target_user_id`, `grant_days`) : une ligne par
+appel (`user.lookup` : `success` / `not_found` ; `subscription.grant` : `success` / `conflict` /
+`not_found`), écrite dans la même transaction que l'octroi. `target_hash` = **HMAC-SHA256** de
+l'email normalisé (minuscules, sans espaces), clé serveur `AUDIT_HASH_KEY`. Choix : HMAC plutôt
+qu'un SHA-256 salé, car un email est de faible entropie : sans la clé, impossible de retrouver
+l'email par dictionnaire à partir d'une fuite de la table. Contrepartie : tourner la clé rompt la
+corrélation des anciennes lignes (acceptable). `AUDIT_HASH_KEY` vide → `503 ADMIN_AUDIT_DISABLED` :
+on refuse plutôt que d'agir sans audit sûr.
+
+**Octroi** : `plan="premium"`, `status="active"`, `origin="granted"` (nouvelle colonne
+`subscriptions.origin`, `apple` par défaut). Premium actif reste `status ∈ {trial, active}` ET
+`expires_at` futur (`entitlement.py`). Un octroi sur un Premium `granted` encore actif **prolonge**
+(`expires_at + days`) ; sinon il part de maintenant. Un abonnement `apple` actif n'est **jamais**
+écrasé : `409 ADMIN_APPLE_SUBSCRIPTION_ACTIVE`. Un achat/renouvellement Apple ultérieur repasse
+la ligne en `origin="apple"` (l'achat réel prime).
+
+**Limites connues** : pas de rate limit dédié (surface réservée à l'allowlist) ; l'octroi sur une
+ligne Apple expirée garde ses identifiants de transaction ; un évènement Apple tardif du même
+cycle peut redonner la main à Apple, ce qui est voulu.

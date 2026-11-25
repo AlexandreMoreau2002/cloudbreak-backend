@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     expo_access_token: str = ""
     internal_cron_secret: str = ""
     admin_user_ids: str = ""
+    # Clé HMAC du hachage d'email dans l'audit admin (jamais d'email en clair). Vide = désactivé.
+    audit_hash_key: str = ""
     supabase_service_role_key: str = ""
     # Purge des comptes anonymes inactifs (POST /internal/maintenance/purge-anonymous).
     anon_retention_days: int = 30

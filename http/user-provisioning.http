@@ -1,0 +1,97 @@
+### Variables: inject a permanent Supabase JWT locally; never commit tokens.
+@baseUrl = http://localhost:8000
+@token = {{$dotenv CLOUDBREAK_JWT}}
+
+### Permanent account: get-or-create (idempotent)
+POST {{baseUrl}}/api/v1/user/provision
+Authorization: Bearer {{token}}
+
+### Repeat: same profile and same supabase_user_id
+POST {{baseUrl}}/api/v1/user/provision
+Authorization: Bearer {{token}}
+
+### Current account and survey state
+GET {{baseUrl}}/api/v1/user/me
+Authorization: Bearer {{token}}
+
+### Survey persistence: first answer (use a fresh permanent account)
+# Expected: 200, survey_completed_at set, app_store / hiker / false returned.
+PATCH {{baseUrl}}/api/v1/user/survey
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "acquisition_source": "app_store",
+  "practice": "hiker",
+  "newsletter_opt_in": false,
+  "skipped": false
+}
+
+### Survey persistence: second answer is ignored (terminal state)
+# Expected: 200 with the exact values and survey_completed_at from the first request.
+PATCH {{baseUrl}}/api/v1/user/survey
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "acquisition_source": "instagram",
+  "practice": "photographer",
+  "newsletter_opt_in": true,
+  "skipped": false
+}
+
+### Survey persistence: read the terminal state
+# Expected: the survey_completed_at from the first request and survey_skipped_at null.
+GET {{baseUrl}}/api/v1/user/me
+Authorization: Bearer {{token}}
+
+### Or skip it (terminal and idempotent)
+PATCH {{baseUrl}}/api/v1/user/survey
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"skipped": true}
+
+### Newsletter consent — withdraw (RGPD, always mutable, unlike the survey)
+PATCH {{baseUrl}}/api/v1/user/preferences
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"newsletter_opt_in": false}
+
+### Newsletter consent — grant again
+PATCH {{baseUrl}}/api/v1/user/preferences
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"newsletter_opt_in": true}
+
+### Preferences without Authorization: expected 403
+PATCH {{baseUrl}}/api/v1/user/preferences
+Content-Type: application/json
+
+{"newsletter_opt_in": false}
+
+### Preferences with unknown field: expected 422
+PATCH {{baseUrl}}/api/v1/user/preferences
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"unexpected": true}
+
+### Anonymous JWT: expected 403 ACCOUNT_REQUIRED
+# POST {{baseUrl}}/api/v1/user/provision
+# Authorization: Bearer <anonymous-jwt>
+
+### Delete account (RGPD: local users/data first, then auth.users)
+# DELETE {{baseUrl}}/api/v1/user
+# Authorization: Bearer {{token}}
+
+### Dev only: reset the survey (404 when ENVIRONMENT=production)
+# Expected: 200, survey_completed_at and survey_skipped_at null. Then PATCH /survey is accepted again.
+POST {{baseUrl}}/api/v1/user/survey/reset
+Authorization: Bearer {{token}}
+
+### Reset without Authorization
+# Expected: 403
+POST {{baseUrl}}/api/v1/user/survey/reset

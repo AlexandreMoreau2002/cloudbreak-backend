@@ -1,0 +1,56 @@
+### Variables: inject a permanent Supabase JWT locally; never commit tokens.
+@baseUrl = http://localhost:8000
+@token = {{$dotenv CLOUDBREAK_JWT}}
+@anonymousToken = {{$dotenv CLOUDBREAK_ANONYMOUS_JWT}}
+
+### Enregistrer le token (nominal) — 204
+POST {{baseUrl}}/api/v1/user/push-token
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "push_token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" }
+
+### Avec la langue de l'app — 204
+POST {{baseUrl}}/api/v1/user/push-token
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "push_token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]", "locale": "en" }
+
+### Langue non supportée — 422
+POST {{baseUrl}}/api/v1/user/push-token
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "push_token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]", "locale": "de" }
+
+### Format invalide — 422
+POST {{baseUrl}}/api/v1/user/push-token
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "push_token": "nope" }
+
+### Compte anonyme — 403 ACCOUNT_REQUIRED
+POST {{baseUrl}}/api/v1/user/push-token
+Authorization: Bearer {{anonymousToken}}
+Content-Type: application/json
+
+{ "push_token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" }
+
+### Sans Authorization — 403
+POST {{baseUrl}}/api/v1/user/push-token
+Content-Type: application/json
+
+{ "push_token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" }
+
+### Désinscrire le token — 204
+DELETE {{baseUrl}}/api/v1/user/push-token
+Authorization: Bearer {{token}}
+
+### Rate-limit — 11e POST dans la même minute → 429 RATE_LIMIT_EXCEEDED (limite : 10/min/utilisateur en production, 1000 en dev)
+POST {{baseUrl}}/api/v1/user/push-token
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "push_token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" }

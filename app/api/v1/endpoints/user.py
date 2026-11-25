@@ -1,0 +1,194 @@
+import logging
+from redis.asyncio import Redis
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.session import get_db
+from app.core.config import settings
+from app.core.errors import ApiError, ErrorCode
+from app.services.analytics import track
+from app.services.quota import QuotaService
+from app.core.security import delete_supabase_user
+from app.services.rate_limit import RateLimitExceededException, RateLimitService
+from app.core.dependencies import get_current_user, get_permanent_user, get_redis
+from app.schemas.user import (
+    UserProfile,
+    SurveyUpdate,
+    PushTokenUpdate,
+    DisplayNameUpdate,
+    PreferencesUpdate,
+    NotificationPreferencesUpdate,
+)
+from app.services.user import (
+    provision_user,
+    set_push_token,
+    clear_push_token,
+    get_user_profile,
+    delete_user_data,
+    reset_user_survey,
+    update_user_survey,
+    update_user_display_name,
+    update_user_preferences,
+    update_user_notification_preferences,
+)
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/v1/user", tags=["user"])
+
+
+@router.get("/me")
+async def get_me(
+    current_user: dict[str, object] = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, object]:
+    profile = None
+    if not bool(current_user.get("is_anonymous", False)):
+        profile = await get_user_profile(str(current_user["id"]), db)
+    return {
+        **current_user,
+        "is_anonymous": bool(current_user.get("is_anonymous", False)),
+        "provisioned": profile is not None,
+        "display_name": profile.display_name if profile else None,
+        "survey_completed_at": profile.survey_completed_at if profile else None,
+        "survey_skipped_at": profile.survey_skipped_at if profile else None,
+        "newsletter_opt_in": profile.newsletter_opt_in if profile else None,
+        "notif_favorites": profile.notif_favorites if profile else True,
+        "notif_regional": profile.notif_regional if profile else True,
+        "notif_terrain": profile.notif_terrain if profile else True,
+    }
+
+
+@router.post("/provision", response_model=UserProfile)
+async def provision(
+    current_user: dict[str, object] = Depends(get_permanent_user),
+    db: AsyncSession = Depends(get_db),
+) -> object:
+    profile = await provision_user(current_user, db)
+    await db.commit()
+    return profile
+
+
+@router.patch("/display-name", response_model=UserProfile)
+async def display_name(
+    payload: DisplayNameUpdate,
+    current_user: dict[str, object] = Depends(get_permanent_user),
+    db: AsyncSession = Depends(get_db),
+) -> object:
+    profile = await update_user_display_name(current_user, payload, db)
+    await db.commit()
+    return profile
+
+
+@router.patch("/survey", response_model=UserProfile)
+async def survey(
+    payload: SurveyUpdate,
+    current_user: dict[str, object] = Depends(get_permanent_user),
+    db: AsyncSession = Depends(get_db),
+) -> object:
+    profile = await update_user_survey(current_user, payload, db)
+    await db.commit()
+    return profile
+
+
+@router.post("/survey/reset", response_model=UserProfile)
+async def reset_survey(
+    current_user: dict[str, object] = Depends(get_permanent_user),
+    db: AsyncSession = Depends(get_db),
+) -> object:
+    """Outil de dev : remet le sondage à zéro. Inexistant (404) en production."""
+    if settings.environment.strip().lower() == "production":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"detail": "Introuvable", "code": ErrorCode.NOT_FOUND},
+        )
+    profile = await reset_user_survey(current_user, db)
+    await db.commit()
+    logger.info("survey_reset", extra={"user_id": str(current_user["id"])})
+    return profile
+
+
+@router.patch("/preferences", response_model=UserProfile)
+async def preferences(
+    payload: PreferencesUpdate,
+    current_user: dict[str, object] = Depends(get_permanent_user),
+    db: AsyncSession = Depends(get_db),
+) -> object:
+    """Met à jour le consentement newsletter (RGPD — retrait de consentement à tout moment)."""
+    profile = await update_user_preferences(current_user, payload, db)
+    await db.commit()
+    return profile
+
+
+@router.patch("/notifications", response_model=UserProfile)
+async def notifications(
+    payload: NotificationPreferencesUpdate,
+    current_user: dict[str, object] = Depends(get_permanent_user),
+    db: AsyncSession = Depends(get_db),
+) -> object:
+    """Met à jour une ou plusieurs préférences de notification (update partiel)."""
+    profile = await update_user_notification_preferences(current_user, payload, db)
+    await db.commit()
+    return profile
+
+
+@router.post("/push-token", status_code=204)
+async def register_push_token(
+    payload: PushTokenUpdate,
+    current_user: dict[str, object] = Depends(get_permanent_user),
+    redis: Redis = Depends(get_redis),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Enregistre le token Expo Push de l'appareil (jamais loggué)."""
+    try:
+        await RateLimitService(redis).check_push_token(str(current_user["id"]))
+    except RateLimitExceededException:
+        logger.warning("push_token_rate_limited", extra={"user_id": str(current_user["id"])})
+        raise ApiError(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Trop de requêtes",
+            ErrorCode.RATE_LIMIT_EXCEEDED,
+        ) from None
+    await set_push_token(current_user, payload.push_token, db, payload.locale)
+    await db.commit()
+    logger.info("push_token_registered", extra={"user_id": str(current_user["id"])})
+
+
+@router.delete("/push-token", status_code=204)
+async def unregister_push_token(
+    current_user: dict[str, object] = Depends(get_permanent_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Retire le token push (déconnexion) pour que l'appareil ne reçoive plus d'alertes."""
+    await clear_push_token(current_user, db)
+    await db.commit()
+    logger.info("push_token_cleared", extra={"user_id": str(current_user["id"])})
+
+
+@router.delete("", status_code=204)
+async def delete_user(
+    current_user: dict[str, object] = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+) -> None:
+    """Supprime le compte utilisateur et toutes ses données (RGPD).
+
+    Ouvert à tout utilisateur authentifié, session anonyme comprise (droit à l'effacement).
+    Ordre : données DB, clés quota Redis (best-effort), compte Supabase ensuite.
+    Retourne 204 No Content en cas de succès.
+    """
+    user_id = str(current_user["id"])
+    try:
+        await RateLimitService(redis).check_delete_account(user_id)
+    except RateLimitExceededException:
+        logger.warning("delete_account_rate_limited", extra={"user_id": user_id})
+        raise ApiError(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Trop de requêtes",
+            ErrorCode.RATE_LIMIT_EXCEEDED,
+        ) from None
+    await delete_user_data(user_id, db)
+    await QuotaService(redis).delete_user_keys(user_id)
+    await delete_supabase_user(user_id, settings.supabase_url, settings.supabase_service_role_key)
+    logger.info("user_deleted", extra={"user_id": user_id})
+    track("account_deleted", user_id)

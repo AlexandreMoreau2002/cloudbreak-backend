@@ -1,0 +1,12 @@
+### Apple Server Notifications V2 — DEV Sandbox callback shape.
+### This placeholder is deliberately invalid: expect 400 APPLE_TRANSACTION_INVALID.
+### A valid signed test must come from Apple; never commit a real JWS or copy it into this file.
+@baseUrl = https://dev-api.cloudbreak-app.com
+@signedPayload = REPLACE_WITH_A_SHORT_LIVED_APPLE_TEST_PAYLOAD_DO_NOT_COMMIT
+
+POST {{baseUrl}}/api/v1/webhooks/apple
+Content-Type: application/json
+
+{
+  "signedPayload": "{{signedPayload}}"
+}
